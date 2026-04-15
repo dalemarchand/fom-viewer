@@ -1,0 +1,17 @@
+{
+  "name": "fom-viewer-tests",
+  "version": "1.0.0",
+  "description": "Browser automation tests for FOM Viewer",
+  "main": "run.js",
+  "scripts": {
+    "test": "node run.js",
+    "test:visible": "node run.js --visible",
+    "test:debug": "node run.js --visible --timeout 30000"
+  },
+  "keywords": ["fom", "hla", "testing"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer-core": "^21.0.0"
+  }
+}
