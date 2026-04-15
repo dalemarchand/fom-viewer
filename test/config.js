@@ -6,7 +6,7 @@ const config = {
     baseUrl: `file://${path.resolve(__dirname, '../fom-viewer.html')}`
   },
   test: {
-    fomDir: path.resolve(__dirname, 'fom'),
+    fomDir: path.resolve(__dirname, '../fom'),
     timeout: 10000,
     waitForSelector: 2000
   },
@@ -37,7 +37,9 @@ const config = {
     'RPR-Physical_v3.0.xml',
     'RPR-Enumerations_v3.0.xml',
     'RPR-Base_v3.0.xml',
-    'RPR-Aggregate_v3.0.xml'
+    'RPR-Aggregate_v3.0.xml',
+    'RPR-Communication_v3.0.xml',
+    'RPR-DER_v3.0.xml'
   ]
 };
 
