@@ -6,7 +6,7 @@ const config = {
     baseUrl: `file://${path.resolve(__dirname, '../fom-viewer.html')}`
   },
   test: {
-    fomDir: path.resolve(__dirname, '../fom'),
+    fomDir: path.resolve(__dirname, 'fom'),
     timeout: 10000,
     waitForSelector: 2000
   },

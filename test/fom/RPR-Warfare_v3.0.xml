@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>SISO-STD-001.1-2025 - Real-time Platform Reference Warfare FOM Module</name>
+        <type>FOM</type>
+        <version>3.0</version>
+        <modificationDate>2025-11-04</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>The RPR FOM supports interoperability for real-time, platform oriented defense simulation.</purpose>
+        <applicationDomain>All domains</applicationDomain>
+        <description>Represents the firing of munitions and expendables and detonation, explosion, burst, or ignition of munitions, non-munitions, and expendables.</description>
+        <useLimitation></useLimitation>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>RPR FOM Product Development Group</pocName>
+            <pocOrg>SISO - Simulation Interoperability Standards Organization</pocOrg>
+            <pocEmail>prowe@sisostandards.org</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Text Document</type>
+            <identification>Standard for Guidance, Rationale, and Interoperability Modalities for the Real-time Platform Reference Federation Object Model (RPR FOM)
+SISO-STD-001-2025
+4 November 2025</identification>
+        </reference>
+        <reference>
+            <type>Text Document</type>
+            <identification>IEEE Standard for Distributed Interactive Simulation - Application Protocols
+IEEE Std 1278.1-2012
+19 December 2012</identification>
+        </reference>
+        <other>Copyright © 2025 by the Simulation Interoperability Standards Organization, Inc.
+7901 4th St N, Suite 300-4043
+St Petersburg FL 33702 USA
+
+All rights reserved.
+
+Schema and API: SISO hereby grants a general, royalty-free license to copy, distribute, display, and make derivative works from this material, for all purposes, provided that any use of the material contains the following attribution: “Reprinted with permission from SISO Inc.” Should a reader require additional information, contact the SISO Inc. Board of Directors.
+
+Documentation: SISO hereby grants a general, royalty-free license to copy, distribute, display, and make derivative works from this material, for noncommercial purposes, provided that any use of the material contains the following attribution: “Reprinted with permission from SISO Inc.” The material may not be used for a commercial purpose without express written permission from the SISO Inc. Board of Directors.
+
+SISO Inc. Board of Directors
+7901 4th St N, Suite 300-4043
+St Petersburg FL 33702 USA
+</other>
+        <glyph type="png" height="64" width="64" alt="">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</glyph>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+            <objectClass>
+                <name>DirectedEnergyFire</name>
+                <sharing>PublishSubscribe</sharing>
+                <semantics>Communicates information associated with the firing of a DE weapon.</semantics>
+                <attribute notes="RPRnoteWarfare1">
+                    <name>FiringObjectIdentifier</name>
+                    <dataType>RTIobjectId</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The object instance ID of the firing entity.</semantics>
+                </attribute>
+                <attribute>
+                    <name>EventIdentifier</name>
+                    <dataType>EventIdentifierStruct</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>An ID, generated by the issuing federate, used to associate to related fire and detonation events.</semantics>
+                </attribute>
+                <attribute>
+                    <name>MunitionType</name>
+                    <dataType>EntityTypeStruct</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The munition type enumeration for the DE weapon beam.</semantics>
+                </attribute>
+                <attribute>
+                    <name>ShotStartTime</name>
+                    <dataType>ClockTimeStruct</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The simulation time at start of the shot.</semantics>
+                </attribute>
+                <attribute>
+                    <name>CumulativeShotTime</name>
+                    <dataType>TimeSecondFloat32</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>On object update</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The current cumulative duration of the shot, expressed in units of seconds.</semantics>
+                </attribute>
+                <attribute>
+                    <name>RelativeFiringLocation</name>
+                    <dataType>RelativePositionStruct</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The location of the DE weapon aperture/emitter in coordinates relative to the firing entity.</semantics>
+                </attribute>
+                <attribute>
+                    <name>ApertureDiameter</name>
+                    <dataType>MeterFloat32</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The beam diameter at the aperture/emitter.</semantics>
+                </attribute>
+                <attribute>
+                    <name>Wavelength</name>
+                    <dataType>MeterFloat32</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The emissions wavelength.</semantics>
+                </attribute>
+                <attribute>
+                    <name>PulseRepetitionFrequency</name>
+                    <dataType>FrequencyHertzFloat32</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>On change</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The current pulse repetition frequency.</semantics>
+                </attribute>
+                <attribute>
+                    <name>PulseWidth</name>
+                    <dataType>TimeSecondFloat32</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>On change</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The pulse width emissions.</semantics>
+                </attribute>
+                <attribute>
+                    <name>PulseShape</name>
+                    <dataType>DEFirePulseShapeEnum8</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>On change</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The pulse shape.</semantics>
+                </attribute>
+                <attribute>
+                    <name>Flags</name>
+                    <dataType>DEFireFlagsDataStruct</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>On change</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Flags indicating status information.</semantics>
+                </attribute>
+                <attribute>
+                    <name>AreaAimpointData</name>
+                    <dataType>AreaAimpointStructArray</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition notes="RPRnoteWarfare2">On change</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Information about the directed energy beam area targeting data.</semantics>
+                </attribute>
+                <attribute>
+                    <name>PrecisionAimpointData</name>
+                    <dataType>PrecisionAimpointStructArray</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition notes="RPRnoteWarfare2">On change</updateCondition>
+                    <ownership>DivestAcquire</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Information about the directed energy beam precise targeting data.</semantics>
+                </attribute>
+            </objectClass>
+        </objectClass>
+    </objects>
+    <interactions>
+        <interactionClass>
+            <name>HLAinteractionRoot</name>
+            <interactionClass>
+                <name>Fire</name>
+                <sharing>Subscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Base class for information associated with the firing or launch of a munition or expendable.</semantics>
+                <parameter notes="RPRnoteWarfare1">
+                    <name>FiringObjectIdentifier</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>The object instance ID of the entity firing the munition or expendable.</semantics>
+                </parameter>
+                <parameter notes="RPRnoteWarfare3">
+                    <name>TargetObjectIdentifier</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>The object instance ID of the intended target (if any).</semantics>
+                </parameter>
+                <parameter>
+                    <name>EventIdentifier</name>
+                    <dataType>EventIdentifierStruct</dataType>
+                    <semantics>An ID, generated by the issuing federate, used to associate related fire and detonation events.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FireMissionIndex</name>
+                    <dataType>UnsignedInteger32</dataType>
+                    <semantics>A unique index to identify the fire mission (used to associate weapon fire interactions in a single fire mission).</semantics>
+                </parameter>
+                <parameter>
+                    <name>FiringLocation</name>
+                    <dataType>LocationStruct</dataType>
+                    <semantics>The location, in world coordinates, from which the munition or expendable was launched.</semantics>
+                </parameter>
+                <parameter>
+                    <name>InitialVelocityVector</name>
+                    <dataType>VelocityVectorStruct</dataType>
+                    <semantics>The velocity vector of the munition or expendable when fired.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FireControlSolutionRange</name>
+                    <dataType>LengthMeterFloat32</dataType>
+                    <semantics>The range used in the fire control solution. Zero if the range is unknown or inapplicable.</semantics>
+                </parameter>
+                <interactionClass>
+                    <name>WeaponFire</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Communicates information associated with the firing or launch of a munition.</semantics>
+                    <parameter notes="RPRnoteWarfare3">
+                        <name>MunitionObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the fired munition, if an object instance is registered.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>MunitionType</name>
+                        <dataType>EntityTypeStruct</dataType>
+                        <semantics>The type of munition being fired.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>WarheadType</name>
+                        <dataType>MunitionDescriptorWarheadEnum16</dataType>
+                        <semantics>The type of warhead fitted to the munition being fired.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>FuseType</name>
+                        <dataType>MunitionDescriptorFuseEnum16</dataType>
+                        <semantics>The type of fuse on the munition.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>QuantityFired</name>
+                        <dataType>UnsignedInteger16</dataType>
+                        <semantics>The number of rounds fired in the burst.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>RateOfFire</name>
+                        <dataType>FireRateRoundPerMinuteUnsignedInteger16</dataType>
+                        <semantics>The rate of fire in rounds per minute when quantity &gt; 1. Zero otherwise.</semantics>
+                    </parameter>
+                </interactionClass>
+                <interactionClass>
+                    <name>ExpendableFire</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Communicates information associated with the firing or launch of an expendable.</semantics>
+                    <parameter notes="RPRnoteWarfare3">
+                        <name>ExpendableObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the fired expendable, if an object instance is registered.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>ExpendableType</name>
+                        <dataType>EntityTypeStruct</dataType>
+                        <semantics>The type of expendable being fired.</semantics>
+                    </parameter>
+                </interactionClass>
+            </interactionClass>
+            <interactionClass>
+                <name>Detonation</name>
+                <sharing>Subscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Base class for information associated with the impact or detonation of a munition, a non-munition explosion, or the burst or ignition of an expendable.</semantics>
+                <parameter>
+                    <name>EventIdentifier</name>
+                    <dataType>EventIdentifierStruct</dataType>
+                    <semantics>An ID, generated by the issuing federate, used to associate related fire and detonation events.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FinalVelocityVector</name>
+                    <dataType>VelocityVectorStruct</dataType>
+                    <semantics>The velocity vector of the munition immediately before detonation/impact, the velocity of a non-munition entity immediately before exploding, or the velocity of an expendable immediately before a chaff burst or ignition of a flare.</semantics>
+                </parameter>
+                <parameter>
+                    <name>DetonationLocation</name>
+                    <dataType>LocationStruct</dataType>
+                    <semantics>The location of the detonation in world coordinates.</semantics>
+                </parameter>
+                <parameter>
+                    <name>RelativeDetonationLocation</name>
+                    <dataType>RelativePositionStruct</dataType>
+                    <semantics>The location of the munition detonation, the expendable detonation, or the non-munition explosion in respectively the target entity's coordinate system, the coordinate system of the entity that launched the expendable, or the exploded entity's coordinate system.</semantics>
+                </parameter>
+                <parameter>
+                    <name>DetonationResultCode</name>
+                    <dataType>DetonationResultEnum8</dataType>
+                    <semantics>The type of detonation (including no detonation).</semantics>
+                </parameter>
+                <parameter>
+                    <name>VariableParametersArray</name>
+                    <dataType>VariableParameterVariantStructArray</dataType>
+                    <semantics>Array of information on articulated parts, attached parts, and other data associated with a detonation or explosion.</semantics>
+                </parameter>
+                <interactionClass>
+                    <name>MunitionDetonation</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Communicates information associated with the impact or detonation of a munition.</semantics>
+                    <parameter notes="RPRnoteWarfare1">
+                        <name>FiringObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the entity that fired the munition.</semantics>
+                    </parameter>
+                    <parameter notes="RPRnoteWarfare3">
+                        <name>TargetObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the target entity if known.</semantics>
+                    </parameter>
+                    <parameter notes="RPRnoteWarfare3">
+                        <name>MunitionObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The Object instance ID of the fired munition, if an object instance is registered.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>MunitionType</name>
+                        <dataType>EntityTypeStruct</dataType>
+                        <semantics>The type of munition that is detonating.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>WarheadType</name>
+                        <dataType>MunitionDescriptorWarheadEnum16</dataType>
+                        <semantics>The type of warhead on the munition.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>FuseType</name>
+                        <dataType>MunitionDescriptorFuseEnum16</dataType>
+                        <semantics>The type of fuse on the munition.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>QuantityFired</name>
+                        <dataType>UnsignedInteger16</dataType>
+                        <semantics>The number of rounds fired in the burst.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>RateOfFire</name>
+                        <dataType>FireRateRoundPerMinuteUnsignedInteger16</dataType>
+                        <semantics>The rate of fire in rounds per minute when quantity &gt; 1. Zero otherwise.</semantics>
+                    </parameter>
+                </interactionClass>
+                <interactionClass>
+                    <name>ExpendableBurst</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Communicates information associated with the burst or ignition of an expendable.</semantics>
+                    <parameter notes="RPRnoteWarfare1">
+                        <name>LaunchingObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the entity that launched the expendable.</semantics>
+                    </parameter>
+                    <parameter notes="RPRnoteWarfare3">
+                        <name>ThreatObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the target threat entity, if applicable and known, that caused the release of the expendable.</semantics>
+                    </parameter>
+                    <parameter notes="RPRnoteWarfare3">
+                        <name>ExpendableObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The Object instance ID of the fired expendable, if an object instance is registered.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>ExpendableType</name>
+                        <dataType>EntityTypeStruct</dataType>
+                        <semantics>The type of expendable.</semantics>
+                    </parameter>
+                </interactionClass>
+                <interactionClass>
+                    <name>Explosion</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Communicates information associated with a non-munition explosion.</semantics>
+                    <parameter notes="RPRnoteWarfare1">
+                        <name>SourceObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the entity that caused the non-munition entity, or portion thereof, to explode.</semantics>
+                    </parameter>
+                    <parameter notes="RPRnoteWarfare3">
+                        <name>ExplodedObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>The object instance ID of the entity, or portion thereof, that exploded.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>ExplodingObjectType</name>
+                        <dataType>EntityTypeStruct</dataType>
+                        <semantics>The type of object that exploded.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>ExplosiveMaterial</name>
+                        <dataType>ExplosiveMaterialCategoriesEnum16</dataType>
+                        <semantics>The material that exploded.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>ExplosiveForce</name>
+                        <dataType>ExplosiveForceKilogramTNTFloat32</dataType>
+                        <semantics>The explosive force expressed as the equivalent kilograms of TNT.</semantics>
+                    </parameter>
+                </interactionClass>
+            </interactionClass>
+        </interactionClass>
+    </interactions>
+    <dataTypes>
+        <simpleDataTypes>
+            <simpleData>
+                <name>ExplosiveForceKilogramTNTFloat32</name>
+                <representation>HLAfloat32BE</representation>
+                <units>kilogram of TNT (4.184 x 10^6 Joules per kilogram)</units>
+                <resolution>NA</resolution>
+                <accuracy>NA</accuracy>
+                <semantics>Explosive force expressed as the equivalent kilograms of TNT.</semantics>
+            </simpleData>
+            <simpleData>
+                <name>FireRateRoundPerMinuteUnsignedInteger16</name>
+                <representation>RPRunsignedInteger16BE</representation>
+                <units>round/minute</units>
+                <resolution>1</resolution>
+                <accuracy>perfect</accuracy>
+                <semantics>Rate of fire, in rounds per minute.</semantics>
+            </simpleData>
+            <simpleData>
+                <name>IrradianceWattPerMeterSquaredFloat32</name>
+                <representation>HLAfloat32BE</representation>
+                <units>watt per meter squared (W/(m^2))</units>
+                <resolution>NA</resolution>
+                <accuracy>NA</accuracy>
+                <semantics>Radiant flux (power) received by a surface per unit area.</semantics>
+            </simpleData>
+        </simpleDataTypes>
+        <arrayDataTypes>
+            <arrayData>
+                <name>AreaAimpointStructArray</name>
+                <dataType>AreaAimpointStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Array with DE area aimpoint data.</semantics>
+            </arrayData>
+            <arrayData>
+                <name>BeamAntennaStructArray</name>
+                <dataType>BeamAntennaStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Array with beam antenna pattern data.</semantics>
+            </arrayData>
+            <arrayData>
+                <name>PrecisionAimpointStructArray</name>
+                <dataType>PrecisionAimpointStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Array with DE precision aimpoint data.</semantics>
+            </arrayData>
+            <arrayData>
+                <name>TargetEnergyDepositionStructArray</name>
+                <dataType>TargetEnergyDepositionStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Array with target energy deposition data.</semantics>
+            </arrayData>
+        </arrayDataTypes>
+        <fixedRecordDataTypes>
+            <fixedRecordData>
+                <name>AreaAimpointStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specification of directed energy weapon targeting information when the target is an area.</semantics>
+                <field>
+                    <name>BeamAntennaPatterns</name>
+                    <dataType>BeamAntennaStructArray</dataType>
+                    <semantics>One or more non-self-identifying beam antenna patterns.</semantics>
+                </field>
+                <field>
+                    <name>TargetEnergyDepositions</name>
+                    <dataType>TargetEnergyDepositionStructArray</dataType>
+                    <semantics>Zero or more non-self-identifying target energy deposition data sets.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>BeamSpotShapeStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Parameters describing the ellipse shape approximating the irradiance region arriving at the target. The ellipse parameters are measured in the plane perpendicular to the direction of the beam. Refer to IEEE Std 1278.1-2012 Section A.2.4.3 for a detailed description.</semantics>
+                <field>
+                    <name>CrossSectionSemiMajorAxis</name>
+                    <dataType>MeterFloat32</dataType>
+                    <semantics>The length of the semi-major axis of an ellipse.</semantics>
+                </field>
+                <field>
+                    <name>CrossSectionSemiMinorAxis</name>
+                    <dataType>MeterFloat32</dataType>
+                    <semantics>The length of the semi-minor axis of an ellipse.</semantics>
+                </field>
+                <field>
+                    <name>CrossSectionOrientationAngle</name>
+                    <dataType>AngleRadianFloat32</dataType>
+                    <semantics>The orientation angle from the local 'down' vector to the semi-major axis of an ellipse.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>DEFireFlagsDataStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>DE Fire-Flags.</semantics>
+                <field>
+                    <name>WeaponOn</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>Identifies the State of the DE Weapon.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>PrecisionAimpointStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specification of directed energy weapon targeting information when the target is a specific target entity.</semantics>
+                <field>
+                    <name>TargetSpotLocation</name>
+                    <dataType>LocationStruct</dataType>
+                    <semantics>Instantaneous location of the target spot in world coordinates.</semantics>
+                </field>
+                <field>
+                    <name>TargetSpotRelativeLocation</name>
+                    <dataType>RelativePositionStruct</dataType>
+                    <semantics>Instantaneous location of the target spot in the target entity's coordinate frame.</semantics>
+                </field>
+                <field>
+                    <name>TargetSpotVelocityVector</name>
+                    <dataType>VelocityVectorStruct</dataType>
+                    <semantics>Instantaneous target spot velocity.</semantics>
+                </field>
+                <field>
+                    <name>TargetSpotAccelerationVector</name>
+                    <dataType>AccelerationVectorStruct</dataType>
+                    <semantics>Instantaneous target spot acceleration.</semantics>
+                </field>
+                <field>
+                    <name>TargetObjectIdentifier</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>The object instance ID of the target affected by the weapon.</semantics>
+                </field>
+                <field>
+                    <name>TargetComponentIdentifier</name>
+                    <dataType>EntityDamageStatusComponentIdentificationEnum8</dataType>
+                    <semantics>The entity component that is being targeted.</semantics>
+                </field>
+                <field>
+                    <name>BeamSpotType</name>
+                    <dataType>DEPrecisionAimpointBeamSpotTypeEnum8</dataType>
+                    <semantics>The beam spot type specifies how the DE precision weapon energy is distributed on the target.</semantics>
+                </field>
+                <field>
+                    <name>BeamSpotShape</name>
+                    <dataType>BeamSpotShapeStruct</dataType>
+                    <semantics>The beam spot ellipse shape approximating the irradiance region arriving at the target.</semantics>
+                </field>
+                <field>
+                    <name>PeakIrradiance</name>
+                    <dataType>IrradianceWattPerMeterSquaredFloat32</dataType>
+                    <semantics>Peak irradiance of emissions.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>TargetEnergyDepositionStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Directed energy deposition properties for a target entity.</semantics>
+                <field>
+                    <name>TargetObjectIdentifier</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>The object instance ID of the target.</semantics>
+                </field>
+                <field>
+                    <name>PeakIrradiance</name>
+                    <dataType>IrradianceWattPerMeterSquaredFloat32</dataType>
+                    <semantics>Peak irradiance deposited at the target.</semantics>
+                </field>
+            </fixedRecordData>
+        </fixedRecordDataTypes>
+    </dataTypes>
+    <notes>
+        <note>
+            <label>RPRnoteWarfare1</label>
+            <semantics>This must reference a valid Object instance.</semantics>
+        </note>
+        <note>
+            <label>RPRnoteWarfare2</label>
+            <semantics>Refer to SISO-STD-001 Section 7.13.1.1 for a detailed description of the update conditions of each of the alternatives possible as array element.</semantics>
+        </note>
+        <note>
+            <label>RPRnoteWarfare3</label>
+            <semantics>If there is no object instance associated with the parameter, then this should be set to the empty string (no characters). Refer to SISO-STD-001 Section 7.8.6 for handling empty strings.</semantics>
+        </note>
+    </notes>
+</objectModel>
