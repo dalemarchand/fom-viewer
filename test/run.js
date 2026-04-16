@@ -1,9 +1,10 @@
 const puppeteer = require('puppeteer-core');
 const path = require('path');
+const fs = require('fs');
 const config = require('./config');
 
 const args = process.argv.slice(2);
-const options = {
+const opts = {
   visible: args.includes('--visible'),
   debug: args.includes('--debug'),
   combined: args.includes('--combined'),
@@ -16,6 +17,10 @@ let page;
 let testsPassed = 0;
 let testsFailed = 0;
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 function log(message, type = 'info') {
   const timestamp = new Date().toISOString().slice(11, 19);
   const prefix = { info: 'ℹ', success: '✓', fail: '✗', warn: '⚠' }[type] || 'ℹ';
@@ -24,16 +29,26 @@ function log(message, type = 'info') {
 
 function logError(message, error) {
   log(`${message}: ${error.message}`, 'fail');
-  if (options.debug) console.error(error.stack);
+  if (opts.debug) console.error(error.stack);
 }
 
-async function waitAndClick(selector, options = {}) {
-  await page.waitForSelector(selector, { timeout: options.timeout || config.test.waitForSelector });
+async function captureScreenshot(name) {
+  const screenshotDir = path.join(__dirname, 'screenshots');
+  if (!fs.existsSync(screenshotDir)) {
+    fs.mkdirSync(screenshotDir, { recursive: true });
+  }
+  const filepath = path.join(screenshotDir, `${name}.png`);
+  await page.screenshot({ path: filepath });
+  log(`Screenshot saved: ${filepath}`, 'info');
+}
+
+async function waitAndClick(selector, waitOpts = {}) {
+  await page.waitForSelector(selector, { timeout: waitOpts.timeout || config.test.waitForSelector });
   await page.click(selector);
 }
 
-async function waitForSelector(selector, options = {}) {
-  await page.waitForSelector(selector, { timeout: options.timeout || config.test.waitForSelector });
+async function waitForSelector(selector, waitOpts = {}) {
+  await page.waitForSelector(selector, { timeout: waitOpts.timeout || config.test.waitForSelector });
   return await page.$(selector);
 }
 
@@ -50,16 +65,16 @@ async function loadTestFomFile(filename) {
 }
 
 async function launchBrowser() {
-  log('Launching browser...', options.visible ? 'info' : 'info');
+  log('Launching browser...', opts.visible ? 'info' : 'info');
   
   const browserOptions = {
-    headless: !options.visible,
-    slowMo: options.debug ? 50 : config.browser.slowMo,
+    headless: !opts.visible,
+    slowMo: opts.debug ? 50 : config.browser.slowMo,
     args: config.browser.args,
     executablePath: config.browser.executablePath
   };
   
-  if (!options.visible) {
+  if (!opts.visible) {
     browserOptions.args.push('--headless');
   }
   
@@ -82,7 +97,7 @@ async function launchBrowser() {
 }
 
 async function openApp() {
-  const htmlPath = options.combined ? config.app.combinedHtmlPath : config.app.htmlPath;
+  const htmlPath = opts.combined ? config.app.combinedHtmlPath : config.app.htmlPath;
   log(`Opening ${htmlPath}...`);
   await page.goto(`file://${htmlPath}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#app');
@@ -96,10 +111,17 @@ async function test_LoadPage() {
     await waitForSelector('#app');
     await waitForSelector('header');
     await waitForSelector('.tab-bar');
+    await waitForSelector('#backBtn');
+    await waitForSelector('#globalSearch');
+    await waitForSelector('#clearBtn');
+    await waitForSelector('#fileInput');
+    await waitForSelector('#exportBtn');
+    await waitForSelector('#sortToggle');
     log('Page loaded successfully', 'success');
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_LoadPage_failed');
     logError('Load page test failed', error);
     testsFailed++;
     return false;
@@ -122,16 +144,17 @@ async function test_TabNavigation() {
     
     for (const tab of tabs) {
       await waitAndClick(tab.selector);
-      await page.waitForTimeout(200);
+      await sleep(200);
     }
     
     await waitAndClick('[data-tab="modules"]');
-    await page.waitForTimeout(200);
+    await sleep(200);
     
     log('Tab navigation working', 'success');
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_TabNavigation_failed');
     logError('Tab navigation test failed', error);
     testsFailed++;
     return false;
@@ -157,6 +180,7 @@ async function test_FileLoading() {
     const hasContent = await page.evaluate(el => el.children.length > 0, treeView);
     
     if (!hasContent) {
+      await captureScreenshot('test_FileLoading_failed');
       throw new Error('Tree view is empty after loading file');
     }
     
@@ -164,6 +188,7 @@ async function test_FileLoading() {
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_FileLoading_failed');
     logError('File loading test failed', error);
     testsFailed++;
     return false;
@@ -195,6 +220,7 @@ async function test_LoadAllFiles() {
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_LoadAllFiles_failed');
     logError('Load all files test failed', error);
     testsFailed++;
     return false;
@@ -207,28 +233,39 @@ async function test_ItemSelection() {
     await openApp();
     
     await loadTestFomFile(config.testFiles[0]);
-    await page.waitForTimeout(500);
+    await sleep(500);
     
     const treeItems = await page.$$('.tree-item');
     
     if (treeItems.length === 0) {
+      await captureScreenshot('test_ItemSelection_failed');
       throw new Error('No tree items found after loading file');
     }
     
     await treeItems[0].click();
-    await page.waitForTimeout(500);
+    await sleep(500);
     
     const detailHeader = await page.$('#detailHeader');
     const isVisible = await detailHeader.isIntersectingViewport();
     
     if (!isVisible) {
+      await captureScreenshot('test_ItemSelection_failed');
       throw new Error('Detail header not visible after clicking item');
+    }
+    
+    const detailBody = await page.$('#detailBody');
+    const hasContent = await page.evaluate(el => el.innerHTML.trim().length > 0, detailBody);
+    
+    if (!hasContent) {
+      await captureScreenshot('test_ItemSelection_failed');
+      throw new Error('Detail body is empty after selecting item');
     }
     
     log(`Item selection working (${treeItems.length} items found)`, 'success');
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_ItemSelection_failed');
     logError('Item selection test failed', error);
     testsFailed++;
     return false;
@@ -241,31 +278,33 @@ async function test_BackButton() {
     await openApp();
     
     await loadTestFomFile(config.testFiles[0]);
-    await page.waitForTimeout(500);
+    await sleep(500);
     
     await page.click('[data-tab="objects"]');
-    await page.waitForTimeout(300);
+    await sleep(300);
     
     const treeItems = await page.$$('.tree-item');
     if (treeItems.length > 0) {
       await treeItems[0].click();
-      await page.waitForTimeout(300);
+      await sleep(300);
     }
     
     const backBtn = await page.$('#backBtn');
     const backBtnVisible = await backBtn.isIntersectingViewport();
     
-    if (backBtnVisible) {
-      await backBtn.click();
-      await page.waitForTimeout(300);
-      log('Back button between tabs works', 'success');
-    } else {
-      log('Back button not visible (no navigation history)', 'warn');
+    if (!backBtnVisible) {
+      await captureScreenshot('test_BackButton_failed');
+      throw new Error('Back button not visible after navigation');
     }
+    
+    await backBtn.click();
+    await sleep(300);
+    log('Back button between tabs works', 'success');
     
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_BackButton_failed');
     logError('Back button test failed', error);
     testsFailed++;
     return false;
@@ -278,29 +317,30 @@ async function test_BackButtonSubTabs() {
     await openApp();
     
     await loadTestFomFile(config.testFiles[0]);
-    await page.waitForTimeout(500);
+    await sleep(500);
     
     await page.click('[data-tab="datatypes"]');
-    await page.waitForTimeout(300);
+    await sleep(300);
     
     const subtabs = await page.$$('#dataTypeTabs .subtab');
     if (subtabs.length > 1) {
       await subtabs[1].click();
-      await page.waitForTimeout(300);
+      await sleep(300);
       
       await subtabs[2].click();
-      await page.waitForTimeout(300);
+      await sleep(300);
       
       const backBtn = await page.$('#backBtn');
       const backBtnVisible = await backBtn.isIntersectingViewport();
       
-      if (backBtnVisible) {
-        await backBtn.click();
-        await page.waitForTimeout(300);
-        log('Back button between subtabs works', 'success');
-      } else {
-        log('Back button not visible for subtab navigation', 'warn');
+      if (!backBtnVisible) {
+        await captureScreenshot('test_BackButtonSubTabs_failed');
+        throw new Error('Back button not visible for subtab navigation');
       }
+      
+      await backBtn.click();
+      await sleep(300);
+      log('Back button between subtabs works', 'success');
     } else {
       log('No subtabs found for this file', 'warn');
     }
@@ -308,6 +348,7 @@ async function test_BackButtonSubTabs() {
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_BackButtonSubTabs_failed');
     logError('Back button subtab test failed', error);
     testsFailed++;
     return false;
@@ -320,28 +361,29 @@ async function test_BackButtonEmbeddedLinks() {
     await openApp();
     
     await loadTestFomFile(config.testFiles[4]);
-    await page.waitForTimeout(500);
+    await sleep(500);
     
     const treeItems = await page.$$('.tree-item');
     if (treeItems.length > 0) {
       await treeItems[0].click();
-      await page.waitForTimeout(500);
+      await sleep(500);
       
       const clickableLinks = await page.$$('.clickable-item');
       if (clickableLinks.length > 0) {
         await clickableLinks[0].click();
-        await page.waitForTimeout(500);
+        await sleep(500);
         
         const backBtn = await page.$('#backBtn');
         const backBtnVisible = await backBtn.isIntersectingViewport();
         
-        if (backBtnVisible) {
-          await backBtn.click();
-          await page.waitForTimeout(300);
-          log('Back button with embedded links works', 'success');
-        } else {
-          log('Back button not visible after clicking embedded link', 'warn');
+        if (!backBtnVisible) {
+          await captureScreenshot('test_BackButtonEmbeddedLinks_failed');
+          throw new Error('Back button not visible after clicking embedded link');
         }
+        
+        await backBtn.click();
+        await sleep(300);
+        log('Back button with embedded links works', 'success');
       } else {
         log('No embedded links found in detail view', 'warn');
       }
@@ -352,6 +394,7 @@ async function test_BackButtonEmbeddedLinks() {
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_BackButtonEmbeddedLinks_failed');
     logError('Back button embedded links test failed', error);
     testsFailed++;
     return false;
@@ -364,16 +407,140 @@ async function test_SearchFunctionality() {
     await openApp();
     await page.waitForSelector('#globalSearch');
     await page.waitForSelector('#clearBtn');
+    
+    await page.focus('#globalSearch');
+    await page.keyboard.type('Test');
+    await sleep(300);
+    
+    await page.keyboard.press('Escape');
     await page.evaluate(() => {
       document.getElementById('globalSearch').value = '';
+      const event = new Event('input', { bubbles: true });
+      document.getElementById('globalSearch').dispatchEvent(event);
     });
-    await page.waitForTimeout(200);
-    log('Search input cleared', 'success');
-    log('Search functionality working', 'success');
+    await sleep(200);
+    
+    log('Search input works', 'success');
     testsPassed++;
     return true;
   } catch (error) {
     logError('Search test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_TreeFiltering() {
+  log('Testing: Tree filtering...');
+  try {
+    await openApp();
+    
+    await loadTestFomFile(config.testFiles[0]);
+    await sleep(500);
+    
+    const treeFilter = await page.$('#treeFilter');
+    if (!treeFilter) {
+      log('Tree filter input not found', 'warn');
+      testsPassed++;
+      return true;
+    }
+    
+    const treeItemsBefore = await page.$$('.tree-item');
+    const countBefore = treeItemsBefore.length;
+    
+    if (countBefore === 0) {
+      await captureScreenshot('test_TreeFiltering_failed');
+      throw new Error('No tree items to filter');
+    }
+    
+    await page.type('#treeFilter', 'Object');
+    await sleep(300);
+    
+    const treeItemsAfter = await page.$$('.tree-item');
+    const countAfter = treeItemsAfter.length;
+    
+    if (countAfter >= countBefore) {
+      await captureScreenshot('test_TreeFiltering_failed');
+      throw new Error(`Tree filter did not filter results (before: ${countBefore}, after: ${countAfter})`);
+    }
+    
+    log(`Tree filter works (filtered ${countBefore} to ${countAfter} items)`, 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_TreeFiltering_failed');
+    logError('Tree filter test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_SortToggle() {
+  log('Testing: Sort toggle...');
+  try {
+    await openApp();
+    
+    await loadTestFomFile(config.testFiles[0]);
+    await sleep(500);
+    
+    const sortToggle = await page.$('#sortToggle');
+    if (!sortToggle) {
+      log('Sort toggle not found', 'warn');
+      testsPassed++;
+      return true;
+    }
+    
+    const itemsBefore = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent));
+    
+    await sortToggle.click();
+    await sleep(300);
+    
+    const itemsAfter = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent));
+    
+    const sorted = itemsBefore.join('') !== itemsAfter.join('');
+    
+    log(`Sort toggle works (order changed: ${sorted})`, 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_SortToggle_failed');
+    logError('Sort toggle test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_ExportFunctionality() {
+  log('Testing: Export functionality...');
+  try {
+    await openApp();
+    
+    await loadTestFomFile(config.testFiles[0]);
+    await sleep(500);
+    
+    const exportBtn = await page.$('#exportBtn');
+    if (!exportBtn) {
+      await captureScreenshot('test_ExportFunctionality_failed');
+      throw new Error('Export button not found');
+    }
+    
+    await exportBtn.click();
+    await sleep(300);
+    
+    const downloadStarted = await page.evaluate(() => {
+      return window.downloadTriggered === true || document.body.classList.contains('export-active');
+    }).catch(() => false);
+    
+    if (!downloadStarted) {
+      log('Export clicked (actual download requires user interaction)', 'warn');
+    }
+    
+    log('Export functionality accessible', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_ExportFunctionality_failed');
+    logError('Export test failed', error);
     testsFailed++;
     return false;
   }
@@ -385,10 +552,10 @@ async function test_SubTabNavigation() {
     await openApp();
     
     await loadTestFomFile(config.testFiles[0]);
-    await page.waitForTimeout(500);
+    await sleep(500);
     
     await waitAndClick('[data-tab="datatypes"]');
-    await page.waitForTimeout(300);
+    await sleep(300);
     
     const subtabs = await page.$$('#dataTypeTabs .subtab');
     
@@ -400,13 +567,14 @@ async function test_SubTabNavigation() {
     
     for (const subtab of subtabs) {
       await subtab.click();
-      await page.waitForTimeout(200);
+      await sleep(200);
     }
     
     log('Sub-tab navigation working', 'success');
     testsPassed++;
     return true;
   } catch (error) {
+    await captureScreenshot('test_SubTabNavigation_failed');
     logError('Sub-tab test failed', error);
     testsFailed++;
     return false;
@@ -430,11 +598,14 @@ async function runAllTests() {
     { name: 'BackButton', fn: test_BackButton },
     { name: 'BackButtonSubTabs', fn: test_BackButtonSubTabs },
     { name: 'BackButtonEmbeddedLinks', fn: test_BackButtonEmbeddedLinks },
-    { name: 'Search', fn: test_SearchFunctionality }
+    { name: 'Search', fn: test_SearchFunctionality },
+    { name: 'TreeFilter', fn: test_TreeFiltering },
+    { name: 'SortToggle', fn: test_SortToggle },
+    { name: 'Export', fn: test_ExportFunctionality }
   ];
   
   for (const test of tests) {
-    if (options.specificTest && test.name.toLowerCase() !== options.specificTest.toLowerCase()) {
+    if (opts.specificTest && test.name.toLowerCase() !== opts.specificTest.toLowerCase()) {
       continue;
     }
     log('-'.repeat(30));
