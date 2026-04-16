@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>JLVC-AggregateEntity</name>
+        <type>FOM</type>
+        <version>2</version>
+        <modificationDate>2026-01-16</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>JLVC-AggregateEntity provides AggregateEntity components neccessary for use in the JLVC federation. </purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the additional object attributes necessary for AggregateEntity communication.</description>
+        <useLimitation/>
+        <useHistory>JLVC2024 - Draft 1 of JLVC Modular FOM.</useHistory>
+        <useHistory>JLVC2024 - Updated version number from 2024 to 1.</useHistory>
+        <useHistory>JLVC2026 - Version 2: Updated JLVC_AggregateEntity:JLVCIsPartOf semantics. Removed old RPRnotes. Updated reference dependencies to use the new RPRv3 module names. Added RPR Enumerations module as a reference dependency.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Heath Rush</pocName>
+            <pocOrg>CAPE Technology Solutions</pocOrg>
+            <pocEmail>heath.rush@capetechsolutions.com</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Physical FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-Base</identification>
+        </reference>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+            <objectClass>
+                <name>BaseEntity</name>
+                <objectClass>
+                    <name>AggregateEntity</name>
+                    <objectClass>
+                        <name>JLVC_AggregateEntity</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <semantics>Aggregate published within the JLVC with JLVC agreed upon attributes.</semantics>
+                        <attribute>
+                            <name>LVCID</name>
+                            <dataType>LVCID</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>An identifier specified by the OBS application xml file consisting of 11 characters.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>AggregateTemplateName</name>
+                            <dataType>HLAASCIIstring</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>The name of the template for the aggregate.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>SideName</name>
+                            <dataType>HLAASCIIstring</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>An optional attribute specifying the side to which the object instance belongs.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>MySuperior</name>
+                            <dataType>LVCID</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>A pointer to the object's superior.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>isTowed</name>
+                            <dataType>RPRboolean</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On Change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Indicates whether the object instance is being towed (true) or not (false)</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>publisher</name>
+                            <dataType>FederateIdentifierStruct</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Value indentifies the particular federate that is currently publishing this entity.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>IntelState</name>
+                            <dataType>IntelStateEnum16</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics/>
+                        </attribute>
+                        <attribute>
+                            <name>TowedBy</name>
+                            <dataType>LVCID</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>[Optional] LVCID of the towing entity (ie. Who is pulling). If the value is empty, then no entity is pulling the entity. </semantics>
+                        </attribute>
+                        <attribute>
+                            <name>JLVCIsPartOf</name>
+                            <dataType>JLVCIsPartOfStruct</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On change</updateCondition>
+                            <ownership>DivestAcquire</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Defines if the entity is a constituent part of another entity (denoted the host entity). If the entity is a constituent part of another entity then the HostEntityIdentifier shall be set to the EntityIdentifier of the host entity and the HostRTIObjectIdentifier shall be set to the RTI object instance ID of the host entity. If the entity is not a constituent part of another entity then the HostEntityIdentifier shall be set to 0.0.0 and the HostRTIObjectIdentifier shall be set to the empty string.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>LVCIndicator</name>
+                            <dataType>LVCIndicatorEnum8</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On change</updateCondition>
+                            <ownership>DivestAcquire</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Indicates whether the data contained in this object instance is related to a Live, Virtual, or Constructive entity.</semantics>
+                        </attribute>
+                    </objectClass>
+                </objectClass>
+            </objectClass>
+        </objectClass>
+    </objects>
+</objectModel>

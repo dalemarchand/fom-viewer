@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>JLVC-BasicEncyclopedia</name>
+        <type>FOM</type>
+        <version>2</version>
+        <modificationDate>2026-01-16</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>JLVC-BasicEncyclopedia provides BasicEncyclopedia components neccessary for use in the JLVC federation.</purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the objects necessary for BasicEncyclopedia communication in the JLVC Federation.</description>
+        <useLimitation/>
+        <useHistory>JLVC2024 - Draft 1 of the JLVC Modular FOM.</useHistory>
+        <useHistory>JLVC2024 - Updated version number from 2024 to 1.</useHistory>
+        <useHistory>JLVC2026 - Version 2: Updated reference dependencies to use the new RPRv3 module names. Added RPR Enumerations module as a reference dependency.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Heath Rush</pocName>
+            <pocOrg>CAPE Technology Solutions</pocOrg>
+            <pocEmail>heath.rush@capetechsolutions.com</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+            <objectClass>
+                <name>BasicEncyclopedia</name>
+                <sharing>PublishSubscribe</sharing>
+                <semantics>Root class for all Basic Encyclopedia (BE) Installation, Facility, and Desired Mean Point of Impact (DMPI) objects.</semantics>
+                <attribute>
+                    <name>FUN</name>
+                    <dataType>RTIobjectId</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Federation Unique Identifier</semantics>
+                </attribute>
+                <attribute>
+                    <name>centerLocation</name>
+                    <dataType>LocationStruct</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>current location of object</semantics>
+                </attribute>
+                <attribute>
+                    <name>countryCode</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Two letter identifier of country controlling object</semantics>
+                </attribute>
+                <attribute>
+                    <name>description</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>text description (usually 80 characters or less in the MIDB)</semantics>
+                </attribute>
+                <objectClass>
+                    <name>BE_Facility</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <semantics>An actual structure, and is part of an installation plus has a unique</semantics>
+                    <attribute>
+                        <name>BE_Number</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>BE number of the installation owning this facility - 10 characters</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>O_Suffix</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>5 character identifier of this facility, unique within this BE number. Combination of BE number and OSuffix uniquely identifies every facility.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>categoryCode</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>5 digit number categorizing the facility by function and composition. They are grouped by series, i.e. 94xxx are all bridges. Thus the cat code will identify a \"concrete command headquaters, three floors, reincforced roof\""</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>structuralStatus</name>
+                        <dataType>Integer32</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>% damaged, 100 is completely undamaged, 0 is totally destroyed</semantics>
+                    </attribute>
+                </objectClass>
+                <objectClass>
+                    <name>DMPI</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <semantics>Desired Mean Point of Impact, an aim point at which the attacker wishes to place ordinace or in some cases the center of a sensor\'s field of view</semantics>
+                    <attribute>
+                        <name>BE_Facility</name>
+                        <dataType>RTIobjectId</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Federation Unique Name of the BE facility associated with this aim point</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>DMPI_ID</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>12 character designation for this DMPI, comes from targeting database and should be unique</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>DMPI_Status</name>
+                        <dataType>Integer32</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>damage status of this DMPI, 100 is completely undestroyed, 0 is totally destroyed</semantics>
+                    </attribute>
+                </objectClass>
+            </objectClass>
+        </objectClass>
+    </objects>
+</objectModel>

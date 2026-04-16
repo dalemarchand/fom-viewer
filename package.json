@@ -4,7 +4,10 @@
   "description": "Single page HTML viewer for IEEE 1516 FOM files",
   "scripts": {
     "lint": "eslint test/",
-    "lint:fix": "eslint test/ --fix"
+    "lint:fix": "eslint test/ --fix",
+    "build": "node scripts/build.js",
+    "test": "cd test && npm test",
+    "test:combined": "npm run build && cd test && npm run test -- --combined"
   },
   "devDependencies": {
     "eslint": "^8.57.1"

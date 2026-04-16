@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>JLVC-Alerts</name>
+        <type>FOM</type>
+        <version>4</version>
+        <modificationDate>2026-01-16</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>JLVC-Alerts provides components neccessary to support federates sending and receiving alerts based on errors and notifications.</purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the objects and interactions used for reporting alerts from federates and violations of JLVC Federation rules.</description>
+        <useLimitation/>
+        <useHistory>JLVC2025 - Initial draft of JLVC-Alerts module</useHistory>
+        <useHistory>JLVC2025 - Version 2: In ScenarioViolationVariantStruct, changed the dataType of MissingEmitterType to EmitterNameEnum16.</useHistory>
+        <useHistory>JLVC2025 - Version 3: Updated the order of dataType groupings in the module to be compliant with schema.</useHistory>
+        <useHistory>JLVC2026 - Version 4: Updated reference dependencies to use the new RPRv3 module names.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Heath Rush</pocName>
+            <pocOrg>CAPE Technology Solutions</pocOrg>
+            <pocEmail>heath.rush@capetechsolutions.com</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-Base</identification>
+        </reference>
+    </modelIdentification>
+    <interactions>
+        <interactionClass>
+            <name>HLAinteractionRoot</name>
+            <interactionClass>
+                <name>JECSalert</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Root class of JECS alerts.</semantics>
+                <parameter>
+                    <name>SourceFederateName</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Federate name of the JECS federate generating the alert.</semantics>
+                </parameter>
+                <interactionClass>
+                    <name>ScenarioAlert</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Notification that data being published in the federation violates rules regarding the scenario (OBS) data.</semantics>
+                    <parameter>
+                        <name>ObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <semantics>Object whose published attribute(s) violate the scenario rules.</semantics>
+                    </parameter>
+                    <parameter>
+                        <name>ScenarioViolation</name>
+                        <dataType>ScenarioViolationVariantStruct</dataType>
+                        <semantics>The type of violation and the data value causing the violation.</semantics>
+                    </parameter>
+                </interactionClass>
+            </interactionClass>
+        </interactionClass>
+    </interactions>
+    <dataTypes>
+        <enumeratedDataTypes>
+            <enumeratedData>
+                <name>ScenarioViolationKindEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Which rule has been violated.</semantics>
+                <enumerator>
+                    <name>LVCID_in_OBS</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Enumeration_in_OBS</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>EmitterType_in_OBS</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Superior_in_OBS</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Unique_LVCID</name>
+                    <value>4</value>
+                </enumerator>
+            </enumeratedData>
+        </enumeratedDataTypes>
+        <variantRecordDataTypes>
+            <variantRecordData>
+                <name>ScenarioViolationVariantStruct</name>
+                <discriminant>ScenarioViolationKind</discriminant>
+                <dataType>ScenarioViolationKindEnum8</dataType>
+                <alternative>
+                    <enumerator>LVCID_in_OBS</enumerator>
+                    <name>MissingLvcid</name>
+                    <dataType>LVCID</dataType>
+                    <semantics>The LVCID which cannot be found in the scenario.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>Enumeration_in_OBS</enumerator>
+                    <name>MissingEnumeration</name>
+                    <dataType>EntityTypeStruct</dataType>
+                    <semantics>The enumeration that cannot be found in the scenario.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>EmitterType_in_OBS</enumerator>
+                    <name>MissingEmitterType</name>
+                    <dataType>EmitterNameEnum16</dataType>
+                    <semantics>Enumeration of the emitter name that cannot be found in the scenario.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>Superior_in_OBS</enumerator>
+                    <name>MissingSuperior</name>
+                    <dataType>LVCID</dataType>
+                    <semantics>The superior LVCID that cannot be found in the scenario.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>Unique_LVCID</enumerator>
+                    <name>DuplicateLvcid</name>
+                    <dataType>LVCID</dataType>
+                    <semantics>The LVCID that is duplicated in the federation.</semantics>
+                </alternative>
+                <encoding>HLAvariantRecord</encoding>
+                <semantics>Which rule is violated and the key info triggering the violation.</semantics>
+            </variantRecordData>
+        </variantRecordDataTypes>
+    </dataTypes>
+</objectModel>

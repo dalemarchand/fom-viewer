@@ -3,6 +3,7 @@ const path = require('path');
 const config = {
   app: {
     htmlPath: path.resolve(__dirname, '../fom-viewer.html'),
+    combinedHtmlPath: path.resolve(__dirname, '../dist/fom-viewer.html'),
     baseUrl: `file://${path.resolve(__dirname, '../fom-viewer.html')}`
   },
   test: {

@@ -6,6 +6,7 @@ const args = process.argv.slice(2);
 const options = {
   visible: args.includes('--visible'),
   debug: args.includes('--debug'),
+  combined: args.includes('--combined'),
   specificTest: args.find(arg => arg.startsWith('--test='))?.replace('--test=', '') || null,
   timeout: parseInt(args.find(arg => arg.startsWith('--timeout='))?.replace('--timeout=', '') || config.test.timeout)
 };
@@ -81,8 +82,9 @@ async function launchBrowser() {
 }
 
 async function openApp() {
-  log(`Opening ${config.app.htmlPath}...`);
-  await page.goto(`file://${config.app.htmlPath}`, { waitUntil: 'domcontentloaded' });
+  const htmlPath = options.combined ? config.app.combinedHtmlPath : config.app.htmlPath;
+  log(`Opening ${htmlPath}...`);
+  await page.goto(`file://${htmlPath}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#app');
   log('App loaded successfully', 'success');
 }

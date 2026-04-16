@@ -1,0 +1,598 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>Agent-Orders</name>
+        <type>FOM</type>
+        <version>0_7</version>
+        <modificationDate>2025-08-27</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>Agent-Orders provides capabilities for allowing federate entities to be remotely controlled (RC) by an agent, along with control commands for the agent to use.</purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the objects and interactions necessary for remote Agent-based control.</description>
+        <useLimitation/>
+        <useHistory>0_1 - Initial Draft of Agent-Orders module</useHistory>
+        <useHistory>0_2 (2025-01-20)- Replaced Radar with more generic 'detection'</useHistory>
+        <useHistory>0_3 (2025-01-23)- Fixed mis-spelled RTIobjectId datatypes</useHistory>
+        <useHistory>0_4 (2025-02-03)- Replaced duplicate AgentID in UpdateEntity with Formation</useHistory>
+        <useHistory>0_5 (2025-02-03)- Draft 2</useHistory>
+        <useHistory>0_7 (2025-08-27)- Updated the version number to match the version number in the filename posted on confluence. This version will be added to JLVC CY25 Final as a preview module.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Andrew Pomykal</pocName>
+            <pocOrg>HII</pocOrg>
+            <pocEmail>andrew.g.pomykal.ctr@mail.mil</pocEmail>
+        </poc>
+        <poc>
+            <pocType>Contributor</pocType>
+            <pocName>Seth Utecht</pocName>
+            <pocOrg>HII</pocOrg>
+            <pocEmail>seth.utecht.ctr@mail.mil</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>RPR-Base_v3.0_draft</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>RPR-Enumerations_v3.0_draft</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>RPR-Foundation_v3.0_draft</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-SIMAN</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-Logistics</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-BASE</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>RPR-Base_v3</identification>
+        </reference>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+                <objectClass>
+                    <name>ControlList</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <semantics>specifies Agent to controlled entities</semantics>
+                    <attribute>
+                        <name>AgentID</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>REQUIRED.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>ActiveEntityList</name>
+                        <dataType>RTIobjectIdArray</dataType>
+                        <updateType>Conditional </updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>REQUIRED. Entities under active control.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>InactiveEntityList</name>
+                        <dataType>RTIobjectIdArray</dataType>
+                        <updateType>Conditional </updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>REQUIRED. Entities no longer under active control.</semantics>
+                    </attribute>
+                </objectClass>
+        </objectClass>
+    </objects>
+    <interactions>
+        <interactionClass>
+            <name>HLAinteractionRoot</name>
+            <interactionClass>
+                <name>AgentControl</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Handshake for establishing Agent remote control</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent assuming control</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <!-- Adding for completeness. Will likely change when we revisit the handshake.-->
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>ActiveEntityList</name>
+                    <dataType>RTIobjectIdArray</dataType>
+                    <semantics>REQUIRED. Entities under active control.</semantics>
+                </parameter>
+                <parameter>
+                    <name>InactiveEntityList</name>
+                    <dataType>RTIobjectIdArray</dataType>
+                    <semantics>REQUIRED. Entities no longer under active control.</semantics>
+                </parameter>
+                <parameter>
+                    <name>ScheduledTime</name>
+                    <dataType>HLAinteger64Time</dataType>
+                    <semantics>time of control handover</semantics>
+                </parameter>
+                <parameter>
+                    <name>ErrorMessage</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>What went wrong with the control handoff</semantics>
+                </parameter>
+                <parameter>
+                    <name>TransferStatus</name>
+                    <dataType>TransferStatusEnum8</dataType>
+                    <semantics>Current state of the control handoff</semantics>
+                </parameter>
+                <parameter>
+                    <name>TransactionID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Unique identifier for the handover of control</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>CommandFailed</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Mechanism for Remote Federate to report problems with remote control.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>FailedCommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying a prior AO command that failed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FailureReason</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Explanation of why the command failed.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>CancelMove</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to cancel all movement orders for entity.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Entity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity being moved by the Agent</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>MagicMove</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to initiate an entity magic move/teleport.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Entity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity being moved by the Agent</semantics>
+                </parameter>
+                <parameter>
+                    <name>Location</name>
+                    <dataType>LocationStruct</dataType>
+                    <semantics>Location to move to</semantics>
+                </parameter>
+                <parameter>
+                    <name>Heading</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>Heading in degress to set</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>PlannedMove</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to initiate Waypoint based movement.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Entity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity being moved by the Agent</semantics>
+                </parameter>
+                <parameter>
+                    <name>Waypoint</name>
+                    <dataType>WaypointArray</dataType>
+                    <semantics>Location(s) to move to</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>ArriveByMove</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to initiate an entity movement to reach the destination at a specified time.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Entity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity being moved by the Agent</semantics>
+                </parameter>
+                <parameter>
+                    <name>Location</name>
+                    <dataType>LocationStruct</dataType>
+                    <semantics>Target destination's location</semantics>
+                </parameter>
+                <parameter>
+                    <name>ArrivalTime</name>
+                    <dataType>HLAinteger64Time</dataType>
+                    <semantics>When the entity should arrive at the target destination.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>DirectFire</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to initiate an engagement/firing by an entity.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FireMissionId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Unique ID of fire mission</semantics>
+                </parameter>
+                <parameter>
+                    <name>Shooter</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity firing</semantics>
+                </parameter>
+                <parameter>
+                    <name>TargetEntity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity being targeted by the Shooter.</semantics>
+                </parameter>
+                <parameter>
+                    <name>StartTime</name>
+                    <dataType>HLAinteger64Time</dataType>
+                    <semantics>When to initiate engagement.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Duration</name>
+                    <dataType>TimeSecondFloat32</dataType>
+                    <semantics>Time allotment to fire specified number of rounds</semantics>
+                </parameter>
+                <parameter>
+                    <name>Munition</name>
+                    <dataType>EntityTypeStruct</dataType>
+                    <semantics>type of munition to fire</semantics>
+                </parameter>
+                <parameter>
+                    <name>QuantityToFire</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>Number of rounds to fire</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>IndirectFire</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to initiate an engagement/firing by an entity.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FireMissionId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Unique ID of fire mission</semantics>
+                </parameter>
+                <parameter>
+                    <name>Shooter</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity firing</semantics>
+                </parameter>
+                <parameter>
+                    <name>TargetLocation</name>
+                    <dataType>LocationStruct</dataType>
+                    <semantics>Target location.</semantics>
+                </parameter>
+                <parameter>
+                    <name>StartTime</name>
+                    <dataType>HLAinteger64Time</dataType>
+                    <semantics>When to initiate engagement.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Duration</name>
+                    <dataType>TimeSecondFloat32</dataType>
+                    <semantics>Time allotment to fire specified number of rounds</semantics>
+                </parameter>
+                <parameter>
+                    <name>Munition</name>
+                    <dataType>EntityTypeStruct</dataType>
+                    <semantics>type of munition to fire</semantics>
+                </parameter>
+                <parameter>
+                    <name>QuantityToFire</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>Number of rounds to fire</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>CancelFire</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to cancel an engagement/firing mission by an entity.</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FireMissionId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Unique ID of fire mission</semantics>
+                </parameter>
+                <parameter>
+                    <name>Shooter</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity firing</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>UpdateEntity</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to alter a controlled entity's state</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Entity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity being updated by the Agent</semantics>
+                </parameter>
+                <parameter>
+                    <name>AutoEngagement</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>Turn on/off autoengagement</semantics>
+                </parameter>
+                <parameter>
+                    <name>Formation</name>
+                    <dataType>AggregateStateFormationEnum32</dataType>
+                    <semantics>Formation to assume</semantics>
+                </parameter>
+                <parameter>
+                    <name>FirePowerKilled</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>Weapons disabled due to damage</semantics>
+                </parameter>
+                <parameter>
+                    <name>MobilityKilled</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>Movement disabled due to damage</semantics>
+                </parameter>
+                <parameter>
+                    <name>MissionKilled</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>Ability to perform mission-functionality disabled due to damage</semantics>
+                </parameter>
+                <parameter>
+                    <name>Sensors</name>
+                    <dataType>SensorStateArray</dataType>
+                    <semantics>Set the entity's detector(s) (e.g. radar, sonar) on/off</semantics>
+                </parameter>
+                <parameter>
+                    <name>MountedOn</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Mark the entity as riding on this one</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>ReportedContact</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Enemy/unknown entities that this one is currently sensing</semantics>
+                <parameter>
+                    <name>Entity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity reporting detected contacts</semantics>
+                </parameter>
+                <parameter>
+                    <name>EmitterName</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Emitter that made detection</semantics>
+                </parameter>
+                <parameter>
+                    <name>Contact</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Currently observed/sensed entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>Tracking</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>Tracking or dropped</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>TransferSupplies</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>RC command to initiate a transfer of supplies from one entity to another</semantics>
+                <parameter>
+                    <name>AgentID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID of Agent controlling the [offering] entity</semantics>
+                </parameter>
+                <parameter>
+                    <name>CommandId</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>ID for indentifying an AO command. Each id is unique for a given agent.</semantics>
+                </parameter>
+                <parameter>
+                    <name>OfferingEntity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity giving the supplies</semantics>
+                </parameter>
+                <parameter>
+                    <name>ReceivingEntity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>Entity receiving the supplies</semantics>
+                </parameter>
+                <parameter>
+                    <name>AdjustmentType</name>
+                    <dataType>LogAdjustActionEnum8</dataType>
+                    <semantics></semantics>
+                </parameter>
+                <parameter>
+                    <name>PersonnelList</name>
+                    <dataType>PersonnelDetailsStructArray1Plus</dataType>
+                    <semantics>Details regarding personnel being transferred.</semantics>
+                </parameter>
+                <parameter>
+                    <name>SupplyList</name>
+                    <dataType>SupplyDetailsStructArray1Plus</dataType>
+                    <semantics>details about the supplies being transferred.</semantics>
+                </parameter>
+            </interactionClass>
+        </interactionClass>
+    </interactions>
+    <dataTypes>
+        <arrayDataTypes>
+            <arrayData>
+                <name>WaypointArray</name>
+                <dataType>Waypoint</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Dynamic array of Waypoint elements, may also contain no elements.</semantics>
+            </arrayData>
+            <arrayData>
+                <name>SensorStateArray</name>
+                <dataType>SensorState</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Dynamic array of sensors elements, may also contain no elements.</semantics>
+            </arrayData>
+        </arrayDataTypes>
+        <fixedRecordDataTypes>
+            <fixedRecordData>
+                <name>Waypoint</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>The location and speed.</semantics>
+                <field>
+                    <name>Location</name>
+                    <dataType>LocationStruct</dataType>
+                    <semantics>Location</semantics>
+                </field>
+                <field>
+                    <name>Speed</name>
+                    <dataType>MeterFloat64</dataType>
+                    <semantics>Speed in meters.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>SensorState</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Sensor and state (on/off).</semantics>
+                <field>
+                    <name>EmitterName</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Emitter name from class data</semantics>
+                </field>
+                <field>
+                    <name>State</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>True/On or False/Off.</semantics>
+                </field>
+            </fixedRecordData>
+        </fixedRecordDataTypes>
+    </dataTypes>
+</objectModel>

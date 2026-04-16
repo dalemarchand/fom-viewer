@@ -1,0 +1,604 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>JLVC-Population</name>
+        <type>FOM</type>
+        <version>2</version>
+        <modificationDate>2026-01-16</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>JLVC-Population provides Population components neccessary for use in the JLVC federation.</purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the objects and interactions necessary for Population communication in the JLVC Federation.</description>
+        <useLimitation/>
+        <useHistory>JLVC2024 - Draft 1 of the JLVC Modular FOM.</useHistory>
+        <useHistory>JLVC2024 - Updated version number from 2024 to 1.</useHistory>
+        <useHistory>JLVC2026 - Version 2: Updated PopulationEntity:JLVCIsPartOf semantics. Removed old RPRnotes. Updated reference dependencies to use the new RPRv3 module names.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Heath Rush</pocName>
+            <pocOrg>CAPE Technology Solutions</pocOrg>
+            <pocEmail>heath.rush@capetechsolutions.com</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Physical FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-Base</identification>
+        </reference>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+            <objectClass>
+                <name>BaseEntity</name>
+                <objectClass>
+                    <name>PopulationEntity</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <semantics>A group of life forms acting together which affects maneuver of other entities. The group has some characteristics amenable to intelligence collection to infer intent.</semantics>
+                    <attribute>
+                        <name>LVCID</name>
+                        <dataType>LVCID</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>On Change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>two</dimension>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>An unique identifier specified by the OBS xml file.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>ForceIdentifier</name>
+                        <dataType>ForceIDEnum8</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The DIS Force ID of this collection of lifeforms. CivilianEntities shall not group opposing forces together.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>Marking</name>
+                        <dataType>MarkingStruct</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Character set and the string of characters used to provide display identification for this entity.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>ActionState</name>
+                        <dataType>ActionStateEnum16</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Enumerated value that describes current location/state of the entity.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>TotalAlive</name>
+                        <dataType>UnsignedInteger32</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Total count of civilians that are ALIVE in this group.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>TotalWounded</name>
+                        <dataType>UnsignedInteger32</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Total count of civilians that are injured in this group.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>TotalDead</name>
+                        <dataType>UnsignedInteger32</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Total count of civilians that are DEAD in this group.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>Demographics</name>
+                        <dataType>DemographicsStructArray1Plus</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>REQUIRED. List of alive, wounded, dead for each lifeform entity type.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>Activity</name>
+                        <dataType>AbstractActivityEnum8</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Activity the group of civilians is currently performing.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>ComplianceState</name>
+                        <dataType>AppearanceLifeFormComplianceStatusEnum8</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The outward expression of compliance for this population group.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>EntityList</name>
+                        <dataType>RTIobjectIdArray</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>List of HLA lifeforms objects that are counted as part of this civilian group.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>Neighborhood</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Name of the neighborhood that contains this civilian entity.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>PGroupType</name>
+                        <dataType>PgroupTypeEnum8</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The type of population group this collection of entities represents.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>UnitID</name>
+                        <dataType>UnsignedInteger32</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The unit ID</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>CapableStatus</name>
+                        <dataType>CapableStatusEnum8</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The current capability of this group.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>HostilityLevel</name>
+                        <dataType>HostilityLevelEnum8</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The current hostility level of the group, regardless of side/faction.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>Boundary</name>
+                        <dataType>LatLongStruct64Array1Plus</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The outer boundary of the area congested due to a crowd.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>MySuperior</name>
+                        <dataType>LVCID</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>A pointer to the Higher Headquarters for the object.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>SideName</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>An optional attribute specifying the side to which the object instance belongs.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>publisher</name>
+                        <dataType>FederateIdentifierStruct</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>On Change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>two</dimension>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics/>
+                    </attribute>
+                    <attribute>
+                        <name>HostileMission</name>
+                        <dataType>HostileMissionEnum8</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>On Change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>two</dimension>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics/>
+                    </attribute>
+                    <attribute>
+                        <name>Role</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>On Change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>two</dimension>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics/>
+                    </attribute>
+                    <attribute>
+                        <name>JLVCIsPartOf</name>
+                        <dataType>JLVCIsPartOfStruct</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>On change</updateCondition>
+                        <ownership>DivestAcquire</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Defines if the entity is a constituent part of another entity (denoted the host entity). If the entity is a constituent part of another entity then the HostEntityIdentifier shall be set to the EntityIdentifier of the host entity and the HostRTIObjectIdentifier shall be set to the RTI object instance ID of the host entity. If the entity is not a constituent part of another entity then the HostEntityIdentifier shall be set to 0.0.0 and the HostRTIObjectIdentifier shall be set to the empty string.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>RoleSize</name>
+                        <dataType>HLAASCIIstring</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>On Change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>two</dimension>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics/>
+                    </attribute>
+                </objectClass>
+            </objectClass>
+            <objectClass>
+                <name>PopulationEffect</name>
+                <sharing>PublishSubscribe</sharing>
+                <semantics/>
+                <attribute>
+                    <name>Description</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Human readable string that describes this area.</semantics>
+                </attribute>
+                <attribute>
+                    <name>HumanSpeed</name>
+                    <dataType>Float32</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Maximum speed limit (m/s) for lifeforms before they interact with the contents of this area. A ZERO speed indicates movement blocked.</semantics>
+                </attribute>
+                <attribute>
+                    <name>VehicleSpeed</name>
+                    <dataType>Float32</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Maximum speed limit (m/s) for vehicles before they interact with the contents of the area. A ZERO speed indicates movement blocked.</semantics>
+                </attribute>
+                <attribute>
+                    <name>WaterSpeed</name>
+                    <dataType>Float32</dataType>
+                    <updateType>Static</updateType>
+                    <updateCondition>NA</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Maximum speed limit (m/s) for water craft before they interact with the contents of the area. A ZERO speed indicates movement blocked.</semantics>
+                </attribute>
+                <attribute>
+                    <name>Boundary</name>
+                    <dataType>LatLongStruct64Array1Plus</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <dimensions>
+                        <dimension>subspace</dimension>
+                        <dimension>one</dimension>
+                        <dimension>two</dimension>
+                    </dimensions>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>List of Latitude/Longitude pairs that define the effects area polygon (expect at least three values).</semantics>
+                </attribute>
+            </objectClass>
+        </objectClass>
+    </objects>
+    <dataTypes>
+        <basicDataRepresentations/>
+        <simpleDataTypes/>
+        <enumeratedDataTypes>
+            <enumeratedData>
+                <name>ActionStateEnum16</name>
+                <representation>HLAinteger16BE</representation>
+                <semantics/>
+                <enumerator>
+                    <name>None</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Formed</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>MountedOn</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>AtCollectionPoint</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Dispersing</name>
+                    <value>4</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>PgroupTypeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Types of population groups.</semantics>
+                <enumerator>
+                    <name>CIVILIAN</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>FORCE</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>ORGANIZATION</name>
+                    <value>3</value>
+                </enumerator>
+            </enumeratedData>
+        </enumeratedDataTypes>
+        <arrayDataTypes>
+            <arrayData>
+                <name>DemographicsStructArray1Plus</name>
+                <dataType>DemographicsStruct</dataType>
+                <cardinality>[1..2147483647]</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>one or more population grouping elements</semantics>
+            </arrayData>
+        </arrayDataTypes>
+        <fixedRecordDataTypes>
+            <fixedRecordData>
+                <name>DemographicsStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>A population group</semantics>
+                <field>
+                    <name>entityType</name>
+                    <dataType>EntityTypeStruct</dataType>
+                    <semantics>DIS type of the given lifeform</semantics>
+                </field>
+                <field>
+                    <name>alive</name>
+                    <dataType>UnsignedInteger32</dataType>
+                    <semantics>Number of lifeforms alive with no damage</semantics>
+                </field>
+                <field>
+                    <name>wounded</name>
+                    <dataType>UnsignedInteger32</dataType>
+                    <semantics>Number of lifeforms with some type of injury</semantics>
+                </field>
+                <field>
+                    <name>dead</name>
+                    <dataType>UnsignedInteger32</dataType>
+                    <semantics>Number of DEAD lifeforms</semantics>
+                </field>
+            </fixedRecordData>
+        </fixedRecordDataTypes>
+    </dataTypes>
+</objectModel>
