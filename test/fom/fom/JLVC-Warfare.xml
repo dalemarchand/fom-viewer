@@ -1,0 +1,1484 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>JLVC-Warfare</name>
+        <type>FOM</type>
+        <version>7</version>
+        <modificationDate>2026-01-16</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>JLVC-Warfare provides Warfare components neccessary for use in the JLVC federation.</purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the objects and interactions necessary for Warfare communication in the JLVC Federation.</description>
+        <useLimitation/>
+        <useHistory>JLVC2024 - Draft 1 of JLVC Modular FOM.</useHistory>
+        <useHistory>JLVC2024 - Updated version number from 2024 to 1.</useHistory>
+        <useHistory>JLVC2024 - Version 2: Added EventUUID to BattleDamageAssessment.</useHistory>
+        <useHistory>JLVC2024 - Version 3: Added enumerations to AttritionDamageEnum16 for Cyber and EMS_Jamming.</useHistory>
+        <useHistory>JLVC2024 - Version 4: Updated NewStructuralStatus and PreviousStructualStatus parameters to use the PercentUnsignedInteger8 dataType. Removed numberOfRecords parameter from Attrition interaction. Added EventUUID to GroupBDA, FacilityBDA, and AttritionStruct. Added enumeration to AttritionDamageEnum16 for environment.</useHistory>
+        <useHistory>JLVC2025 - Version 5: Updated AttritionStruct.killType attribute to use DISDamageStatusEnum32 datatype.</useHistory>
+        <useHistory>JLVC2025 - Version 6: Added TowedBy attribute to CounterMeasures.</useHistory>
+        <useHistory>JLVC2026 - Version 7: Removed old RPRnotes. Updated reference dependencies to use the new RPRv3 module names.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Heath Rush</pocName>
+            <pocOrg>CAPE Technology Solutions</pocOrg>
+            <pocEmail>heath.rush@capetechsolutions.com</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Minefield FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Warfare FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Synthetic Environment FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-Base</identification>
+        </reference>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+            <objectClass>
+                <name>BaseEntity</name>
+                <objectClass>
+                    <name>CounterMeasures</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <semantics>Simpler counter measure implementation, originated by AWSIM</semantics>
+                    <attribute>
+                        <name>HostObjectIdentifier</name>
+                        <dataType>RTIobjectId</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>REQUIRED. Entity \"dropping\" counter measures.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>isTowed</name>
+                        <dataType>RPRboolean</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics/>
+                    </attribute>
+                    <attribute>
+                        <name>TowedBy</name>
+                        <dataType>LVCID</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>[Optional] LVCID of the towing entity (ie. Who is pulling). If the value is empty, then no entity is pulling the counter measure. </semantics>
+                    </attribute>
+                    <attribute>
+                        <name>LVCIndicator</name>
+                        <dataType>LVCIndicatorEnum8</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>On change</updateCondition>
+                        <ownership>DivestAcquire</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>Indicates whether the data contained in this object instance is related to a Live, Virtual, or Constructive entity.</semantics>
+                    </attribute>
+                    <objectClass>
+                        <name>Chaff</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <semantics>Two types of chaff clouds exist, packette and corridor. Packet modeling is defined by a center point from base entity spatial, and a radius. Corridor modeling is a straight cylinder, defined by two points, base entity spatial and EndPoint and a radius.</semantics>
+                        <attribute>
+                            <name>ChaffIdentifier</name>
+                            <dataType>ChaffIdentifierEnum16</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>REQUIRED. Type of Chaff</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>ChaffType</name>
+                            <dataType>ChaffTypeEnum8</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>REQUIRED. Type of Chaff \"drop\" (corridor or packet)</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>EndPoint</name>
+                            <dataType>SpatialVariantStruct</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>REQUIRED. Second point defining chaff cylinder.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>RFSpectralCoverage_High</name>
+                            <dataType>FrequencyGigahertzFloat32</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>REQUIRED. High end of effective band.</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>RFSpectralCoverage_Low</name>
+                            <dataType>FrequencyGigahertzFloat32</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>REQUIRED. Low end of effective band</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>RadarCrossSection</name>
+                            <dataType>dBsmUnsignedInteger16</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>REQUIRED. Radar reflectivity of sphere with specified radius</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>Radius</name>
+                            <dataType>FeetFloat32</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>REQUIRED. Radius of packette cloud, or around corridor line.</semantics>
+                        </attribute>
+                    </objectClass>
+                    <objectClass>
+                        <name>Flare</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <semantics>simple flares</semantics>
+                        <attribute>
+                            <name>FlareIdentifier</name>
+                            <dataType>FlareIdentifierEnum16</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Type of flare</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>IRSpectralCoverage_High</name>
+                            <dataType>WavelengthMicronFloat32</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>High end of effective band</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>IRSpectralCoverage_Low</name>
+                            <dataType>WavelengthMicronFloat32</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Low end of effective IR band</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>PeakOutput</name>
+                            <dataType>KilowattsPerSteradianFloat32</dataType>
+                            <updateType>Static</updateType>
+                            <updateCondition>NA</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>IR Signal strength.</semantics>
+                        </attribute>
+                    </objectClass>
+                </objectClass>
+            </objectClass>
+            <objectClass>
+                <name>EnvironmentObject</name>
+                <objectClass>
+                    <name>ArealObject</name>
+                    <objectClass>
+                        <name>MinefieldObject</name>
+                        <objectClass>
+                            <name>JLVC_SeaSweepArea</name>
+                            <sharing>Neither</sharing>
+                            <semantics/>
+                            <attribute>
+                                <name>SweepLocation</name>
+                                <dataType>LocationStructArray</dataType>
+                                <updateType>Conditional</updateType>
+                                <updateCondition>On Change</updateCondition>
+                                <ownership>NoTransfer</ownership>
+                                <sharing>PublishSubscribe</sharing>
+                                <dimensions>
+                                    <dimension>two</dimension>
+                                    <dimension>subspace</dimension>
+                                    <dimension>one</dimension>
+                                </dimensions>
+                                <transportation>HLAbestEffort</transportation>
+                                <order>Receive</order>
+                                <semantics>Five points to describe a sweep area polygon which has been swept for mines. Last point must match the first.</semantics>
+                            </attribute>
+                            <attribute>
+                                <name>SweepStatus</name>
+                                <dataType>SweepStatusEnum8</dataType>
+                                <updateType>Conditional</updateType>
+                                <updateCondition>On Change</updateCondition>
+                                <ownership>NoTransfer</ownership>
+                                <sharing>PublishSubscribe</sharing>
+                                <dimensions>
+                                    <dimension>two</dimension>
+                                    <dimension>subspace</dimension>
+                                    <dimension>one</dimension>
+                                </dimensions>
+                                <transportation>HLAbestEffort</transportation>
+                                <order>Receive</order>
+                                <semantics/>
+                            </attribute>
+                            <attribute>
+                                <name>Name</name>
+                                <dataType>HLAASCIIstring</dataType>
+                                <updateType>Conditional</updateType>
+                                <updateCondition>on change</updateCondition>
+                                <ownership>NoTransfer</ownership>
+                                <sharing>PublishSubscribe</sharing>
+                                <dimensions>
+                                    <dimension>subspace</dimension>
+                                    <dimension>one</dimension>
+                                    <dimension>two</dimension>
+                                </dimensions>
+                                <transportation>HLAbestEffort</transportation>
+                                <order>Receive</order>
+                                <semantics>An optional attribute naming the clear lane.</semantics>
+                            </attribute>
+                        </objectClass>
+                    </objectClass>
+                </objectClass>
+            </objectClass>
+        </objectClass>
+    </objects>
+    <interactions>
+        <interactionClass>
+            <name>HLAinteractionRoot</name>
+            <interactionClass>
+                <name>Attrition</name>
+                <sharing>PublishSubscribe</sharing>
+                <dimensions>
+                    <dimension>subspace</dimension>
+                    <dimension>one</dimension>
+                    <dimension>two</dimension>
+                </dimensions>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Entity attrition specified by a source other than that which owns the entity, i.e. MESL events to kill sim entities</semantics>
+                <parameter>
+                    <name>attritionStruct</name>
+                    <dataType>AttritionStructArray</dataType>
+                    <semantics>the collection of damaged entity id\'s, kill types, and damage reasons</semantics>
+                </parameter>
+                <parameter>
+                    <name>from</name>
+                    <dataType>EntityIdentifierStruct</dataType>
+                    <semantics>Who sent this interaction</semantics>
+                </parameter>
+                <parameter>
+                    <name>sequenceNumber</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>Combined with the \"from\" gives a unique identification of this interactio</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>BattleDamageAssessment</name>
+                <sharing>PublishSubscribe</sharing>
+                <dimensions>
+                    <dimension>subspace</dimension>
+                    <dimension>one</dimension>
+                    <dimension>two</dimension>
+                </dimensions>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Provides information on the damage resulting from an attack.</semantics>
+                <parameter>
+                    <name>DamageResultReason</name>
+                    <dataType>DamageReasonEnum32</dataType>
+                    <semantics>The reason for the damage or lack thereof</semantics>
+                </parameter>
+                <parameter>
+                    <name>ComputedDamageResult</name>
+                    <dataType>DISDamageStatusEnum32</dataType>
+                    <semantics>The damage resulting from the attack.</semantics>
+                </parameter>
+                <parameter>
+                    <name>MissionID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Optional. Associated mission identifier.</semantics>
+                </parameter>
+                <parameter>
+                    <name>DamageDetails</name>
+                    <dataType>DamageRepairStructArray</dataType>
+                    <semantics>The details of the damage, how long it will take to repair and the level of maintenance organization which will perform the repair.</semantics>
+                </parameter>
+                <parameter>
+                    <name>DamageMethod</name>
+                    <dataType>AttritionDamageEnum16</dataType>
+                    <semantics>Optional. Informs how the damage was generated.</semantics>
+                </parameter>
+                <parameter>
+                    <name>NewDamageState</name>
+                    <dataType>DISDamageStatusEnum32</dataType>
+                    <semantics>Provides the new damage state.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EventIdentifier</name>
+                    <dataType>EventIdentifierStruct</dataType>
+                    <semantics>An identifier, taken from another interaction(s) and used to associate this interaction with linked events (i.e. WeaponFire/MunitionDetonation, AggregateCombat interactions, etc.).</semantics>
+                </parameter>
+                <parameter>
+                    <name>PreviousDamageState</name>
+                    <dataType>DISDamageStatusEnum32</dataType>
+                    <semantics>The damage state of the object prior to the event.</semantics>
+                </parameter>
+                <parameter>
+                    <name>ReportingObjectIdentifier</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>The RTI Object Identifier of the reporting object.</semantics>
+                </parameter>
+                <parameter>
+                    <name>ReportingID</name>
+                    <dataType>LVCID</dataType>
+                    <semantics>Optional. The LVC ID of the reporting object for cases where it hasn’t been published into the federation. This includes cases where the entity is mounted inside a platform or in a hide box</semantics>
+                </parameter>
+                <parameter>
+                    <name>EventUUID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>Optional, unless reporting on a FIS event or object.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>BattleDamageRepair</name>
+                <sharing>PublishSubscribe</sharing>
+                <dimensions>
+                    <dimension>subspace</dimension>
+                    <dimension>one</dimension>
+                    <dimension>two</dimension>
+                </dimensions>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Performs handshaking for repair requests and replies</semantics>
+                <parameter>
+                    <name>damagedEntity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>RTI name of entity requesting repairs.</semantics>
+                </parameter>
+                <parameter>
+                    <name>repairDetails</name>
+                    <dataType>DamageRepairStructArray</dataType>
+                    <semantics>Array that reflects current state of damage/repair.</semantics>
+                </parameter>
+                <parameter>
+                    <name>repairEntity</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>RTI name of entity that is/will help repair damaged system.</semantics>
+                </parameter>
+                <parameter>
+                    <name>repairHandling</name>
+                    <dataType>DamageHandlingEnum8</dataType>
+                    <semantics>used to indicated MedEvac or similar special handling OPTIONAL.</semantics>
+                </parameter>
+                <parameter>
+                    <name>repairNotes</name>
+                    <dataType>ASCIIstringArray</dataType>
+                    <semantics>Notes regarding damage, repair. One per Code. OPTIONAL.</semantics>
+                </parameter>
+                <parameter>
+                    <name>statusCode</name>
+                    <dataType>DamageRepairTransactionEnum8</dataType>
+                    <semantics>Enumeration value for repair status. If StatusCode has a value of DOWReport then field RepairTime in DamageRepairStruct in Parameter RepairDetails will be used to indicate the time until death (in minutes).</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>GroupBattleDamageAssessment</name>
+                <sharing>PublishSubscribe</sharing>
+                <dimensions>
+                    <dimension>subspace</dimension>
+                    <dimension>one</dimension>
+                    <dimension>two</dimension>
+                </dimensions>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Provides information on the damage by a PopulationEntity object resulting from an attack. It is also used to provide system level damage taken by an aggregate resulting from an engagement on the Aggregate unit. Utilized for reporting Aggregate level BDA in one interaction via the J2B.</semantics>
+                <parameter>
+                    <name>MissionID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Optional. Associated mission identifier.</semantics>
+                </parameter>
+                <parameter>
+                    <name>DamageMethod</name>
+                    <dataType>AttritionDamageEnum16</dataType>
+                    <semantics>Optional. Informs how the damage was generated.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EventIdentifier</name>
+                    <dataType>EventIdentifierStruct</dataType>
+                    <semantics>An ID, generated by the issuing federate, used to associate the GroupBattleDamageAssessment interaction with related fire and detonation events.</semantics>
+                </parameter>
+                <parameter>
+                    <name>ReportingObjectIdentifier</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>The RTI Object Identifier of the reporting object.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Attrition</name>
+                    <dataType>DamageMemberStructArray</dataType>
+                    <semantics>Denotes the changes of damage state of the implicit members.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EventUUID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>Optional, unless reporting on a FIS event or object.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>Detonation</name>
+                <interactionClass>
+                    <name>MunitionDetonation</name>
+                    <interactionClass>
+                        <name>JLVC_MunitionDetonation</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>MunitionDetonation interactions published within the JLVC with JLVC agreed upon attribute.</semantics>
+                        <parameter>
+                            <name>MissionID</name>
+                            <dataType>HLAASCIIstring</dataType>
+                            <semantics>Optional. Associated mission identifier.</semantics>
+                        </parameter>
+                        <parameter>
+                            <name>HitAimPoint</name>
+                            <dataType>HitAimPointEnum8</dataType>
+                            <semantics>REQUIRED. Guided weapons use this field to indicate whether they hit their intended aimpoint or not</semantics>
+                        </parameter>
+                        <parameter>
+                            <name>RelativeBulletLocation</name>
+                            <dataType>RelativePositionStruct</dataType>
+                            <semantics>This field contains the relative location of the point of closest approach of a bullet to the target's center of gravity.</semantics>
+                        </parameter>
+                        <parameter>
+                            <name>WeaponFailCode</name>
+                            <dataType>WeaponFailCodeEnum8</dataType>
+                            <semantics>Indicates why a weapon failed.</semantics>
+                        </parameter>
+                        <parameter>
+                            <name>IntendedTarget</name>
+                            <dataType>HLAASCIIstring</dataType>
+                            <semantics>DMPI_ID; Cardinality 0-1</semantics>
+                        </parameter>
+                    </interactionClass>
+                </interactionClass>
+            </interactionClass>
+            <interactionClass>
+                <name>FacilityBattleDamageAssessment</name>
+                <sharing>PublishSubscribe</sharing>
+                <dimensions>
+                    <dimension>subspace</dimension>
+                    <dimension>one</dimension>
+                    <dimension>two</dimension>
+                </dimensions>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>specifies damage to a facility</semantics>
+                <parameter>
+                    <name>TargetIdentifier</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Equivalent to the Target Identifier in the USMTF TNO specification. This field can represent data from a variety of planning systems including BE Number (e.g. /1234DF8765), BE WITH SUFFIX (e.g. /S1234F1234599), BE WITH BEN SUFFIX (e.g. /N1234-12345AA001), PLSS (e.g. X12345), PIN (e.g. /E12345001), ABCA (e.g. /AAA1234), Theater Target Number (e.g. /T1A12345AZ), HULTEC (e.g. /H1234ABCEF123), and FIBE (e.g. / 2134AA1689)</semantics>
+                </parameter>
+                <parameter>
+                    <name>DamageResultReason</name>
+                    <dataType>DamageReasonEnum32</dataType>
+                    <semantics>Reason for NO damage to the facility</semantics>
+                </parameter>
+                <parameter>
+                    <name>EventIdentifier</name>
+                    <dataType>EventIdentifierStruct</dataType>
+                    <semantics>Event identifier of the munition detonation.</semantics>
+                </parameter>
+                <parameter>
+                    <name>NewStructuralStatus</name>
+                    <dataType>PercentUnsignedInteger8</dataType>
+                    <semantics>Post Event structural Status %. 100% is undamaged and 0% is totally destroyed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>PreviousStructuralStatus</name>
+                    <dataType>PercentUnsignedInteger8</dataType>
+                    <semantics>Pre-Event structural Status %. 100% is undamaged and 0% is totally destroyed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>MissionID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>Optional. Associated mission identifier.</semantics>
+                </parameter>
+                <parameter>
+                    <name>DamageMethod</name>
+                    <dataType>AttritionDamageEnum16</dataType>
+                    <semantics>Optional. Informs how the damage was generated.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EventUUID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>Optional, unless reporting on a FIS event or object.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>Fire</name>
+                <interactionClass>
+                    <name>WeaponFire</name>
+                    <interactionClass>
+                        <name>JLVC_WeaponFire</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>WeaponFire interactions published within the JLVC with JLVC agreed upon attribute.</semantics>
+                        <parameter>
+                            <name>MissionID</name>
+                            <dataType>HLAASCIIstring</dataType>
+                            <semantics>Optional. Associated mission identifier.</semantics>
+                        </parameter>
+                    </interactionClass>
+                </interactionClass>
+            </interactionClass>
+            <interactionClass>
+                <name>MissionHistory</name>
+                <sharing>PublishSubscribe</sharing>
+                <dimensions>
+                    <dimension>subspace</dimension>
+                    <dimension>one</dimension>
+                    <dimension>two</dimension>
+                </dimensions>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Report from end of Air Force mission</semantics>
+                <parameter>
+                    <name>AC_Type</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>The type of aircraft</semantics>
+                </parameter>
+                <parameter>
+                    <name>ATO_ID</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>the ATO identifier</semantics>
+                </parameter>
+                <parameter>
+                    <name>Call_Sign</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>the aircraft call sign</semantics>
+                </parameter>
+                <parameter>
+                    <name>Departure_Base</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>The base, if applicable, from which the aircraft departed on the mission</semantics>
+                </parameter>
+                <parameter>
+                    <name>Departure_Platform</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>The platform, if applicable, from which the aircraft departed on the mission.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Departure_Size</name>
+                    <dataType>UnsignedInteger32</dataType>
+                    <semantics/>
+                </parameter>
+                <parameter>
+                    <name>Departure_Time</name>
+                    <dataType>GameTimeStruct</dataType>
+                    <semantics>The game time at which the flight departed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Landing_Base</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>The base, if applicable, at which the aircraft landed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Landing_Platform</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>The platform, if applicable, on which the aircraft landed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Landing_Size</name>
+                    <dataType>UnsignedInteger32</dataType>
+                    <semantics/>
+                </parameter>
+                <parameter>
+                    <name>Landing_Time</name>
+                    <dataType>GameTimeStruct</dataType>
+                    <semantics>The game time at which the mission landed.</semantics>
+                </parameter>
+                <parameter>
+                    <name>Mission_Number</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>flight\'s mission number</semantics>
+                </parameter>
+                <parameter>
+                    <name>Mission_Type</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>flight\'s mission type</semantics>
+                </parameter>
+                <parameter>
+                    <name>Side</name>
+                    <dataType>ForceIDEnum8</dataType>
+                    <semantics>flight\'s force</semantics>
+                </parameter>
+                <parameter>
+                    <name>Squadron</name>
+                    <dataType>HLAASCIIstring</dataType>
+                    <semantics>squadron name</semantics>
+                </parameter>
+            </interactionClass>
+        </interactionClass>
+    </interactions>
+    <dataTypes>
+        <basicDataRepresentations/>
+        <simpleDataTypes>
+            <simpleData>
+                <name>TimeMinuteUnsignedInteger32</name>
+                <representation>RPRunsignedInteger32BE</representation>
+                <units>Minutes</units>
+                <resolution>1</resolution>
+                <accuracy>perfect</accuracy>
+                <semantics>Datatype time in minutes.</semantics>
+            </simpleData>
+            <simpleData>
+                <name>FrequencyGigahertzFloat32</name>
+                <representation>HLAfloat32BE</representation>
+                <units>Ghz</units>
+                <resolution>NA</resolution>
+                <accuracy>perfect</accuracy>
+                <semantics>frequency in gigahertz</semantics>
+            </simpleData>
+            <simpleData>
+                <name>dBsmUnsignedInteger16</name>
+                <representation>RPRunsignedInteger16BE</representation>
+                <units>dBsm</units>
+                <resolution>NA</resolution>
+                <accuracy>perfect</accuracy>
+                <semantics>decibel measure of the radar cross section (RCS) of a target relative to one square meter.</semantics>
+            </simpleData>
+            <simpleData>
+                <name>FeetFloat32</name>
+                <representation>HLAfloat32BE</representation>
+                <units>feet</units>
+                <resolution>NA</resolution>
+                <accuracy>perfect</accuracy>
+                <semantics>feet expressed as a 32 bit float</semantics>
+            </simpleData>
+            <simpleData>
+                <name>KilowattsPerSteradianFloat32</name>
+                <representation>HLAfloat32BE</representation>
+                <units>Kw/sr</units>
+                <resolution>NA</resolution>
+                <accuracy>Perfect</accuracy>
+                <semantics>Kilowatt/steradian expressed as a float value</semantics>
+            </simpleData>
+        </simpleDataTypes>
+        <enumeratedDataTypes>
+            <enumeratedData>
+                <name>AttritionDamageEnum16</name>
+                <representation>RPRunsignedInteger16BE</representation>
+                <semantics>The cause of the attrition or damage.</semantics>
+                <enumerator>
+                    <name>Direct</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>IED</name>
+                    <value>12</value>
+                </enumerator>
+                <enumerator>
+                    <name>Crash</name>
+                    <value>9</value>
+                </enumerator>
+                <enumerator>
+                    <name>Mine</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>Repair</name>
+                    <value>11</value>
+                </enumerator>
+                <enumerator>
+                    <name>SelfDestruct</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>Controller</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Resurrect</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>Indirect</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>None</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>UntreatedWound</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>ChemBio</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>DataSync</name>
+                    <value>10</value>
+                </enumerator>
+                <enumerator>
+                    <name>ACS</name>
+                    <value>13</value>
+                </enumerator>
+                <enumerator>
+                    <name>RadiationKill</name>
+                    <value>14</value>
+                </enumerator>
+                <enumerator>
+                    <name>NukeKill</name>
+                    <value>15</value>
+                </enumerator>
+                <enumerator>
+                    <name>Cyber</name>
+                    <value>16</value>
+                </enumerator>
+                <enumerator>
+                    <name>EMS_Jamming</name>
+                    <value>17</value>
+                </enumerator>
+                <enumerator>
+                    <name>Environment</name>
+                    <value>18</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>ChaffIdentifierEnum16</name>
+                <representation>HLAinteger16BE</representation>
+                <semantics>Type of Chaff</semantics>
+                <enumerator>
+                    <name>Generic</name>
+                    <value>1</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>ChaffTypeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Type of Chaff \"drop\" (corridor or packet)</semantics>
+                <enumerator>
+                    <name>NotUsed</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>ChaffPacket</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>ChaffCloud</name>
+                    <value>2</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>DamageHandlingEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics/>
+                <enumerator>
+                    <name>Other</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>HighPriority</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>None</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>MedEvac</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>MedEvacAndHighPriority</name>
+                    <value>3</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>DamageReasonEnum32</name>
+                <representation>HLAinteger32BE</representation>
+                <semantics>A randomly drawn reason for the damage or lack of damage.</semantics>
+                <enumerator>
+                    <name>MunitionNotKnown</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>FirerState</name>
+                    <value>18</value>
+                </enumerator>
+                <enumerator>
+                    <name>TargetCovered</name>
+                    <value>14</value>
+                </enumerator>
+                <enumerator>
+                    <name>TooFarAway</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>WarheadWrong</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>FuseWrong</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>TargetDestroyed</name>
+                    <value>15</value>
+                </enumerator>
+                <enumerator>
+                    <name>TargetState</name>
+                    <value>16</value>
+                </enumerator>
+                <enumerator>
+                    <name>FinalVelocityVectorWrong</name>
+                    <value>12</value>
+                </enumerator>
+                <enumerator>
+                    <name>MunitionWrong</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>RelativeDetonationLocationWrong</name>
+                    <value>13</value>
+                </enumerator>
+                <enumerator>
+                    <name>RateWrong</name>
+                    <value>9</value>
+                </enumerator>
+                <enumerator>
+                    <name>DetonationLocationWrong</name>
+                    <value>10</value>
+                </enumerator>
+                <enumerator>
+                    <name>NoWeaponsFire</name>
+                    <value>19</value>
+                </enumerator>
+                <enumerator>
+                    <name>QuantityWrong</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>RandomDraw</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>NoFirer</name>
+                    <value>17</value>
+                </enumerator>
+                <enumerator>
+                    <name>DetonationResultWrong</name>
+                    <value>11</value>
+                </enumerator>
+                <enumerator>
+                    <name>NoDamageMapping</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>EngagementSuccess</name>
+                    <value>0</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>DamageRepairTransactionEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics/>
+                <enumerator>
+                    <name>DOWReport</name>
+                    <value>11</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairCancelled</name>
+                    <value>9</value>
+                </enumerator>
+                <enumerator>
+                    <name>MagicFix</name>
+                    <value>10</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairRejected</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairUpdated</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>Other</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairStarted</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairAccepted</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairConfirmed</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairOffered</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairComplete</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairRequested</name>
+                    <value>1</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>FlareIdentifierEnum16</name>
+                <representation>HLAinteger16BE</representation>
+                <semantics>Type of flare.</semantics>
+                <enumerator>
+                    <name>Generic</name>
+                    <value>1</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>HitAimPointEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>indicates whether aim point is hit</semantics>
+                <enumerator>
+                    <name>NotUsed</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Hit</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Miss</name>
+                    <value>2</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>RepairLevelEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>The maintenance organizational level required for the repair.</semantics>
+                <enumerator>
+                    <name>RepairLevel5</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairLevel1B</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairLevel3</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairLevel4</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairLevel2</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>NoRepairs</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Other</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>FullyRepaired</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>RepairLevel1A</name>
+                    <value>1</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>SweepStatusEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics/>
+                <enumerator>
+                    <name>PROGRESS</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>COMPLETE</name>
+                    <value>2</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>WeaponFailCodeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>reasons for weapon failure</semantics>
+                <enumerator>
+                    <name>None</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>ExcessiveLagHeading</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>ExcessiveLeadHeading</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>InsideMinRange</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>OutsideMaxRange</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>InsufficientMissileVelocity</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>GimbalLimitExceeded</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>SeekerLostLock</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>InsufficientSpeedAtBurnout</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>ManeuverSuccessful</name>
+                    <value>9</value>
+                </enumerator>
+                <enumerator>
+                    <name>InsufficientCloseRate</name>
+                    <value>10</value>
+                </enumerator>
+                <enumerator>
+                    <name>MissileDeceivedByChaff</name>
+                    <value>11</value>
+                </enumerator>
+                <enumerator>
+                    <name>MissileDeceivedByFlare</name>
+                    <value>12</value>
+                </enumerator>
+                <enumerator>
+                    <name>AAADeceivedByChaff</name>
+                    <value>13</value>
+                </enumerator>
+                <enumerator>
+                    <name>AircraftRadarBrokeLock</name>
+                    <value>14</value>
+                </enumerator>
+                <enumerator>
+                    <name>InsufficientSafeArmTime</name>
+                    <value>15</value>
+                </enumerator>
+                <enumerator>
+                    <name>MissDistanceExceeded</name>
+                    <value>16</value>
+                </enumerator>
+                <enumerator>
+                    <name>MaxFlightTimeExceeded</name>
+                    <value>17</value>
+                </enumerator>
+                <enumerator>
+                    <name>LowIRSignalAtLaunch</name>
+                    <value>18</value>
+                </enumerator>
+                <enumerator>
+                    <name>ExcessiveClutter</name>
+                    <value>19</value>
+                </enumerator>
+                <enumerator>
+                    <name>InsufficientClosureRate</name>
+                    <value>20</value>
+                </enumerator>
+                <enumerator>
+                    <name>IRInterferedByCloud</name>
+                    <value>21</value>
+                </enumerator>
+                <enumerator>
+                    <name>EffectiveECM</name>
+                    <value>22</value>
+                </enumerator>
+                <enumerator>
+                    <name>IRMissileTrackedToSun</name>
+                    <value>23</value>
+                </enumerator>
+                <enumerator>
+                    <name>LowIRSignalInFlight</name>
+                    <value>24</value>
+                </enumerator>
+                <enumerator>
+                    <name>AntiCompJettison</name>
+                    <value>25</value>
+                </enumerator>
+                <enumerator>
+                    <name>DECMEffective</name>
+                    <value>26</value>
+                </enumerator>
+                <enumerator>
+                    <name>MissileSeekerRangeExceeded</name>
+                    <value>27</value>
+                </enumerator>
+                <enumerator>
+                    <name>InsufficientLeadHeading</name>
+                    <value>28</value>
+                </enumerator>
+                <enumerator>
+                    <name>FlightDenied</name>
+                    <value>29</value>
+                </enumerator>
+                <enumerator>
+                    <name>MaxInFlight</name>
+                    <value>30</value>
+                </enumerator>
+                <enumerator>
+                    <name>MissileHitGround</name>
+                    <value>31</value>
+                </enumerator>
+                <enumerator>
+                    <name>RollPitchRateExceeded</name>
+                    <value>32</value>
+                </enumerator>
+                <enumerator>
+                    <name>ActiveGuidanceMaxTimeExceeded</name>
+                    <value>33</value>
+                </enumerator>
+                <enumerator>
+                    <name>RadarNotOn</name>
+                    <value>34</value>
+                </enumerator>
+                <enumerator>
+                    <name>MissileNotArmed</name>
+                    <value>35</value>
+                </enumerator>
+                <enumerator>
+                    <name>ExternalTerminateRequested</name>
+                    <value>36</value>
+                </enumerator>
+                <enumerator>
+                    <name>NoTargetFound</name>
+                    <value>37</value>
+                </enumerator>
+                <enumerator>
+                    <name>BelowSAMMunitionAltitude</name>
+                    <value>38</value>
+                </enumerator>
+                <enumerator>
+                    <name>HarpoonOutOfFuel</name>
+                    <value>39</value>
+                </enumerator>
+                <enumerator>
+                    <name>HarpoonSelfDestruct</name>
+                    <value>40</value>
+                </enumerator>
+                <enumerator>
+                    <name>GPSJamming</name>
+                    <value>41</value>
+                </enumerator>
+            </enumeratedData>
+        </enumeratedDataTypes>
+        <arrayDataTypes>
+            <arrayData>
+                <name>DamageRepairStructArray</name>
+                <dataType>DamageRepairStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Zero or more elements</semantics>
+            </arrayData>
+            <arrayData>
+                <name>DamageMemberStructArray</name>
+                <dataType>DamageMemberStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>Zero or more elements</semantics>
+            </arrayData>
+            <arrayData>
+                <name>AttritionStructArray</name>
+                <dataType>AttritionStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>An array of Attritions.</semantics>
+            </arrayData>
+        </arrayDataTypes>
+        <fixedRecordDataTypes>
+            <fixedRecordData>
+                <name>AttritionStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics/>
+                <field>
+                    <name>LVCID</name>
+                    <dataType>LVCID</dataType>
+                    <semantics/>
+                </field>
+                <field>
+                    <name>killType</name>
+                    <dataType>DISDamageStatusEnum32</dataType>
+                    <semantics/>
+                </field>
+                <field>
+                    <name>damage</name>
+                    <dataType>AttritionDamageEnum16</dataType>
+                    <semantics/>
+                </field>
+                <field>
+                    <name>EventUUID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>For report on FIS event or object.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>DamageMemberStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specific personnel that were killed or wounded</semantics>
+                <field>
+                    <name>damageReason</name>
+                    <dataType>DamageReasonEnum32</dataType>
+                    <semantics>The reason for the damage or lack thereof</semantics>
+                </field>
+                <field>
+                    <name>member</name>
+                    <dataType>ImplicitMemberStruct</dataType>
+                    <semantics>A class of entities that all with the same damage result code</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>DamageRepairStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>The details of the damage, how long it will take to repair and the level of maintenance organization which will perform the repair.</semantics>
+                <field>
+                    <name>damageCode</name>
+                    <dataType>Integer32</dataType>
+                    <semantics>describes the condition that has been assigned to the person or piece of equipment - i.e. broken leg or overheated radiator, etc. The combat models and JDLM agree on the values during the database build process.</semantics>
+                </field>
+                <field>
+                    <name>repairLevel</name>
+                    <dataType>RepairLevelEnum8</dataType>
+                    <semantics>The maintenance organizational level required for the repair.</semantics>
+                </field>
+                <field>
+                    <name>repairTime</name>
+                    <dataType>TimeMinuteUnsignedInteger32</dataType>
+                    <semantics>The time in minutes required for repair.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>ImplicitMemberStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specific personnel that were killed or wounded</semantics>
+                <field>
+                    <name>Type</name>
+                    <dataType>EntityTypeStruct</dataType>
+                    <semantics>DIS Type of a given platform or lifeform</semantics>
+                </field>
+                <field>
+                    <name>Authorized</name>
+                    <dataType>Integer32</dataType>
+                    <semantics>Total expected number of entities of this type</semantics>
+                </field>
+                <field>
+                    <name>Alive</name>
+                    <dataType>Integer32</dataType>
+                    <semantics>Number of ALIVE and non wounded entities</semantics>
+                </field>
+                <field>
+                    <name>Fkill</name>
+                    <dataType>Integer32</dataType>
+                    <semantics>Number of Firepower killed entities</semantics>
+                </field>
+                <field>
+                    <name>Mkill</name>
+                    <dataType>Integer32</dataType>
+                    <semantics>Number of Mobility killed entities</semantics>
+                </field>
+                <field>
+                    <name>MFkill</name>
+                    <dataType>Integer32</dataType>
+                    <semantics>Number of Mobility/Fire powered killed entities</semantics>
+                </field>
+                <field>
+                    <name>Kkill</name>
+                    <dataType>Integer32</dataType>
+                    <semantics>Number that are killed or dead</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>GameTimeStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>The game time in days, hours, minutes, and seconds</semantics>
+                <field>
+                    <name>Day</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>the number of days</semantics>
+                </field>
+                <field>
+                    <name>Hour</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>the number of hours</semantics>
+                </field>
+                <field>
+                    <name>Min</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>the number of minutes</semantics>
+                </field>
+                <field>
+                    <name>Sec</name>
+                    <dataType>UnsignedInteger16</dataType>
+                    <semantics>the number of seconds</semantics>
+                </field>
+            </fixedRecordData>
+        </fixedRecordDataTypes>
+    </dataTypes>
+</objectModel>

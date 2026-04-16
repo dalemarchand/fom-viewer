@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main, test, '**']
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install root dependencies
+        run: npm install
+      - name: Install test dependencies
+        run: cd test && npm install
+      - name: Run lint
+        run: npm run lint
+      - name: Run standard tests
+        run: npm test
+      - name: Build combined file
+        run: npm run build
+      - name: Run combined tests
+        run: npm run test:combined
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fom-viewer
+          path: dist/fom-viewer.html

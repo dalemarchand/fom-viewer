@@ -1,0 +1,753 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>JLVC-Effects</name>
+        <type>FOM</type>
+        <version>10</version>
+        <modificationDate>2026-03-03</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>JLVC-Effects provides components neccessary to support the use of external effects in the JLVC federation.</purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the objects and interactions used for effects in the JLVC Fully Informed Simulation Environment.</description>
+        <useLimitation/>
+        <useHistory>JLVC2024 - Initial draft of JLVC-Effects module</useHistory>
+        <useHistory>JLVC2024 - RequestAcknowledgement moved from FISEevent to FISEevent.FISEeffect and also added to FISEpersistentEffect.</useHistory>
+        <useHistory>JLVC2024 - Version 3: Changed dataTypes for EventID and RelatedEventID to use UUID.</useHistory>
+        <useHistory>JLVC2024 - Version 4: Defined FunctionalEffectArray1Plus. Updated FISEpersistentEffect.FunctionalEffect and FISEeffect.FunctionalEffect to use FunctionalEffectArray1Plus. Moved FISEacknowledge interaction out of FISEevent. Added federateIdentifier to FISEacknowledge. Added FISEstopEffect interaction. Added Sensor_Kill enumeration to PhysicalEffectEnum8. Added environment enumeration to ReasonForEffectEnum8. Changed TargetID and Geometry in FISEpersistentEffect into a variantRecord. Implement FunctionalEffectVariantStruct for FISEeffect.</useHistory>
+        <useHistory>JLVC2025 - Version 5: Redesigned to reduce the number of variantStructs and contain more optional lists. New individual attributes were added to FISEpersistentEffect to provide additional functionality: A list of geometries. A list of LVCIDs. A list of targeted entity types, A list of targeted emitters. These attributes will functional as additional filters with an ANDed behavior. New individual parameters were added to FISEevent to provide additional functionality: A list of geometries. A list of LVCIDs. A list of targeted entity types. A list of targeted emitters. These parameters will functional as additional filters with an ANDed behavior. Air_Movement_Speed was added to CapabilityTypeEnum8. Semantics for the PhysicalEffect attribute of FISEpersistentEffect was updated to remove reference to "Array Of".</useHistory>
+        <useHistory>JLVC2025 - Version 6: Removed JLVC-SIMAN dependency by moving Area2DVariantStruct to JLVC-Base. Merged FISEevent and FISEevent.FISEeffect into new FISEeffect. Updated cardinality and renamed FunctionalEffectArray1Plus. Updated PhysicalEffectEnum8: "Unknown changed to "No_Statement" and "No_Damage" changed to "Provisional". Updated FISEacknowledgeResponseEnum8 with new enumerations: Not_Applicable, Rejected, Pending, and Complete. Updated semantics of DegradationPercentage in CapabilityDegradationStruct and NetworkDegradationStruct to indicate valid values. Moved Geometries, TargetList, TargetEntityTypes, and TargetEmitters into fixed record EffectTargetStruct. Added new attribute and parameter EffectTarget in FISEpersistentEffect and FISEeffect to utilize EffectTargetStruct. Moved FunctionalEffect, PhysicalEffect, and ReasonForEffect into new EffectTypeStruct. Added new attribute and parameter EffectType to utilize EffectTypeStruct. Created PlatformDomainArray. Added PlatformDomainArray to EffectTargetStruct.</useHistory>
+        <useHistory>JLVC2025 - Version 7: Updated the order of dataType groupings in the module and moved the encoding tag of FunctionalEffectVariantStruct to be compliant with schema. Updated the enumeration names of values 0 and 1 in CapabilityTypeEnum8 for clarity regarding ground movement. Updated both RequestAcknowledgement attributes to use RPRboolean dataType. Updated semantics for NetworkDegradationStruct's DegradationPercentage field. Added FISEeffectsAssessment interaction and supporting datatypes: ReportingIdStruct, FunctionalStateDegradationStruct, FEAcapabilityDegradationStruct, FEAnetworkDegradationStruct, SystemTypeStateChangeStruct, FunctionalEffectsAssessmentVariantStruct, and FunctionalEffectsAssessmentVariantStructArray.</useHistory>
+        <useHistory>JLVC2025 - Version 8: In FunctionalStateDegradationStruct, updated the data type of ToApply field to allow negative values. Updated semantics.</useHistory>
+        <useHistory>JLVC2026 - Version 9: In FunctionalStateDegradationStruct, updated the semantics of the ToApply field. Updated reference dependencies to use the new RPRv3 module names. Added RPR Foundation module as a reference dependency.</useHistory>
+        <useHistory>JLVC2026 - Version 10: Created new data type FISEdomainEnum8 and FISEDomainArray to replace PlatformDomainEnum8 and PlatformDomainArray. FISEdomainEnum8 replicates PlatformDomainEnum8 and adds domains for Munitions and Supplies.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Heath Rush</pocName>
+            <pocOrg>CAPE Technology Solutions</pocOrg>
+            <pocEmail>heath.rush@capetechsolutions.com</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-Base</identification>
+        </reference>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+            <objectClass>
+                <name>FISEpersistentEffect</name>
+                <sharing>PublishSubscribe</sharing>
+                <semantics>A FISE effect that will persist in the federation and allow updates.</semantics>
+                <attribute>
+                    <name>EventID</name>
+                    <dataType>UUID</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Required. UUID used to associate related FISE events.</semantics>
+                </attribute>
+                <attribute>
+                    <name>SourceID</name>
+                    <dataType>LVCID</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Optional, as source may not be known due to classification. LVCID of entity causing the effect.</semantics>
+                </attribute>
+                <attribute>
+                    <name>EffectTarget</name>
+                    <dataType>EffectTargetStruct</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>The target of an effect as defined by multiple filters. The resulting target must meet all filtering criteria.</semantics>
+                </attribute>
+                <attribute>
+                    <name>EffectType</name>
+                    <dataType>EffectTypeStruct</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>Required. The physical and functional effects applied to a target, and the provided reason for the effect.</semantics>
+                </attribute>
+                <attribute>
+                    <name>RequestAcknowledgement</name>
+                    <dataType>RPRboolean</dataType>
+                    <updateType>Conditional</updateType>
+                    <updateCondition>on change</updateCondition>
+                    <ownership>NoTransfer</ownership>
+                    <sharing>PublishSubscribe</sharing>
+                    <transportation>HLAbestEffort</transportation>
+                    <order>Receive</order>
+                    <semantics>True, if the receiver should send a FISEacknowledge back to the sender.</semantics>
+                </attribute>
+            </objectClass>
+        </objectClass>
+    </objects>
+    <interactions>
+        <interactionClass>
+            <name>HLAinteractionRoot</name>
+            <interactionClass>
+                <name>FISEacknowledge</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Acknowledges the status of a specified event.</semantics>
+                <parameter>
+                    <name>RelatedEventID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>Required. UUID of the FISE Event being acknowledged.</semantics>
+                </parameter>
+                <parameter>
+                    <name>AcknowledgeResponse</name>
+                    <dataType>FISEacknowledgeResponseEnum8</dataType>
+                    <semantics>Required. The response to the related FISE event being acknowledged.</semantics>
+                </parameter>
+                <parameter>
+                    <name>FederateIdentifier</name>
+                    <dataType>FederateIdentifierStruct</dataType>
+                    <semantics>Required. The federate sending the acknowledgement.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>FISEeffect</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>A FISE effect that is a "single shot" and does not need to be updated.</semantics>
+                <parameter>
+                    <name>EventID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>Required. UUID used to associate related FISE events.</semantics>
+                </parameter>
+                <parameter>
+                    <name>SourceID</name>
+                    <dataType>LVCID</dataType>
+                    <semantics>Optional, as source may not be known due to classification. LVCID of entity causing the effect.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EffectTarget</name>
+                    <dataType>EffectTargetStruct</dataType>
+                    <semantics>The target of an effect as defined by multiple filters. The resulting target must meet all filtering criteria.</semantics>
+                </parameter>
+                <parameter>
+                    <name>EffectType</name>
+                    <dataType>EffectTypeStruct</dataType>
+                    <semantics>Required. The physical and functional effects applied to a target, and the provided reason for the effect.</semantics>
+                </parameter>
+                <parameter>
+                    <name>RequestAcknowledgement</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>True, if the receiver should send a FISEacknowledge back to the sender.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>FISEeffectsAssessment</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Provides information on functional damage resulting from an effect.</semantics>
+                <parameter>
+                    <name>EventID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>Required. The UUID of event that caused the effects damage.</semantics>
+                </parameter>
+                <parameter>
+                    <name>ReportingID</name>
+                    <dataType>ReportingIdStruct</dataType>
+                    <semantics>Required. The ID of the reporting entity. Can be represented as a RTIobjectId, LVCID, or both. </semantics>
+                </parameter>
+                <parameter>
+                    <name>FunctionalEffects</name>
+                    <dataType>FunctionalEffectsAssessmentVariantStructArray</dataType>
+                    <semantics>Required. Specifies a list of functional effects including system damage, degraded capabilities, and degraded networks.</semantics>
+                </parameter>
+            </interactionClass>
+            <interactionClass>
+                <name>FISEstopEffect</name>
+                <sharing>PublishSubscribe</sharing>
+                <transportation>HLAbestEffort</transportation>
+                <order>Receive</order>
+                <semantics>Interaction to stop effects. To stop a specific event, specify an EventID to stop. If no EventID is specified, all effects will be stopped globally.</semantics>
+                <parameter>
+                    <name>EventID</name>
+                    <dataType>UUID</dataType>
+                    <semantics>Optional. Specifies the EventID to stop effect. If not specified, all effects will be stopped globally.</semantics>
+                </parameter>
+            </interactionClass>
+        </interactionClass>
+    </interactions>
+    <dataTypes>
+        <enumeratedDataTypes>
+            <enumeratedData>
+                <name>CapabilityTypeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Capability Type for Functional Effect.</semantics>
+                <enumerator>
+                    <name>Ground_Movement_Speed-Lifeform</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Ground_Movement_Speed-Vehicle</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Water_Movement_Speed</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Acquisition_Probability</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Acquisition_Range</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>Probability_To_Hit</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>Tracking</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>Self_Reporting</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>Activity_Prep</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>Supply_Transfer</name>
+                    <value>9</value>
+                </enumerator>
+                <enumerator>
+                    <name>Communications</name>
+                    <value>10</value>
+                </enumerator>
+                <enumerator>
+                    <name>Air_Movement_Speed</name>
+                    <value>11</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>FISEacknowledgeResponseEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Responses for a FISEacknowledge.</semantics>
+                <enumerator>
+                    <name>Not_Applicable</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Rejected</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Pending</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Complete</name>
+                    <value>3</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>FISEdomainEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Domain used for filtering FISE effects.</semantics>
+                <enumerator>
+                    <name>Other</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Land</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Air</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Surface</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Subsurface</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>Space</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>Munitions</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>Supplies</name>
+                    <value>7</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>FunctionalEffectTypeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Type of functional effect.</semantics>
+                <enumerator>
+                    <name>System</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Capability</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Network</name>
+                    <value>2</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>FunctionalEffectSystemTypeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>System Type for Functional Effect.</semantics>
+                <enumerator>
+                    <name>BFT</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>IFF</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Link16</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>GPS</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Laser_Designator</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>FO</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>Protective_System</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>Jammer</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>All_Electronics</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>All_Communication_Devices</name>
+                    <value>9</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>NetworkTypeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Network Type of functional effect.</semantics>
+                <enumerator>
+                    <name>Water</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Electricity</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>NaturalGas</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Wired_Communications</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Wireless_Communications</name>
+                    <value>4</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>PhysicalEffectEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Physical Effects from FISE.</semantics>
+                <enumerator>
+                    <name>No_Statement</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Provisional</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Firepower</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Mobility</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Firepower_And_Mobility</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>Catastrophic</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>Sensor_Kill</name>
+                    <value>6</value>
+                </enumerator>
+            </enumeratedData>
+            <enumeratedData>
+                <name>ReasonForEffectEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Reason for effect from FISE.</semantics>
+                <enumerator>
+                    <name>Unknown</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Direct_Fire</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>IED</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Mine</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Self_Destruct</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>Indirect_Fire</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>Chem_Bio</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>Radiation</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>Nuclear</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>Cyber</name>
+                    <value>9</value>
+                </enumerator>
+                <enumerator>
+                    <name>EMS_Jamming</name>
+                    <value>10</value>
+                </enumerator>
+                <enumerator>
+                    <name>Environment</name>
+                    <value>11</value>
+                </enumerator>
+            </enumeratedData>
+        </enumeratedDataTypes>
+        <arrayDataTypes>
+            <arrayData>
+                <name>Area2DVariantStructArray</name>
+                <dataType>Area2DVariantStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>A list of defined two-dimensional areas.</semantics>
+            </arrayData>
+            <arrayData>
+                <name>EmitterNameArray</name>
+                <dataType>EmitterNameEnum16</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>A list of emitter names.</semantics>
+            </arrayData>
+            <arrayData>
+                <name>FISEDomainArray</name>
+                <dataType>FISEdomainEnum8</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>A list of domains for filtering FISE effects</semantics>
+            </arrayData>
+            <arrayData>
+                <name>FunctionalEffectArray</name>
+                <dataType>FunctionalEffectVariantStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>A list of functional effects.</semantics>
+            </arrayData>
+            <arrayData>
+                <name>FunctionalEffectsAssessmentVariantStructArray</name>
+                <dataType>FunctionalEffectsAssessmentVariantStruct</dataType>
+                <cardinality>Dynamic</cardinality>
+                <encoding>HLAvariableArray</encoding>
+                <semantics>A list of defined functional effects for FISEeffectsAssessment.</semantics>
+            </arrayData>
+        </arrayDataTypes>
+        <fixedRecordDataTypes>
+            <fixedRecordData>
+                <name>CapabilityDegradationStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Capability type and the change in degradation caused by the effect.</semantics>
+                <field>
+                    <name>CapabilityType</name>
+                    <dataType>CapabilityTypeEnum8</dataType>
+                    <semantics>Specific capability type degraded.</semantics>
+                </field>
+                <field>
+                    <name>DegradationPercentage</name>
+                    <dataType>PercentUnsignedInteger8</dataType>
+                    <semantics>Percentage by which the capability is reduced. The valid range of values is 0-100. Multiple overlapping degradations are additive: 20% + 30% = 50%.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>EffectTargetStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Defines a set of filters (lists of geometries, LVCID, EntityTypes, EmitterNames, and platform domains) that can be used to specify effects targets.</semantics>
+                <field>
+                    <name>Geometries</name>
+                    <dataType>Area2DVariantStructArray</dataType>
+                    <semantics>Specifies a list of two-dimensional geometries targeted by effect.</semantics>
+                </field>
+                <field>
+                    <name>TargetList</name>
+                    <dataType>LVCIDArray</dataType>
+                    <semantics>Specifies a list of unit and or entity targets by LVCID.</semantics>
+                </field>
+                <field>
+                    <name>TargetEntityTypes</name>
+                    <dataType>EntityTypeStructArray</dataType>
+                    <semantics>Specifies a list of entity types impacted by effect.</semantics>
+                </field>
+                <field>
+                    <name>TargetEmitters</name>
+                    <dataType>EmitterNameArray</dataType>
+                    <semantics>Specifies a list of emitters (by name) impacted by effect.</semantics>
+                </field>
+                <field>
+                    <name>TargetDomains</name>
+                    <dataType>FISEDomainArray</dataType>
+                    <semantics>Specifies a list of domains impacted by the effect.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>EffectTypeStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Defines a set of physical and functional effects to be applied to a target, plus a reason for the effects.</semantics>
+                <field>
+                    <name>FunctionalEffect</name>
+                    <dataType>FunctionalEffectArray</dataType>
+                    <semantics>Specifies a list of functional effects provided by FISE. Damage from multiple functional effects is cumulative.</semantics>
+                </field>
+                <field>
+                    <name>PhysicalEffect</name>
+                    <dataType>PhysicalEffectEnum8</dataType>
+                    <semantics>Physical damage effect. Multiple physical effects are cumulative. Physical damage caused by effects cannot be undone or reduced by updating this value. It must be remedied by normal medical/repair operations or healed/repaired by a federate controller.</semantics>
+                </field>
+                <field>
+                    <name>ReasonForEffect</name>
+                    <dataType>ReasonForEffectEnum8</dataType>
+                    <semantics>The provided reason for the effect from FISE.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>FEAcapabilityDegradationStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specifies a type of capability and the change in that capability’s degradation.</semantics>
+                <field>
+                    <name>CapabilityType</name>
+                    <dataType>CapabilityTypeEnum8</dataType>
+                    <semantics>Specifies the capability type degraded.</semantics>
+                </field>
+                <field>
+                    <name>CapabilityDegradationChange</name>
+                    <dataType>FunctionalStateDegradationStruct</dataType>
+                    <semantics>Change in capability degradation from effect.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>FEAnetworkDegradationStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specifies a type of network and the change in that network’s degradation.</semantics>
+                <field>
+                    <name>NetworkType</name>
+                    <dataType>NetworkTypeEnum8</dataType>
+                    <semantics>Specifies the network type degraded.</semantics>
+                </field>
+                <field>
+                    <name>NetworkDegradationChange</name>
+                    <dataType>FunctionalStateDegradationStruct</dataType>
+                    <semantics>Change in network degradation from effect.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>FunctionalStateDegradationStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specifies the states of functional degradation and the degradation percentage.</semantics>
+                <field>
+                    <name>Before</name>
+                    <dataType>PercentUnsignedInteger8</dataType>
+                    <semantics>Percentage degradation before applying the effect. The valid range of values is 0-100.</semantics>
+                </field>
+                <field>
+                    <name>ToApply</name>
+                    <dataType>PercentInteger16</dataType>
+                    <semantics>Percentage degradation the effect is attempting to apply. The valid range of values is -100 to 100.</semantics>
+                </field>
+                <field>
+                    <name>After</name>
+                    <dataType>PercentUnsignedInteger8</dataType>
+                    <semantics>Percentage degradation after applying the effect. The valid range of values is 0-100.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>NetworkDegradationStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Network type and the change in degradation caused by the effect.</semantics>
+                <field>
+                    <name>NetworkType</name>
+                    <dataType>NetworkTypeEnum8</dataType>
+                    <semantics>Specific network type degraded.</semantics>
+                </field>
+                <field>
+                    <name>DegradationPercentage</name>
+                    <dataType>PercentUnsignedInteger8</dataType>
+                    <semantics>Percentage by which the network is reduced. The valid range of values is 0-100. Multiple overlapping degradations are additive: 20% + 30% = 50%.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>ReportingIdStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Defines a reporting object ID as an LVCID and an RTIobjectId. The RTIobjectId should be specified if the object is published. The LVCID is mandatory if no RTIobjectId is specified, otherwise it is optional.</semantics>
+                <field>
+                    <name>LVCID</name>
+                    <dataType>LVCID</dataType>
+                    <semantics>The LVCID of the reporting object.</semantics>
+                </field>
+                <field>
+                    <name>ReportingObjectID</name>
+                    <dataType>RTIobjectId</dataType>
+                    <semantics>The RTI Object Identifier of the reporting object.</semantics>
+                </field>
+            </fixedRecordData>
+            <fixedRecordData>
+                <name>SystemTypeStateChangeStruct</name>
+                <encoding>HLAfixedRecord</encoding>
+                <semantics>Specifies a system type and the change in that system's operational status.</semantics>
+                <field>
+                    <name>SystemType</name>
+                    <dataType>FunctionalEffectSystemTypeEnum8</dataType>
+                    <semantics>Specifies the system type impacted by effect.</semantics>
+                </field>
+                <field>
+                    <name>Before</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>The system status before applying the effect. True, if system is operational. False, if the system is disabled.</semantics>
+                </field>
+                <field>
+                    <name>ToApply</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>The system status the effect is attempting to apply. True, if system is operational. False, if the system is disabled.</semantics>
+                </field>
+                <field>
+                    <name>After</name>
+                    <dataType>RPRboolean</dataType>
+                    <semantics>The system status after applying the effect. True, if system is operational. False, if the system is disabled.</semantics>
+                </field>
+            </fixedRecordData>
+        </fixedRecordDataTypes>
+        <variantRecordDataTypes>
+            <variantRecordData>
+                <name>FunctionalEffectsAssessmentVariantStruct</name>
+                <discriminant>FunctionalEffectType</discriminant>
+                <dataType>FunctionalEffectTypeEnum8</dataType>
+                <alternative>
+                    <enumerator>System</enumerator>
+                    <name>SystemType</name>
+                    <dataType>SystemTypeStateChangeStruct</dataType>
+                    <semantics>Specifies a functional effect on a system.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>Capability</enumerator>
+                    <name>CapabilityDegradation</name>
+                    <dataType>FEAcapabilityDegradationStruct</dataType>
+                    <semantics>Specifies a capability degradation effect.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>Network</enumerator>
+                    <name>NetworkDegradation</name>
+                    <dataType>FEAnetworkDegradationStruct</dataType>
+                    <semantics>Specifies a network degradation effect.</semantics>
+                </alternative>
+                <encoding>HLAvariantRecord</encoding>
+                <semantics>Struct determining whether the functional effect assessment is on a system, capability, or network.</semantics>
+            </variantRecordData>
+            <variantRecordData>
+                <name>FunctionalEffectVariantStruct</name>
+                <discriminant>FunctionalEffectType</discriminant>
+                <dataType>FunctionalEffectTypeEnum8</dataType>
+                <alternative>
+                    <enumerator>System</enumerator>
+                    <name>SystemType</name>
+                    <dataType>FunctionalEffectSystemTypeEnum8</dataType>
+                    <semantics>System type disabled by the effect.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>Capability</enumerator>
+                    <name>CapabilityDegradation</name>
+                    <dataType>CapabilityDegradationStruct</dataType>
+                    <semantics>Capability degradation effect.</semantics>
+                </alternative>
+                <alternative>
+                    <enumerator>Network</enumerator>
+                    <name>NetworkDegradation</name>
+                    <dataType>NetworkDegradationStruct</dataType>
+                    <semantics>Network degradation effect.</semantics>
+                </alternative>
+                <encoding>HLAvariantRecord</encoding>
+                <semantics>Struct determining whether the functional effect is on a system, capability, or network.</semantics>
+            </variantRecordData>
+        </variantRecordDataTypes>
+    </dataTypes>
+</objectModel>

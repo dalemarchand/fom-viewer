@@ -1,0 +1,414 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objectModel xsi:schemaLocation="http://standards.ieee.org/IEEE1516-2010 http://standards.ieee.org/downloads/1516/1516.2-2010/IEEE1516-DIF-2010.xsd" xmlns="http://standards.ieee.org/IEEE1516-2010" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelIdentification>
+        <name>JLVC-Emission</name>
+        <type>FOM</type>
+        <version>5</version>
+        <modificationDate>2026-01-16</modificationDate>
+        <securityClassification>Unclassified</securityClassification>
+        <purpose>JLVC-Emission provides Emission components neccessary for use in the JLVC federation.</purpose>
+        <applicationDomain>Training</applicationDomain>
+        <description>This FOM module contains the objects and interactions necessary for Emission communication in the JLVC Federation.</description>
+        <useLimitation/>
+        <useHistory>JLVC2024 - Draft 1 of the JLVC Modular FOM.</useHistory>
+        <useHistory>JLVC2024 - JSJ7JLVC-21246: Add Scan Rate and Scan Type to RadarBeam and JLVC_JammerBeam: Created JLVC_RadarBeam as a JLVC extension of RPR's RadarBeam. Created EmitterBeamScanTypeEnum8. Added ScanRate and ScanType attributes to JLVC_Radarbeam and JLVC_JammerBeam.</useHistory>
+        <useHistory>JLVC2024 - Updated version number from 2024 to 2.</useHistory>
+        <useHistory>JLVC2024 - Version 3: Updated semantics for JLVC_JammerBeam and JLVC_RadarBeam ScanRate to have Min and Max vs Low and High.</useHistory>
+        <useHistory>JLVC2025 - Version 4: Removed trailing spaces from names in EmitterBeamScanTypeEnum8</useHistory>
+        <useHistory>JLVC2026 - Version 5: Updated reference dependencies to use the new RPRv3 module names. Added RPR Enumerations module as a reference dependency.</useHistory>
+        <poc>
+            <pocType>Primary author</pocType>
+            <pocName>Heath Rush</pocName>
+            <pocOrg>CAPE Technology Solutions</pocOrg>
+            <pocEmail>heath.rush@capetechsolutions.com</pocEmail>
+        </poc>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Base FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Communication FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Distributed Emission Regeneration FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Foundation FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Underwater Acoustics FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>SISO-STD-001.1-2025 - Real-time Platform Reference Enumerations FOM Module</identification>
+        </reference>
+        <reference>
+            <type>Dependency</type>
+            <identification>JLVC-Base</identification>
+        </reference>
+    </modelIdentification>
+    <objects>
+        <objectClass>
+            <name>HLAobjectRoot</name>
+            <objectClass>
+                <name>ActiveSonarBeam</name>
+                <objectClass>
+                    <name>JLVC_ActiveSonarBeam</name>
+                    <sharing>PublishSubscribe</sharing>
+                    <semantics>An active sonar beam with JLVC agreed upon attributes</semantics>
+                    <attribute>
+                        <name>SonarSystem</name>
+                        <dataType>RTIobjectId</dataType>
+                        <updateType>Static</updateType>
+                        <updateCondition>NA</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>A reference to the ActiveSonar object that is emitting this beam.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>InitialPingTime</name>
+                        <dataType>ClockTimeStruct</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The pattern that describes the movement of the sonar beam of the emitter.</semantics>
+                    </attribute>
+                    <attribute>
+                        <name>PingRepetitionInterval</name>
+                        <dataType>TimeMillisecondUnsignedInteger32</dataType>
+                        <updateType>Conditional</updateType>
+                        <updateCondition>on change</updateCondition>
+                        <ownership>NoTransfer</ownership>
+                        <sharing>PublishSubscribe</sharing>
+                        <dimensions>
+                            <dimension>subspace</dimension>
+                            <dimension>one</dimension>
+                            <dimension>two</dimension>
+                        </dimensions>
+                        <transportation>HLAbestEffort</transportation>
+                        <order>Receive</order>
+                        <semantics>The elapsed time between pings in a repeating series. If not provided, it can be assumed that this is a manually triggered system (e.g. sonobuoys and submarines) with only on\ne ping in the series.</semantics>
+                    </attribute>
+                </objectClass>
+            </objectClass>
+            <objectClass>
+                <name>EmbeddedSystem</name>
+                <objectClass>
+                    <name>RadioReceiver</name>
+                    <objectClass>
+                        <name>JLVC_RadioReceiver</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <semantics>A radio receiver with JLVC agreed upon attributes</semantics>
+                        <attribute>
+                            <name>EventIdentifier</name>
+                            <dataType>EventIdentifierStruct</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Allows tracking of radio on/off to a given event ID.</semantics>
+                        </attribute>
+                    </objectClass>
+                </objectClass>
+                <objectClass>
+                    <name>RadioTransmitter</name>
+                    <objectClass>
+                        <name>JLVC_RadioTransmitter</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <semantics>A radio transmitter with JLVC agreed upon attributes.</semantics>
+                        <attribute>
+                            <name>AntennaPatternType</name>
+                            <dataType>UnsignedInteger16</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>type of antenna pattern</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>HighOrderFreq</name>
+                            <dataType>Integer32</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>on change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>the high order freq</semantics>
+                        </attribute>
+                    </objectClass>
+                </objectClass>
+            </objectClass>
+            <objectClass>
+                <name>EmitterBeam</name>
+                <objectClass>
+                    <name>JammerBeam</name>
+                    <objectClass>
+                        <name>JLVC_JammerBeam</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <semantics>Jammer beam published within the JLVC with JLVC agreed upon attribute.</semantics>
+                        <attribute>
+                            <name>JammerTechnique</name>
+                            <dataType>UnsignedInteger32</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On Change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <dimensions>
+                                <dimension>subspace</dimension>
+                                <dimension>one</dimension>
+                                <dimension>two</dimension>
+                            </dimensions>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Identification of the jammer technique being used</semantics>
+                        </attribute>
+                        <attribute>
+                            <name>ScanRate</name>
+                            <dataType>FrequencyHertzFloat32</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On Change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Current operating scan rate selected from the range of available scan rates defined for this type of jammer equipment (see SCAN_RATE_MIN and SCAN_RATE_MAX in scenario file.) </semantics>
+                        </attribute>
+                        <attribute>
+                            <name>ScanType</name>
+                            <dataType>EmitterBeamScanTypeEnum8</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On Change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Scan type of the jammer beam.</semantics>
+                        </attribute>
+                    </objectClass>
+                </objectClass>
+                <objectClass>
+                    <name>RadarBeam</name>
+                    <objectClass>
+                        <name>JLVC_RadarBeam</name>
+                        <sharing>PublishSubscribe</sharing>
+                        <semantics>Radar beam published within the JLVC with JLVC agreed upon attributes.</semantics>
+                        <attribute>
+                            <name>ScanRate</name>
+                            <dataType>FrequencyHertzFloat32</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On Change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Current operating scan rate selected from the range of available scan rates defined for this type of radar equipment (see SCAN_RATE_MIN and SCAN_RATE_MAX in scenario file.) </semantics>
+                        </attribute>
+                        <attribute>
+                            <name>ScanType</name>
+                            <dataType>EmitterBeamScanTypeEnum8</dataType>
+                            <updateType>Conditional</updateType>
+                            <updateCondition>On Change</updateCondition>
+                            <ownership>NoTransfer</ownership>
+                            <sharing>PublishSubscribe</sharing>
+                            <transportation>HLAbestEffort</transportation>
+                            <order>Receive</order>
+                            <semantics>Scan type of the radar beam.</semantics>
+                        </attribute>
+                    </objectClass>
+                </objectClass>
+            </objectClass>
+        </objectClass>
+    </objects>
+    <dataTypes>
+        <enumeratedDataTypes>
+            <enumeratedData>
+                <name>EmitterBeamScanTypeEnum8</name>
+                <representation>RPRunsignedInteger8BE</representation>
+                <semantics>Emitter beam scan type.</semantics>
+                <enumerator>
+                    <name>None</name>
+                    <value>0</value>
+                </enumerator>
+                <enumerator>
+                    <name>Agile_Beam</name>
+                    <value>1</value>
+                </enumerator>
+                <enumerator>
+                    <name>Bidirectional</name>
+                    <value>2</value>
+                </enumerator>
+                <enumerator>
+                    <name>Bidirectional_Sector</name>
+                    <value>3</value>
+                </enumerator>
+                <enumerator>
+                    <name>Circular_Conical</name>
+                    <value>4</value>
+                </enumerator>
+                <enumerator>
+                    <name>Circular_Rotating_Scan</name>
+                    <value>5</value>
+                </enumerator>
+                <enumerator>
+                    <name>Circular_Vertical_Sector</name>
+                    <value>6</value>
+                </enumerator>
+                <enumerator>
+                    <name>Complex_Scan</name>
+                    <value>7</value>
+                </enumerator>
+                <enumerator>
+                    <name>Conical_Scan</name>
+                    <value>8</value>
+                </enumerator>
+                <enumerator>
+                    <name>Fixed_Scan</name>
+                    <value>9</value>
+                </enumerator>
+                <enumerator>
+                    <name>Helical</name>
+                    <value>10</value>
+                </enumerator>
+                <enumerator>
+                    <name>Helical_Conical</name>
+                    <value>11</value>
+                </enumerator>
+                <enumerator>
+                    <name>Horizontal_Sector_Bidirectional</name>
+                    <value>12</value>
+                </enumerator>
+                <enumerator>
+                    <name>Horizontal_Sector_Unidirectional</name>
+                    <value>13</value>
+                </enumerator>
+                <enumerator>
+                    <name>HT_Find</name>
+                    <value>14</value>
+                </enumerator>
+                <enumerator>
+                    <name>Irregular</name>
+                    <value>15</value>
+                </enumerator>
+                <enumerator>
+                    <name>Lobe_Switch</name>
+                    <value>16</value>
+                </enumerator>
+                <enumerator>
+                    <name>Manual</name>
+                    <value>17</value>
+                </enumerator>
+                <enumerator>
+                    <name>Other</name>
+                    <value>18</value>
+                </enumerator>
+                <enumerator>
+                    <name>Other_Combos</name>
+                    <value>19</value>
+                </enumerator>
+                <enumerator>
+                    <name>Palmer-Conical</name>
+                    <value>20</value>
+                </enumerator>
+                <enumerator>
+                    <name>Passive_Scan</name>
+                    <value>21</value>
+                </enumerator>
+                <enumerator>
+                    <name>Raster</name>
+                    <value>22</value>
+                </enumerator>
+                <enumerator>
+                    <name>Sector_and_Conical</name>
+                    <value>23</value>
+                </enumerator>
+                <enumerator>
+                    <name>Sector_Scan</name>
+                    <value>24</value>
+                </enumerator>
+                <enumerator>
+                    <name>Spiral</name>
+                    <value>25</value>
+                </enumerator>
+                <enumerator>
+                    <name>Spiral_Conical</name>
+                    <value>26</value>
+                </enumerator>
+                <enumerator>
+                    <name>Steady</name>
+                    <value>27</value>
+                </enumerator>
+                <enumerator>
+                    <name>Tracking</name>
+                    <value>28</value>
+                </enumerator>
+                <enumerator>
+                    <name>Undetermined</name>
+                    <value>29</value>
+                </enumerator>
+                <enumerator>
+                    <name>Unidirectional</name>
+                    <value>30</value>
+                </enumerator>
+                <enumerator>
+                    <name>Unidirectional_Sector</name>
+                    <value>31</value>
+                </enumerator>
+                <enumerator>
+                    <name>Variable_Random</name>
+                    <value>32</value>
+                </enumerator>
+                <enumerator>
+                    <name>Vertical_Sector_Bidirectional</name>
+                    <value>33</value>
+                </enumerator>
+                <enumerator>
+                    <name>Vertical_Sector_Unidirectional</name>
+                    <value>34</value>
+                </enumerator>
+                <enumerator>
+                    <name>With_Director</name>
+                    <value>35</value>
+                </enumerator>
+            </enumeratedData>
+        </enumeratedDataTypes>
+    </dataTypes>
+</objectModel>
