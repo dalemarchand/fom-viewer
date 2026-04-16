@@ -2,16 +2,24 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, '**']
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+permissions:
+  contents: write
+
 jobs:
-  release:
+  release-main:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -19,17 +27,65 @@ jobs:
         run: npm install
       - name: Build
         run: npm run build
-      - name: Get version
+      - name: Get current version
         id: version
-        run: echo "VERSION=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
-      - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+      - name: Bump version
+        id: bumped
+        run: |
+          CURRENT=${{ steps.version.outputs.current }}
+          IFS='.' read -r major minor patch <<< "$CURRENT"
+          PATCH=$((patch + 1))
+          NEW_VERSION="$major.$minor.$PATCH"
+          echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW_VERSION\"/" package.json
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "Bump version to $NEW_VERSION"
+      - name: Push version bump
+        run: git push
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.VERSION }}
-          release_name: Release v${{ steps.version.outputs.VERSION }}
+          tag_name: v${{ steps.bumped.outputs.new }}
+          name: Release v${{ steps.bumped.outputs.new }}
           draft: true
           prerelease: false
-          body: 'FOM Viewer release'
+          body: FOM Viewer release
+          files: dist/fom-viewer.html
+
+  release-dev:
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Get branch and commit info
+        id: info
+        run: |
+          BRANCH=${{ github.ref_name }}
+          COMMIT=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "version=$DEV_VERSION" >> $GITHUB_OUTPUT
+          DEV_VERSION="${BRANCH}-${COMMIT}"
+          echo "version=$DEV_VERSION" >> $GITHUB_OUTPUT
+      - name: Upload dev Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.info.outputs.version }}
+          name: Release (${{ steps.info.outputs.version }})
+          draft: true
+          prerelease: true
+          body: Development build from branch ${{ github.ref_name }} at commit ${{ github.sha }}
           files: dist/fom-viewer.html
