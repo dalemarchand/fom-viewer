@@ -1,0 +1,19 @@
+{
+  "name": "fom-viewer",
+  "version": "1.0.0",
+  "description": "Single page HTML viewer for IEEE 1516 FOM files",
+  "scripts": {
+    "lint": "eslint test/",
+    "lint:fix": "eslint test/ --fix"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1"
+  },
+  "keywords": [
+    "fom",
+    "hla",
+    "viewer"
+  ],
+  "author": "",
+  "license": "MIT"
+}
