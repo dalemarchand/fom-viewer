@@ -74,6 +74,7 @@ jobs:
         run: |
           BRANCH=${{ github.ref_name }}
           COMMIT=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "version=$DEV_VERSION" >> $GITHUB_OUTPUT
           DEV_VERSION="${BRANCH}-${COMMIT}"
           echo "version=$DEV_VERSION" >> $GITHUB_OUTPUT
       - name: Upload dev Release Asset
