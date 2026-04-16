@@ -38,7 +38,6 @@ jobs:
           NEW_VERSION="$major.$minor.$PATCH"
           echo "new=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-          # Update package.json version
           sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW_VERSION\"/" package.json
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -46,16 +45,14 @@ jobs:
           git commit -m "Bump version to $NEW_VERSION"
       - name: Push version bump
         run: git push
-      - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.bumped.outputs.new }}
-          release_name: Release v${{ steps.bumped.outputs.new }}
+          name: Release v${{ steps.bumped.outputs.new }}
           draft: true
           prerelease: false
-          body: 'FOM Viewer release'
+          body: FOM Viewer release
           files: dist/fom-viewer.html
 
   release-dev:
@@ -79,14 +76,12 @@ jobs:
           COMMIT=$(echo "${{ github.sha }}" | cut -c1-7)
           DEV_VERSION="${BRANCH}-${COMMIT}"
           echo "version=$DEV_VERSION" >> $GITHUB_OUTPUT
-      - name: Create dev Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload dev Release Asset
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.info.outputs.version }}
-          release_name: Release (${{ steps.info.outputs.version }})
+          name: Release (${{ steps.info.outputs.version }})
           draft: true
           prerelease: true
-          body: 'Development build from branch ${{ github.ref_name }} at commit ${{ github.sha }}'
+          body: Development build from branch ${{ github.ref_name }} at commit ${{ github.sha }}
           files: dist/fom-viewer.html
