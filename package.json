@@ -6,6 +6,8 @@
     "lint": "eslint test/",
     "lint:fix": "eslint test/ --fix",
     "build": "node scripts/build.js",
+    "build:dev": "node scripts/build.js --external",
+    "build:map": "node scripts/build.js --sourcemap",
     "test": "cd test && npm test",
     "test:combined": "npm run build && cd test && npm run test -- --combined"
   },
