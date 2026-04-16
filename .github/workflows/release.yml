@@ -3,33 +3,65 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get latest tag
+        id: latest_tag
+        run: |
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest=$LATEST" >> $GITHUB_OUTPUT
+          echo "semver=$LATEST" >> $GITHUB_OUTPUT
+
+      - name: Calculate next version
+        id: next_version
+        run: |
+          CURRENT="${{ steps.latest_tag.outputs.semver }}"
+          CURRENT=${CURRENT#v}
+          IFS='.' read -r major minor patch <<< "$CURRENT"
+          PATCH=$((patch + 1))
+          NEXT="v$major.$minor.$PATCH"
+          echo "version=$NEXT" >> $GITHUB_OUTPUT
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+
       - name: Install dependencies
         run: npm install
+
       - name: Build
         run: npm run build
-      - name: Get version
-        id: version
-        run: echo "VERSION=$(node -p \"require('./package.json').version\")" >> $GITHUB_OUTPUT
-      - name: Create Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create annotated tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.next_version.outputs.version }}" -m "Release ${{ steps.next_version.outputs.version }}"
+
+      - name: Push tag
+        run: git push origin "${{ steps.next_version.outputs.version }}"
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.version.outputs.VERSION }}
-          release_name: Release v${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.next_version.outputs.version }}
+          name: Release ${{ steps.next_version.outputs.version }}
           draft: true
           prerelease: false
-          body: 'FOM Viewer release'
+          body: FOM Viewer Release
           files: dist/fom-viewer.html
