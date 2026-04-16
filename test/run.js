@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer-core');
 const path = require('path');
-const fs = require('fs');
 const config = require('./config');
 
 const args = process.argv.slice(2);
@@ -35,22 +34,6 @@ async function waitAndClick(selector, options = {}) {
 async function waitForSelector(selector, options = {}) {
   await page.waitForSelector(selector, { timeout: options.timeout || config.test.waitForSelector });
   return await page.$(selector);
-}
-
-async function getText(selector) {
-  await page.waitForSelector(selector);
-  return await page.$eval(selector, el => el.textContent);
-}
-
-async function getAttribute(selector, attr) {
-  await page.waitForSelector(selector);
-  return await page.$eval(selector, (el, a) => el.getAttribute(a), attr);
-}
-
-async function isVisible(selector) {
-  const el = await page.$(selector);
-  if (!el) return false;
-  return await el.isIntersectingViewport();
 }
 
 async function loadTestFomFile(filename) {

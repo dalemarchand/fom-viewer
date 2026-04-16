@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node run.js",
     "test:visible": "node run.js --visible",
-    "test:debug": "node run.js --visible --timeout 30000"
+    "test:debug": "node run.js --visible --timeout 30000",
+    "lint": "eslint run.js config.js"
   },
   "keywords": ["fom", "hla", "testing"],
   "author": "",
