@@ -135,7 +135,6 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   transition: all 0.2s; 
 }
 .header-btn:hover { background: rgba(255,255,255,0.3); }
-.header-btn:active { transform: scale(0.98); }
 
 .header-label { 
   display: flex; 
@@ -144,6 +143,39 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   cursor: pointer; 
   font-size: 13px; 
   color: rgba(255,255,255,0.9); 
+}
+
+/* Modern checkbox styling */
+.header-label input[type="checkbox"] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+  vertical-align: middle;
+  margin: 0;
+}
+.header-label input[type="checkbox"]:checked {
+  background: white;
+  border-color: white;
+}
+.header-label input[type="checkbox"]:checked::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid var(--header-bg);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.header-label input[type="checkbox"]:hover {
+  border-color: rgba(255,255,255,0.7);
 }
 
 /* Theme toggle button */
