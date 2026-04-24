@@ -129,6 +129,30 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
 .btn-ghost:hover { background: var(--bg-tertiary); }
 
+/* Header-specific buttons */
+.header-btn { 
+  background: rgba(255,255,255,0.2); 
+  border: none; 
+  color: white;
+  padding: 8px 14px; 
+  border-radius: var(--radius-sm); 
+  cursor: pointer; 
+  font-size: 13px; 
+  font-weight: 500;
+  transition: all 0.2s; 
+}
+.header-btn:hover { background: rgba(255,255,255,0.3); }
+.header-btn:active { transform: scale(0.98); }
+
+.header-label { 
+  display: flex; 
+  align-items: center; 
+  gap: 6px; 
+  cursor: pointer; 
+  font-size: 13px; 
+  color: rgba(255,255,255,0.9); 
+}
+
 /* Theme toggle button */
 .theme-toggle { 
   background: rgba(255,255,255,0.15); 
@@ -394,12 +418,12 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <header>
 <h1>FOM Viewer</h1>
 <div class="header-controls">
-<button class="btn" id="backBtn" style="display:none;">← Back</button>
-<label><input type="checkbox" id="sortToggle" checked> Sort</label>
+<button class="btn header-btn" id="backBtn" style="display:none;">← Back</button>
+<label class="header-label"><input type="checkbox" id="sortToggle" checked> Sort</label>
 <input type="text" id="globalSearch" class="global-search" placeholder="Search all...">
-<button class="btn btn-danger" id="clearBtn">Clear</button>
-<label class="btn btn-success">Load FOM<input type="file" id="fileInput" multiple accept=".xml" style="display:none;"></label>
-<button class="btn" id="exportBtn">Export</button>
+<button class="btn header-btn" id="clearBtn">Clear</button>
+<label class="btn header-btn">Load FOM<input type="file" id="fileInput" multiple accept=".xml" style="display:none;"></label>
+<button class="btn header-btn" id="exportBtn">Export</button>
 <button class="theme-toggle" id="themeToggle" title="Toggle light/dark theme">☀️</button>
 </div>
 </header>
@@ -3040,6 +3064,7 @@ initTheme();
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
