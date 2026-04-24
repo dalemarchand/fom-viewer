@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup: Professional IDE</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --bg: #1e1e1e; --sidebar: #252526; --accent: #0078d4; --text: #cccccc; --text-muted: #858585; --border: #3c3c3c; --hover: #2a2d2e; --selection: #264f78; }
+body { font-family: 'JetBrains Mono', 'Fira Code', monospace; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; }
+.header { background: #333333; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.header h1 { font-size: 14px; font-weight: 500; color: var(--text); }
+.header-controls { display: flex; gap: 8px; }
+.search { background: var(--sidebar); border: 1px solid var(--border); padding: 6px 10px; border-radius: 4px; color: var(--text); width: 220px; font-size: 12px; font-family: inherit; }
+.btn { background: var(--accent); color: white; border: none; padding: 6px 12px; border-radius: 2px; cursor: pointer; font-size: 12px; }
+.btn-secondary { background: var(--sidebar); border: 1px solid var(--border); }
+.tab-bar { background: var(--sidebar); padding: 0 8px; display: flex; gap: 2px; border-bottom: 1px solid var(--border); }
+.tab { padding: 8px 14px; cursor: pointer; color: var(--text-muted); font-size: 12px; background: var(--bg); border-top: 2px solid transparent; }
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--bg); color: var(--text); border-top-color: var(--accent); }
+.main { display: flex; flex: 1; height: calc(100vh - 80px); }
+.sidebar-left { width: 240px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.explorer-header { padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); display: flex; justify-content: space-between; }
+.tree-header { padding: 8px; border-bottom: 1px solid var(--border); }
+.tree-input { width: 100%; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 12px; font-family: inherit; }
+.tree-list { padding: 4px; flex: 1; overflow-y: auto; }
+.tree-item { padding: 4px 8px; cursor: pointer; border-radius: 2px; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tree-item:hover { background: var(--hover); }
+.tree-item.selected { background: var(--selection); }
+.icon { color: #ce9178; }
+.editor { flex: 1; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+.editor-tabs { background: var(--sidebar); padding: 0 8px; display: flex; gap: 2px; border-bottom: 1px solid var(--border); }
+.editor-tab { padding: 6px 12px; background: var(--bg); color: var(--text); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.editor-tab .close { color: var(--text-muted); cursor: pointer; }
+.editor-tab.active { background: var(--bg); border-bottom: 2px solid var(--accent); }
+.detail { padding: 16px; overflow-y: auto; flex: 1; }
+.detail-header { padding: 12px 16px; background: var(--sidebar); border-bottom: 1px solid var(--border); }
+.detail-title { font-size: 14px; font-weight: 500; color: white; margin-bottom: 4px; }
+.detail-meta { font-size: 12px; color: var(--text-muted); }
+.detail-body { padding: 16px; }
+.section { margin-bottom: 20px; }
+.section h3 { font-size: 14px; font-weight: 500; color: white; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.prop-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.prop-table th, .prop-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+.prop-table th { color: var(--text-muted); width: 140px; font-weight: normal; }
+.prop-table td { color: #ce9178; }
+.sidebar-right { width: 280px; background: var(--sidebar); border-left: 1px solid var(--border); padding: 12px; }
+.properties h3 { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.prop-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.prop-key { color: var(--text-muted); }
+.prop-val { color: var(--text); }
+.empty { text-align: center; padding: 80px 40px; color: var(--text-muted); }
+.empty h2 { font-size: 18px; color: var(--text); margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div class="header">
+<h1>FOM Viewer</h1>
+<div class="header-controls">
+<button class="btn btn-secondary">← Back</button>
+<input type="text" class="search" placeholder="Search (Ctrl+Shift+F)">
+<button class="btn btn-secondary">Sort</button>
+<button class="btn btn-secondary">Clear</button>
+<button class="btn">Load FOM</button>
+</div>
+</div>
+<div class="tab-bar">
+<div class="tab active">EXPLORER</div>
+<div class="tab">SEARCH</div>
+<div class="tab">DEBUG</div>
+</div>
+<div class="main">
+<div class="sidebar-left">
+<div class="explorer-header">FOM MODULES <span>▼</span></div>
+<div class="tree-header">
+<input type="text" class="tree-input" placeholder="Filter">
+</div>
+<div class="tree-list">
+<div class="tree-item selected"><span class="icon">📄</span>HLAfloat32BE</div>
+<div class="tree-item"><span class="icon">📄</span>HLAfloat32LE</div>
+<div class="tree-item"><span class="icon">📄</span>HLAfloat64BE</div>
+<div class="tree-item"><span class="icon">📄</span>HLAunicodeString</div>
+</div>
+</div>
+<div class="editor">
+<div class="editor-tabs">
+<div class="editor-tab active">HLAfloat32BE.ts <span class="close">×</span></div>
+</div>
+<div class="detail">
+<div class="detail-header">
+<h2 class="detail-title">HLAfloat32BE</h2>
+<div class="detail-meta">Basic Data Type • dataTypes</div>
+</div>
+<div class="detail-body">
+<div class="section">
+<h3>Data Type Definition</h3>
+<table class="prop-table">
+<tr><th>name</th><td>"HLAfloat32BE"</td></tr>
+<tr><th>size</th><td>"32"</td></tr>
+<tr><th>encoding</th><td>"IEEE-754 binary32"</td></tr>
+<tr><th>interpretation</th><td>"Float [-3.4E38, 3.4E38]"</td></tr>
+</table>
+</div>
+</div>
+</div>
+</div>
+<div class="sidebar-right">
+<div class="properties">
+<h3>Properties</h3>
+<div class="prop-row"><span class="prop-key">Type</span><span class="prop-val">Basic</span></div>
+<div class="prop-row"><span class="prop-key">Size</span><span class="prop-val">32</span></div>
+<div class="prop-row"><span class="prop-key">Encoding</span><span class="prop-val">IEEE-754</span></div>
+<div class="prop-row"><span class="prop-key">Module</span><span class="prop-val">MIM</span></div>
+</div>
+</div>
+</div>
+<style>
+</body>
+</html>

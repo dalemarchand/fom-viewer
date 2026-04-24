@@ -118,7 +118,7 @@ async function test_LoadPage() {
     await waitForSelector('#clearBtn');
     await waitForSelector('#fileInput');
     await waitForSelector('#exportBtn');
-    await waitForSelector('#sortToggle');
+    await waitForSelector('#sortBtn');
     log('Page loaded successfully', 'success');
     testsPassed++;
     return true;
@@ -574,35 +574,134 @@ async function test_TreeFiltering() {
 }
 
 async function test_SortToggle() {
-  log('Testing: Sort toggle...');
+  log('Testing: Sort toggle on multiple tabs...');
   try {
     await openApp();
-    
-    await loadTestFomFile(config.testFiles[0]);
+    await loadTestFomFile('RPR-Foundation_v3.0.xml');
     await sleep(500);
     
-    const sortToggle = await page.$('#sortToggle');
-    if (!sortToggle) {
-      log('Sort toggle not found', 'warn');
+    const sortBtn = await page.$('#sortBtn');
+    if (!sortBtn) {
+      log('Sort button not found', 'warn');
       testsPassed++;
       return true;
     }
     
-    const itemsBefore = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent));
+    const tabsToTest = [
+      { id: 'modules', name: 'FOM Modules' },
+      { id: 'objects', name: 'Object Classes' },
+      { id: 'interactions', name: 'Interaction Classes' },
+      { id: 'datatypes', name: 'Data Types' },
+      { id: 'dims', name: 'Dimensions' },
+      { id: 'trans', name: 'Transportations' },
+      { id: 'switches', name: 'Switches' },
+      { id: 'tags', name: 'Tags' },
+      { id: 'notes', name: 'Notes' }
+    ];
     
-    await sortToggle.click();
-    await sleep(300);
+    for (const tab of tabsToTest) {
+      try {
+        await page.click(`[data-tab="${tab.id}"]`);
+        await sleep(300);
+        
+        const items = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        if (items.length === 0) {
+          log(`Tab ${tab.name}: no items`, 'warn');
+          continue;
+        }
+        
+        const currentSort = await sortBtn.evaluate(e => e.textContent);
+        
+        // Test ascending (Off → A→Z)
+        await sortBtn.click();
+        await sleep(300);
+        
+        const itemsAfterSort = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        const orderChanged = items.join('') !== itemsAfterSort.join('');
+        
+        log(`Tab ${tab.name}: ${items[0]} → ${itemsAfterSort[0]} (asc: ${orderChanged})`, 'info');
+        
+        // Test descending (A→Z → Z→A)
+        await sortBtn.click();
+        await sleep(300);
+        
+        const itemsAfterDesc = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        const orderChangedDesc = itemsAfterSort.join('') !== itemsAfterDesc.join('');
+        
+        log(`Tab ${tab.name}: ${itemsAfterSort[0]} → ${itemsAfterDesc[0]} (desc: ${orderChangedDesc})`, 'info');
+        
+      } catch (tabError) {
+        log(`Tab ${tab.name}: ${tabError.message}`, 'warn');
+      }
+    }
     
-    const itemsAfter = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent));
-    
-    const sorted = itemsBefore.join('') !== itemsAfter.join('');
-    
-    log(`Sort toggle works (order changed: ${sorted})`, 'success');
+    log(`Sort toggle test completed`, 'success');
     testsPassed++;
     return true;
   } catch (error) {
     await captureScreenshot('test_SortToggle_failed');
     logError('Sort toggle test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_DataTypeSubtabSorting() {
+  log('Testing: Data Type subtab sorting...');
+  try {
+    await openApp();
+    await loadTestFomFile('RPR-Foundation_v3.0.xml');
+    await sleep(500);
+    
+    const sortBtn = await page.$('#sortBtn');
+    await page.click('[data-tab="datatypes"]');
+    await sleep(300);
+    
+    const subtabsToTest = [
+      { id: 'basic', name: 'Basic' },
+      { id: 'simple', name: 'Simple' },
+      { id: 'array', name: 'Array' },
+      { id: 'fixed', name: 'Fixed Record' },
+      { id: 'enum', name: 'Enumerated' },
+      { id: 'variant', name: 'Variant Record' }
+    ];
+    
+    for (const subtab of subtabsToTest) {
+      try {
+        await page.click(`.subtab[data-subtab="${subtab.id}"]`);
+        await sleep(300);
+        
+        const items = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        if (items.length === 0) {
+          log(`Subtab ${subtab.name}: no items`, 'warn');
+          continue;
+        }
+        
+        await sortBtn.click();
+        await sleep(300);
+        
+        const itemsAfterSort = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        const orderChanged = items.join('') !== itemsAfterSort.join('');
+        
+        await sortBtn.click();
+        await sleep(300);
+        
+        const itemsAfterDesc = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        const orderChangedDesc = itemsAfterSort.join('') !== itemsAfterDesc.join('');
+        
+        log(`Subtab ${subtab.name}: ${items[0]} → ${itemsAfterSort[0]} (asc: ${orderChanged}) → ${itemsAfterDesc[0]} (desc: ${orderChangedDesc})`, 'info');
+        
+      } catch (subError) {
+        log(`Subtab ${subtab.name}: ${subError.message}`, 'warn');
+      }
+    }
+    
+    log('Data Type subtab sorting test completed', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_DataTypeSubtabSorting_failed');
+    logError('Data Type subtab sorting test failed', error);
     testsFailed++;
     return false;
   }
@@ -699,6 +798,7 @@ async function runAllTests() {
     { name: 'Search', fn: test_SearchFunctionality },
     { name: 'TreeFilter', fn: test_TreeFiltering },
     { name: 'SortToggle', fn: test_SortToggle },
+    { name: 'DataTypeSubtabSorting', fn: test_DataTypeSubtabSorting },
     { name: 'Export', fn: test_ExportFunctionality },
     { name: 'DataType', fn: test_DataTypeSelection }
   ];

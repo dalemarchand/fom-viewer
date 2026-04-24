@@ -15,7 +15,7 @@ const state = {
   currentTab: 'modules',
   currentSubTab: 'basic',
   selectedItem: null,
-  sortEnabled: true,
+  sortEnabled: 'asc', // 'asc', 'desc', or false (off)
   conflicts: [],
   errors: [],
   history: [],
@@ -23,7 +23,7 @@ const state = {
     currentTab: 'modules',
     currentSubTab: 'basic',
     selectedItem: null,
-    sortEnabled: true
+    sortEnabled: 'asc'
   }
 };
 
@@ -96,8 +96,8 @@ async function loadFromStorage() {
       state.currentTab = uiState.currentTab || 'modules';
       state.currentSubTab = uiState.currentSubTab || 'basic';
       state.selectedItem = uiState.selectedItem || null;
-      state.sortEnabled = uiState.sortEnabled !== undefined ? uiState.sortEnabled : true;
-      document.getElementById('sortToggle').checked = state.sortEnabled;
+      state.sortEnabled = uiState.sortEnabled !== undefined ? uiState.sortEnabled : 'asc';
+      updateSortButton();
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelector(`.tab[data-tab="${state.currentTab}"]`).classList.add('active');
       const dtTabs = document.getElementById('dataTypeTabs');
@@ -1381,7 +1381,7 @@ function findDataTypeUsages(typeName) {
 // TREE RENDERING
 // ============================================================================
 
-function buildClassTree(classes, sortEnabled) {
+function buildClassTree(classes, sortDir) {
   const roots = [];
   const map = {};
   classes.forEach(c => { map[c.name] = { ...c, children: [] }; });
@@ -1390,7 +1390,11 @@ function buildClassTree(classes, sortEnabled) {
     if (c.parent && map[c.parent]) { map[c.parent].children.push(node); }
     else { roots.push(node); }
   });
-  const sortTree = nodes => { if (sortEnabled) nodes.sort((a, b) => a.name.localeCompare(b.name)); nodes.forEach(n => sortTree(n.children)); };
+  const sortTree = nodes => { 
+    if (sortDir === 'asc') nodes.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortDir === 'desc') nodes.sort((a, b) => b.name.localeCompare(a.name));
+    nodes.forEach(n => sortTree(n.children)); 
+  };
   sortTree(roots);
   return roots;
 }
@@ -1416,7 +1420,7 @@ function renderDataTypeList(type) {
   const items = state.mergedFOM.dataTypes[type];
   const hasConflict = type === 'enum' || type === 'variant';
   if (!items || items.length === 0) return '<div class="empty-state">No ' + type + ' data types in loaded FOM files.</div>';
-  const sortedItems = state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortedItems = state.sortEnabled === 'asc' ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...items].sort((a, b) => b.name.localeCompare(a.name)) : items;
   let html = '';
   sortedItems.forEach(item => {
     const conflict = hasConflict ? state.conflicts.find(c => c.type === type && c.name === item.name) : null;
@@ -1673,7 +1677,7 @@ function showModuleDetails(file, addToHistory = true) {
 }
 
 function renderModuleBody(file) {
-  const sortItems = (items) => state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortItems = (items) => state.sortEnabled !== false ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
   const makeLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDataType('${d.name}', '${type}'); return false;">${d.name}</a></li>`).join('') + '</ul>';
   const makeClassLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDetail('${d.name}', '${type}', true); return false;">${d.name}</a></li>`).join('') + '</ul>';
   let modelIdentHtml = '<table class="property-table">';
@@ -1739,7 +1743,7 @@ function updateUI() {
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
   if (!state.mergedFOM && state.currentTab !== 'modules') { treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>'; return; }
   if (state.currentTab === 'modules') {
-    const files = state.sortEnabled ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.files;
+    const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
     treeView.innerHTML = '<div class="tree-wrapper">' + (files.length > 0 ? files.map(f => `<div class="tree-item" data-name="${f.name}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded. Use the "Load FOM" button in the header.</div>') + '</div>';
     if (state.selectedItem && state.selectedItem.type === 'module') {
       const selectedItem = treeView.querySelector(`.tree-item[data-name="${state.selectedItem.name}"]`);
@@ -1841,7 +1845,7 @@ function updateUI() {
 function renderTransList() {
   if (!state.mergedFOM || !state.mergedFOM.transportations || state.mergedFOM.transportations.length === 0) return '<div class="empty-state">No transportations. Load a FOM file containing HLAstandardMIM.xml or similar to see transport types (HLAreliable, HLAbestEffort).</div>';
   let html = '';
-  const list = state.sortEnabled ? [...state.mergedFOM.transportations].sort((a, b) => a.name.localeCompare(b.name)) : state.mergedFOM.transportations;
+  const list = state.sortEnabled === 'asc' ? [...state.mergedFOM.transportations].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.mergedFOM.transportations].sort((a, b) => b.name.localeCompare(a.name)) : state.mergedFOM.transportations;
   list.forEach(t => {
     const name = t.name;
     const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -1851,29 +1855,39 @@ function renderTransList() {
 }
 function renderNotesList() {
   if (!state.files || state.files.length === 0) return '<div class="empty-state">No FOM files loaded. Use the "Load FOM" button in the header.</div>';
-  let html = '';
+  let allNotes = [];
   state.files.forEach(f => {
     if (f.notes && f.notes.length > 0) {
       f.notes.forEach(n => {
         const name = typeof n === 'string' ? n : (n.name || 'Note');
-        const displayName = name.length > 30 ? name.substring(0, 30) + '...' : name;
-        const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        html += `<div class="tree-item" data-name="${escapedName}" data-type="notes"><span class="icon">📝</span><span class="name">${displayName}</span></div>`;
+        allNotes.push(name);
       });
     }
+  });
+  if (state.sortEnabled === 'asc') allNotes.sort((a, b) => a.localeCompare(b));
+  else if (state.sortEnabled === 'desc') allNotes.sort((a, b) => b.localeCompare(a));
+  let html = '';
+  allNotes.forEach(name => {
+    const displayName = name.length > 30 ? name.substring(0, 30) + '...' : name;
+    const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    html += `<div class="tree-item" data-name="${escapedName}" data-type="notes"><span class="icon">📝</span><span class="name">${displayName}</span></div>`;
   });
   return html || '<div class="empty-state">No notes in loaded FOM files.</div>';
 }
 function renderDimensionsList() {
   if (!state.files || state.files.length === 0) return '<div class="empty-state">No FOM files loaded. Use the "Load FOM" button in the header.</div>';
-  let html = '';
+  let allDims = [];
   state.files.forEach(f => {
     if (f.dimensions && f.dimensions.length > 0) {
-      f.dimensions.forEach(d => {
-        const escapedName = d.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        html += `<div class="tree-item" data-name="${escapedName}" data-type="dims"><span class="icon">📐</span><span class="name">${d.name}</span></div>`;
-      });
+      f.dimensions.forEach(d => { allDims.push(d); });
     }
+  });
+  if (state.sortEnabled === 'asc') allDims.sort((a, b) => a.name.localeCompare(b.name));
+  else if (state.sortEnabled === 'desc') allDims.sort((a, b) => b.name.localeCompare(a.name));
+  let html = '';
+  allDims.forEach(d => {
+    const escapedName = d.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    html += `<div class="tree-item" data-name="${escapedName}" data-type="dims"><span class="icon">📐</span><span class="name">${d.name}</span></div>`;
   });
   return html || '<div class="empty-state">No dimensions</div>';
 }
@@ -1915,8 +1929,11 @@ function mergeTime(files) {
 
 function renderSwitchesList() {
   if (!state.mergedFOM || !state.mergedFOM.switches || state.mergedFOM.switches.length === 0) return '<div class="empty-state">No switches. Switches are typically defined in RPR-Base_v3.0.xml or similar FOM files.</div>';
+  let allSwitches = [...state.mergedFOM.switches];
+  if (state.sortEnabled === 'asc') allSwitches.sort((a, b) => a.name.localeCompare(b.name));
+  else if (state.sortEnabled === 'desc') allSwitches.sort((a, b) => b.name.localeCompare(a.name));
   let html = '';
-  state.mergedFOM.switches.forEach(s => {
+  allSwitches.forEach(s => {
     const escapedName = s.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     html += `<div class="tree-item" data-name="${escapedName}" data-type="switches"><span class="icon">🔘</span><span class="name">${s.name}</span></div>`;
   });
@@ -1925,8 +1942,11 @@ function renderSwitchesList() {
 
 function renderTagsList() {
   if (!state.mergedFOM || !state.mergedFOM.tags || state.mergedFOM.tags.length === 0) return '<div class="empty-state">No tags. Tags are typically defined in RPR-Base_v3.0.xml or similar FOM files.</div>';
+  let allTags = [...state.mergedFOM.tags];
+  if (state.sortEnabled === 'asc') allTags.sort((a, b) => a.name.localeCompare(b.name));
+  else if (state.sortEnabled === 'desc') allTags.sort((a, b) => b.name.localeCompare(a.name));
   let html = '';
-  state.mergedFOM.tags.forEach(t => {
+  allTags.forEach(t => {
     const escapedName = t.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     html += `<div class="tree-item" data-name="${escapedName}" data-type="tags"><span class="icon">🏷️</span><span class="name">${t.name}</span></div>`;
   });
@@ -1940,6 +1960,8 @@ function renderTimeInfo() {
 
 function updateTabCounts() {
   if (!state.mergedFOM) return;
+  
+  // Update tab counts
   const tabs = [
     { id: 'modules', getCount: () => state.files.length },
     { id: 'objects', getCount: () => state.mergedFOM.objectClasses?.length || 0 },
@@ -1979,6 +2001,33 @@ function updateTabCounts() {
       tabEl.textContent = count > 0 ? `${label} (${count})` : label;
     }
   });
+  
+  // Update welcome screen stats
+  updateWelcomeStats();
+}
+
+function updateWelcomeStats() {
+  const statsEl = document.getElementById('welcomeStats');
+  if (!statsEl || !state.mergedFOM) return;
+  
+  const dt = state.mergedFOM.dataTypes;
+  const totalBasic = dt.basic?.length || 0;
+  const totalSimple = dt.simple?.length || 0;
+  const totalArray = dt.array?.length || 0;
+  const totalFixed = dt.fixed?.length || 0;
+  const totalEnum = dt.enum?.length || 0;
+  const totalVariant = dt.variant?.length || 0;
+  const totalObjects = state.mergedFOM.objectClasses?.length || 0;
+  const totalInteractions = state.mergedFOM.interactionClasses?.length || 0;
+  const totalModules = state.files.length;
+  
+  statsEl.innerHTML = `
+    <div class="stat-item"><span class="stat-value">${totalModules}</span><span class="stat-label">Modules</span></div>
+    <div class="stat-item"><span class="stat-value">${totalObjects}</span><span class="stat-label">Objects</span></div>
+    <div class="stat-item"><span class="stat-value">${totalInteractions}</span><span class="stat-label">Interactions</span></div>
+    <div class="stat-item"><span class="stat-value">${totalBasic + totalSimple + totalArray + totalFixed + totalEnum + totalVariant}</span><span class="stat-label">Data Types</span></div>
+  `;
+  statsEl.style.display = 'flex';
 }
 
 async function loadFiles(files) {
@@ -2032,7 +2081,29 @@ function removeFile(index) {
 
 document.getElementById('fileInput').addEventListener('change', e => { loadFiles(Array.from(e.target.files)); });
 
-document.getElementById('sortToggle').addEventListener('change', e => { state.sortEnabled = e.target.checked; saveToStorage(); updateUI(); });
+function updateSortButton() {
+  const btn = document.getElementById('sortBtn');
+  if (!btn) return;
+  if (state.sortEnabled === false) {
+    btn.textContent = 'Sort: Off';
+    btn.style.opacity = '0.5';
+  } else if (state.sortEnabled === 'asc') {
+    btn.textContent = 'Sort: A→Z';
+    btn.style.opacity = '1';
+  } else {
+    btn.textContent = 'Sort: Z→A';
+    btn.style.opacity = '1';
+  }
+}
+
+document.getElementById('sortBtn')?.addEventListener('click', () => {
+  if (state.sortEnabled === 'asc') state.sortEnabled = 'desc';
+  else if (state.sortEnabled === 'desc') state.sortEnabled = false;
+  else state.sortEnabled = 'asc';
+  saveToStorage();
+  updateSortButton();
+  updateUI();
+});
 
 document.getElementById('exportBtn').addEventListener('click', () => { window.print(); });
 
@@ -2353,7 +2424,8 @@ function goBack() {
   // Rebuild tree for restoreState.tab
   const treeView = document.getElementById('treeView');
   if (restoreState.tab === 'modules') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + (state.files.length > 0 ? state.files.map(f => `<div class="tree-item" data-name="${f.name.replace(/"/g, '&quot;')}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded.</div>') + '</div>';
+    const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
+    treeView.innerHTML = '<div class="tree-wrapper">' + (files.length > 0 ? files.map(f => `<div class="tree-item" data-name="${f.name.replace(/"/g, '&quot;')}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded.</div>') + '</div>';
   } else if (restoreState.tab === 'objects') {
     const classes = mergeClasses(state.files, 'object');
     const tree = buildClassTree(classes, state.sortEnabled);
@@ -2526,4 +2598,33 @@ function setupTabScroll() {
 
 init();
 setupTabScroll();
+
+// ============================================================================
+// THEME TOGGLE
+// ============================================================================
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('fomViewerTheme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) {
+    toggle.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('fomViewerTheme', next);
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) {
+    toggle.textContent = next === 'dark' ? '🌙' : '☀️';
+  }
+}
+
+// Theme toggle button handler
+document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+
+initTheme();
 
