@@ -92,6 +92,12 @@ function build({ sourcemap = false, external = false } = {}) {
   const outputPath = path.join(distDir, external ? 'fom-viewer-dev.html' : 'fom-viewer.html');
   fs.writeFileSync(outputPath, htmlContent, 'utf8');
   console.log(`Built: ${outputPath}${external ? ' (external mode)' : ''}`);
+  
+  if (!external) {
+    const rootPath = path.join(rootDir, 'fom-viewer.html');
+    fs.writeFileSync(rootPath, htmlContent, 'utf8');
+    console.log(`Copied to: ${rootPath}`);
+  }
 }
 
 const args = process.argv.slice(2);
