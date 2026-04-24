@@ -2527,3 +2527,32 @@ function setupTabScroll() {
 init();
 setupTabScroll();
 
+// ============================================================================
+// THEME TOGGLE
+// ============================================================================
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('fomViewerTheme') || 'light';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) {
+    toggle.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('fomViewerTheme', next);
+  const toggle = document.getElementById('themeToggle');
+  if (toggle) {
+    toggle.textContent = next === 'dark' ? '🌙' : '☀️';
+  }
+}
+
+// Theme toggle button handler
+document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+
+initTheme();
+
