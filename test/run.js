@@ -86,6 +86,8 @@ async function launchBrowser() {
   page.on('console', msg => {
     if (msg.type() === 'error') {
       log(`Console error: ${msg.text()}`, 'fail');
+    } else if (msg.type() === 'log') {
+      log(`Console: ${msg.text()}`, 'info');
     }
   });
   
@@ -267,6 +269,102 @@ async function test_ItemSelection() {
   } catch (error) {
     await captureScreenshot('test_ItemSelection_failed');
     logError('Item selection test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_DataTypeSelection() {
+  log('Testing: Data type selection...');
+  try {
+    await openApp();
+    
+    await loadTestFomFile(config.testFiles[0]);
+    await sleep(500);
+    
+    await page.click('[data-tab="datatypes"]');
+    await sleep(300);
+    
+    const subtab = await page.waitForSelector('.subtab[data-subtab="basic"]');
+    await subtab.click();
+    await sleep(500);
+    
+    const treeItems = await page.$$('.tree-item');
+    if (treeItems.length === 0) {
+      await captureScreenshot('test_DataTypeSelection_failed');
+      throw new Error('No data type items found in tree view');
+    }
+    
+    const firstItemName = await treeItems[0].evaluate(el => el.dataset.name);
+    const firstItemType = await treeItems[0].evaluate(el => el.dataset.type);
+    log(`Clicking item: name=${firstItemName}, type=${firstItemType}`, 'info');
+    
+    log(`About to evaluate click for name=${firstItemName}, type=${firstItemType}`, 'info');
+    
+    await page.evaluate((name, type) => {
+      console.log('EVALUATE: name=' + name + ', type=' + type);
+      if (typeof showDetail === 'function') {
+        console.log('EVALUATE: Calling showDetail');
+        showDetail(name, type, true);
+        console.log('EVALUATE: showDetail called');
+        console.log('EVALUATE: state.mergedFOM.dataTypes.basic first 3:', JSON.stringify(state?.mergedFOM?.dataTypes?.basic?.slice(0, 3)));
+        console.log('EVALUATE: state.mergedFOM.dataTypes.basic contains HLAfloat32BE:', state?.mergedFOM?.dataTypes?.basic?.some(d => d.name === 'HLAfloat32BE'));
+        console.log('EVALUATE: state.currentTab:', state?.currentTab);
+        console.log('EVALUATE: state.currentSubTab:', state?.currentSubTab);
+        console.log('EVALUATE: document.getElementById("detailBody").innerHTML.length:', document.getElementById("detailBody").innerHTML.length);
+      } else {
+        console.log('EVALUATE: showDetail NOT found');
+      }
+    }, firstItemName, firstItemType);
+    await sleep(500)
+    
+    const stateAfterClick = await page.evaluate(() => {
+      return {
+        currentTab: window.state?.currentTab,
+        currentSubTab: window.state?.currentSubTab,
+        selectedItem: window.state?.selectedItem,
+        detailBodyContent: document.getElementById('detailBody')?.innerHTML?.substring(0, 100)
+      };
+    });
+    log(`State after click: ${JSON.stringify(stateAfterClick)}`, 'info');
+    
+    const detailHeader = await page.$('#detailHeader');
+    const headerVisible = await detailHeader.evaluate(el => el.style.display !== 'none');
+    
+    if (!headerVisible) {
+      await captureScreenshot('test_DataTypeSelection_failed');
+      throw new Error('Detail header not visible after clicking data type');
+    }
+    
+    const detailBody = await page.$('#detailBody');
+    const bodyContent = await detailBody.evaluate(el => el.innerHTML.trim());
+    
+    log(`Detail body content length: ${bodyContent.length}`, 'info');
+    
+    if (bodyContent.length === 0) {
+      await captureScreenshot('test_DataTypeSelection_failed');
+      
+      const treeContent = await page.evaluate(() => {
+        const tree = document.querySelector('.tree-wrapper');
+        return tree ? tree.innerHTML.substring(0, 500) : 'No tree';
+      });
+      log(`Tree content: ${treeContent}`, 'info');
+      
+      throw new Error('Detail body is empty after selecting data type');
+    }
+    
+    const hasTable = await detailBody.evaluate(el => el.querySelector('table') !== null);
+    if (!hasTable) {
+      await captureScreenshot('test_DataTypeSelection_failed');
+      throw new Error('Detail body does not contain a table');
+    }
+    
+    log(`Data type selection working (${treeItems.length} items found)`, 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_DataTypeSelection_failed');
+    logError('Data type selection test failed', error);
     testsFailed++;
     return false;
   }
@@ -601,7 +699,8 @@ async function runAllTests() {
     { name: 'Search', fn: test_SearchFunctionality },
     { name: 'TreeFilter', fn: test_TreeFiltering },
     { name: 'SortToggle', fn: test_SortToggle },
-    { name: 'Export', fn: test_ExportFunctionality }
+    { name: 'Export', fn: test_ExportFunctionality },
+    { name: 'DataType', fn: test_DataTypeSelection }
   ];
   
   for (const test of tests) {
