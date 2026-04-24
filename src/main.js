@@ -15,7 +15,7 @@ const state = {
   currentTab: 'modules',
   currentSubTab: 'basic',
   selectedItem: null,
-  sortEnabled: true,
+  sortEnabled: 'asc', // 'asc', 'desc', or false (off)
   conflicts: [],
   errors: [],
   history: [],
@@ -23,7 +23,7 @@ const state = {
     currentTab: 'modules',
     currentSubTab: 'basic',
     selectedItem: null,
-    sortEnabled: true
+    sortEnabled: 'asc'
   }
 };
 
@@ -96,8 +96,8 @@ async function loadFromStorage() {
       state.currentTab = uiState.currentTab || 'modules';
       state.currentSubTab = uiState.currentSubTab || 'basic';
       state.selectedItem = uiState.selectedItem || null;
-      state.sortEnabled = uiState.sortEnabled !== undefined ? uiState.sortEnabled : true;
-      document.getElementById('sortToggle').checked = state.sortEnabled;
+      state.sortEnabled = uiState.sortEnabled !== undefined ? uiState.sortEnabled : 'asc';
+      updateSortButton();
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelector(`.tab[data-tab="${state.currentTab}"]`).classList.add('active');
       const dtTabs = document.getElementById('dataTypeTabs');
@@ -994,7 +994,7 @@ const sources = item._sources || (item._source ? [item._source] : []);
     }
     html += '</table></div>';
     if (item.values && item.values.length > 0) {
-      const sortedValues = state.sortEnabled ? [...item.values].sort((a, b) => a.value - b.value) : item.values;
+      const sortedValues = state.sortEnabled !== false ? [...item.values].sort((a, b) => a.value - b.value) : item.values;
       html += '<h4 style="margin:12px 0 8px">Enumerators</h4><table class="property-table"><tr><th>Name</th><th>Value</th></tr>';
       sortedValues.forEach(v => { html += `<tr><td>${v.name}${v.notes ? ' ' + renderNoteIcon(v.notes) : ''}</td><td>${v.value}</td></tr>`; });
       html += '</table>';
@@ -1416,7 +1416,7 @@ function renderDataTypeList(type) {
   const items = state.mergedFOM.dataTypes[type];
   const hasConflict = type === 'enum' || type === 'variant';
   if (!items || items.length === 0) return '<div class="empty-state">No ' + type + ' data types in loaded FOM files.</div>';
-  const sortedItems = state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortedItems = state.sortEnabled !== false ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
   let html = '';
   sortedItems.forEach(item => {
     const conflict = hasConflict ? state.conflicts.find(c => c.type === type && c.name === item.name) : null;
@@ -1673,7 +1673,7 @@ function showModuleDetails(file, addToHistory = true) {
 }
 
 function renderModuleBody(file) {
-  const sortItems = (items) => state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortItems = (items) => state.sortEnabled !== false ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
   const makeLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDataType('${d.name}', '${type}'); return false;">${d.name}</a></li>`).join('') + '</ul>';
   const makeClassLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDetail('${d.name}', '${type}', true); return false;">${d.name}</a></li>`).join('') + '</ul>';
   let modelIdentHtml = '<table class="property-table">';
@@ -2061,7 +2061,29 @@ function removeFile(index) {
 
 document.getElementById('fileInput').addEventListener('change', e => { loadFiles(Array.from(e.target.files)); });
 
-document.getElementById('sortToggle').addEventListener('change', e => { state.sortEnabled = e.target.checked; saveToStorage(); updateUI(); });
+function updateSortButton() {
+  const btn = document.getElementById('sortBtn');
+  if (!btn) return;
+  if (state.sortEnabled === false) {
+    btn.textContent = 'Sort: Off';
+    btn.style.opacity = '0.5';
+  } else if (state.sortEnabled === 'asc') {
+    btn.textContent = 'Sort: A→Z';
+    btn.style.opacity = '1';
+  } else {
+    btn.textContent = 'Sort: Z→A';
+    btn.style.opacity = '1';
+  }
+}
+
+document.getElementById('sortBtn')?.addEventListener('click', () => {
+  if (state.sortEnabled === 'asc') state.sortEnabled = 'desc';
+  else if (state.sortEnabled === 'desc') state.sortEnabled = false;
+  else state.sortEnabled = 'asc';
+  saveToStorage();
+  updateSortButton();
+  updateUI();
+});
 
 document.getElementById('exportBtn').addEventListener('click', () => { window.print(); });
 
