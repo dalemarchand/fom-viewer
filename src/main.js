@@ -1381,7 +1381,7 @@ function findDataTypeUsages(typeName) {
 // TREE RENDERING
 // ============================================================================
 
-function buildClassTree(classes, sortEnabled) {
+function buildClassTree(classes, sortDir) {
   const roots = [];
   const map = {};
   classes.forEach(c => { map[c.name] = { ...c, children: [] }; });
@@ -1390,7 +1390,11 @@ function buildClassTree(classes, sortEnabled) {
     if (c.parent && map[c.parent]) { map[c.parent].children.push(node); }
     else { roots.push(node); }
   });
-  const sortTree = nodes => { if (sortEnabled) nodes.sort((a, b) => a.name.localeCompare(b.name)); nodes.forEach(n => sortTree(n.children)); };
+  const sortTree = nodes => { 
+    if (sortDir === 'asc') nodes.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortDir === 'desc') nodes.sort((a, b) => b.name.localeCompare(a.name));
+    nodes.forEach(n => sortTree(n.children)); 
+  };
   sortTree(roots);
   return roots;
 }

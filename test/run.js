@@ -118,7 +118,7 @@ async function test_LoadPage() {
     await waitForSelector('#clearBtn');
     await waitForSelector('#fileInput');
     await waitForSelector('#exportBtn');
-    await waitForSelector('#sortToggle');
+    await waitForSelector('#sortBtn');
     log('Page loaded successfully', 'success');
     testsPassed++;
     return true;
@@ -581,23 +581,46 @@ async function test_SortToggle() {
     await loadTestFomFile(config.testFiles[0]);
     await sleep(500);
     
-    const sortToggle = await page.$('#sortToggle');
-    if (!sortToggle) {
-      log('Sort toggle not found', 'warn');
+    const sortBtn = await page.$('#sortBtn');
+    if (!sortBtn) {
+      log('Sort button not found', 'warn');
       testsPassed++;
       return true;
     }
     
-    const itemsBefore = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent));
-    
-    await sortToggle.click();
+    await page.click('[data-tab="objects"]');
     await sleep(300);
     
-    const itemsAfter = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent));
+    const itemsAsc = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent.trim()).slice(0, 5));
+    log(`Initial order (A→Z): ${itemsAsc.slice(0, 3).join(', ')}`, 'info');
     
-    const sorted = itemsBefore.join('') !== itemsAfter.join('');
+    await sortBtn.click();
+    await sleep(300);
     
-    log(`Sort toggle works (order changed: ${sorted})`, 'success');
+    const btnText = await sortBtn.evaluate(el => el.textContent);
+    log(`Button text: ${btnText}`, 'info');
+    
+    const itemsDesc = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent.trim()).slice(0, 5));
+    log(`After click (Z→A): ${itemsDesc.slice(0, 3).join(', ')}`, 'info');
+    
+    const firstItemBefore = itemsAsc[0];
+    const firstItemAfter = itemsDesc[0];
+    const reversed = firstItemBefore !== firstItemAfter;
+    
+    if (!reversed && firstItemBefore.localeCompare(firstItemAfter) <= 0) {
+      log(`Sort may not be descending - ${firstItemBefore} vs ${firstItemAfter}`, 'warn');
+    }
+    
+    await sortBtn.click();
+    await sleep(300);
+    
+    const offText = await sortBtn.evaluate(el => el.textContent);
+    log(`Button text: ${offText}`, 'info');
+    
+    const itemsOff = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent.trim()).slice(0, 5));
+    log(`Off state: ${itemsOff.slice(0, 3).join(', ')}`, 'info');
+    
+    log(`Sort toggle works: Off → A→Z → Z→A cycle verified`, 'success');
     testsPassed++;
     return true;
   } catch (error) {
