@@ -2626,5 +2626,10 @@ function toggleTheme() {
 // Theme toggle button handler
 document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
 
+// About button handler
+document.getElementById('aboutBtn')?.addEventListener('click', () => {
+  alert('FOM Viewer v1.0.0\n\nSingle-page HTML viewer for IEEE 1516 FOM files.\n\nhttps://github.com/dalemarchand/fom-viewer');
+});
+
 initTheme();
 

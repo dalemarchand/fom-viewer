@@ -456,6 +456,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <label class="btn header-btn">Load FOM<input type="file" id="fileInput" multiple accept=".xml" style="display:none;"></label>
 <button class="btn header-btn" id="exportBtn">Export</button>
 <button class="theme-toggle" id="themeToggle" title="Toggle light/dark theme">☀️</button>
+<button class="theme-toggle" id="aboutBtn" title="About FOM Viewer">?</button>
 <button class="btn header-btn" id="backBtn" style="display:none;">← Back</button>
 </div>
 </header>
@@ -3134,11 +3135,17 @@ function toggleTheme() {
 // Theme toggle button handler
 document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
 
+// About button handler
+document.getElementById('aboutBtn')?.addEventListener('click', () => {
+  alert('FOM Viewer v1.0.0\n\nSingle-page HTML viewer for IEEE 1516 FOM files.\n\nhttps://github.com/dalemarchand/fom-viewer');
+});
+
 initTheme();
 
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
