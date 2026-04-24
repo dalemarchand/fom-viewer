@@ -865,6 +865,35 @@ const sources = item._sources || (item._source ? [item._source] : []);
       classUsages.forEach(u => { html += `<tr><td><span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span></td><td>${u.type === 'object' ? 'Object Class' : 'Interaction Class'}</td><td>${u.location}</td></tr>`; });
       html += '</table>';
     }
+  } else if (type === 'basic') {
+    html += '<div class="detail-section"><h3>Basic Data Type</h3><table class="property-table">';
+    html += `<tr><th>Name</th><td>${item.name}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
+    if (item.size) html += `<tr><th>Size</th><td>${item.size}</td></tr>`;
+    if (item.encoding) html += `<tr><th>Encoding</th><td>${item.encoding}</td></tr>`;
+    if (item.endian) html += `<tr><th>Endian</th><td>${item.endian}</td></tr>`;
+    if (item.interpretation) html += `<tr><th>Interpretation</th><td>${item.interpretation}</td></tr>`;
+    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
+    const sources = item._sources || (item._source ? [item._source] : []);
+    if (sources.length > 0) {
+      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
+      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
+      html += `</ul></td></tr>`;
+    }
+    html += '</table></div>';
+    
+    const basicUsages = findDataTypeUsages(item.name);
+    if (basicUsages.length > 0) {
+      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
+      const makeLink = (u) => {
+        if (u.type === 'object' || u.type === 'interaction') {
+          return `<span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span>`;
+        }
+        return `<span class="clickable-item" onclick="showDataType('${u.name}', '${u.type}')">${u.name}</span>`;
+      };
+      const typeLabels = { simple: 'Simple', array: 'Array', fixed: 'Fixed', variant: 'Variant', enum: 'Enum', object: 'Object Class', interaction: 'Interaction Class' };
+      basicUsages.forEach(u => { html += `<tr><td>${makeLink(u)}</td><td>${typeLabels[u.type]}</td><td>${u.location}</td></tr>`; });
+      html += '</table>';
+    }
   } else if (type === 'simple') {
     html += '<div class="detail-section"><h3>Simple Data Type</h3><table class="property-table">';
     html += `<tr><th>Name</th><td>${item.name}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
@@ -1573,7 +1602,7 @@ if (type === 'object') {
     parentChain.reverse();
     body.innerHTML = renderDetail(item, type, parentChain);
   } else {
-    body.innerHTML = renderDetail(item, type || type);
+    body.innerHTML = renderDetail(item, type);
   }
   
   // Highlight selected item in tree after tree is rebuilt
