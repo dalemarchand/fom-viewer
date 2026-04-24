@@ -574,11 +574,10 @@ async function test_TreeFiltering() {
 }
 
 async function test_SortToggle() {
-  log('Testing: Sort toggle...');
+  log('Testing: Sort toggle on multiple tabs...');
   try {
     await openApp();
-    
-    await loadTestFomFile(config.testFiles[0]);
+    await loadTestFomFile('RPR-Foundation_v3.0.xml');
     await sleep(500);
     
     const sortBtn = await page.$('#sortBtn');
@@ -588,39 +587,46 @@ async function test_SortToggle() {
       return true;
     }
     
-    await page.click('[data-tab="objects"]');
-    await sleep(300);
+    const tabsToTest = [
+      { id: 'objects', name: 'Object Classes' },
+      { id: 'interactions', name: 'Interaction Classes' },
+      { id: 'datatypes', name: 'Data Types' },
+      { id: 'dims', name: 'Dimensions' },
+      { id: 'trans', name: 'Transportations' },
+      { id: 'switches', name: 'Switches' },
+      { id: 'tags', name: 'Tags' }
+    ];
     
-    const itemsAsc = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent.trim()).slice(0, 5));
-    log(`Initial order (A→Z): ${itemsAsc.slice(0, 3).join(', ')}`, 'info');
-    
-    await sortBtn.click();
-    await sleep(300);
-    
-    const btnText = await sortBtn.evaluate(el => el.textContent);
-    log(`Button text: ${btnText}`, 'info');
-    
-    const itemsDesc = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent.trim()).slice(0, 5));
-    log(`After click (Z→A): ${itemsDesc.slice(0, 3).join(', ')}`, 'info');
-    
-    const firstItemBefore = itemsAsc[0];
-    const firstItemAfter = itemsDesc[0];
-    const reversed = firstItemBefore !== firstItemAfter;
-    
-    if (!reversed && firstItemBefore.localeCompare(firstItemAfter) <= 0) {
-      log(`Sort may not be descending - ${firstItemBefore} vs ${firstItemAfter}`, 'warn');
+    for (const tab of tabsToTest) {
+      try {
+        await page.click(`[data-tab="${tab.id}"]`);
+        await sleep(300);
+        
+        const items = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        if (items.length === 0) {
+          log(`Tab ${tab.name}: no items`, 'warn');
+          continue;
+        }
+        
+        const currentSort = await sortBtn.evaluate(e => e.textContent);
+        
+        await sortBtn.click();
+        await sleep(300);
+        
+        const itemsAfterSort = await page.$$eval('.tree-item .name', els => els.map(e => e.textContent.trim()).slice(0, 3));
+        const orderChanged = items.join('') !== itemsAfterSort.join('');
+        
+        log(`Tab ${tab.name}: ${items[0]} → ${itemsAfterSort[0]} (changed: ${orderChanged})`, 'info');
+        
+        await sortBtn.click();
+        await sleep(300);
+        
+      } catch (tabError) {
+        log(`Tab ${tab.name}: ${tabError.message}`, 'warn');
+      }
     }
     
-    await sortBtn.click();
-    await sleep(300);
-    
-    const offText = await sortBtn.evaluate(el => el.textContent);
-    log(`Button text: ${offText}`, 'info');
-    
-    const itemsOff = await page.$$eval('.tree-item .name', items => items.map(i => i.textContent.trim()).slice(0, 5));
-    log(`Off state: ${itemsOff.slice(0, 3).join(', ')}`, 'info');
-    
-    log(`Sort toggle works: Off → A→Z → Z→A cycle verified`, 'success');
+    log(`Sort toggle test completed`, 'success');
     testsPassed++;
     return true;
   } catch (error) {

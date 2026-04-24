@@ -1502,7 +1502,7 @@ const sources = item._sources || (item._source ? [item._source] : []);
     }
     html += '</table></div>';
     if (item.values && item.values.length > 0) {
-      const sortedValues = state.sortEnabled !== false ? [...item.values].sort((a, b) => a.value - b.value) : item.values;
+      const sortedValues = state.sortEnabled ? [...item.values].sort((a, b) => a.value - b.value) : item.values;
       html += '<h4 style="margin:12px 0 8px">Enumerators</h4><table class="property-table"><tr><th>Name</th><th>Value</th></tr>';
       sortedValues.forEach(v => { html += `<tr><td>${v.name}${v.notes ? ' ' + renderNoteIcon(v.notes) : ''}</td><td>${v.value}</td></tr>`; });
       html += '</table>';
@@ -1928,7 +1928,7 @@ function renderDataTypeList(type) {
   const items = state.mergedFOM.dataTypes[type];
   const hasConflict = type === 'enum' || type === 'variant';
   if (!items || items.length === 0) return '<div class="empty-state">No ' + type + ' data types in loaded FOM files.</div>';
-  const sortedItems = state.sortEnabled !== false ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortedItems = state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
   let html = '';
   sortedItems.forEach(item => {
     const conflict = hasConflict ? state.conflicts.find(c => c.type === type && c.name === item.name) : null;
@@ -2185,7 +2185,7 @@ function showModuleDetails(file, addToHistory = true) {
 }
 
 function renderModuleBody(file) {
-  const sortItems = (items) => state.sortEnabled !== false ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortItems = (items) => state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
   const makeLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDataType('${d.name}', '${type}'); return false;">${d.name}</a></li>`).join('') + '</ul>';
   const makeClassLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDetail('${d.name}', '${type}', true); return false;">${d.name}</a></li>`).join('') + '</ul>';
   let modelIdentHtml = '<table class="property-table">';
@@ -2363,29 +2363,39 @@ function renderTransList() {
 }
 function renderNotesList() {
   if (!state.files || state.files.length === 0) return '<div class="empty-state">No FOM files loaded. Use the "Load FOM" button in the header.</div>';
-  let html = '';
+  let allNotes = [];
   state.files.forEach(f => {
     if (f.notes && f.notes.length > 0) {
       f.notes.forEach(n => {
         const name = typeof n === 'string' ? n : (n.name || 'Note');
-        const displayName = name.length > 30 ? name.substring(0, 30) + '...' : name;
-        const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        html += `<div class="tree-item" data-name="${escapedName}" data-type="notes"><span class="icon">📝</span><span class="name">${displayName}</span></div>`;
+        allNotes.push(name);
       });
     }
+  });
+  if (state.sortEnabled === 'asc') allNotes.sort((a, b) => a.localeCompare(b));
+  else if (state.sortEnabled === 'desc') allNotes.sort((a, b) => b.localeCompare(a));
+  let html = '';
+  allNotes.forEach(name => {
+    const displayName = name.length > 30 ? name.substring(0, 30) + '...' : name;
+    const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    html += `<div class="tree-item" data-name="${escapedName}" data-type="notes"><span class="icon">📝</span><span class="name">${displayName}</span></div>`;
   });
   return html || '<div class="empty-state">No notes in loaded FOM files.</div>';
 }
 function renderDimensionsList() {
   if (!state.files || state.files.length === 0) return '<div class="empty-state">No FOM files loaded. Use the "Load FOM" button in the header.</div>';
-  let html = '';
+  let allDims = [];
   state.files.forEach(f => {
     if (f.dimensions && f.dimensions.length > 0) {
-      f.dimensions.forEach(d => {
-        const escapedName = d.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        html += `<div class="tree-item" data-name="${escapedName}" data-type="dims"><span class="icon">📐</span><span class="name">${d.name}</span></div>`;
-      });
+      f.dimensions.forEach(d => { allDims.push(d); });
     }
+  });
+  if (state.sortEnabled === 'asc') allDims.sort((a, b) => a.name.localeCompare(b.name));
+  else if (state.sortEnabled === 'desc') allDims.sort((a, b) => b.name.localeCompare(a.name));
+  let html = '';
+  allDims.forEach(d => {
+    const escapedName = d.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    html += `<div class="tree-item" data-name="${escapedName}" data-type="dims"><span class="icon">📐</span><span class="name">${d.name}</span></div>`;
   });
   return html || '<div class="empty-state">No dimensions</div>';
 }
@@ -2427,8 +2437,11 @@ function mergeTime(files) {
 
 function renderSwitchesList() {
   if (!state.mergedFOM || !state.mergedFOM.switches || state.mergedFOM.switches.length === 0) return '<div class="empty-state">No switches. Switches are typically defined in RPR-Base_v3.0.xml or similar FOM files.</div>';
+  let allSwitches = [...state.mergedFOM.switches];
+  if (state.sortEnabled === 'asc') allSwitches.sort((a, b) => a.name.localeCompare(b.name));
+  else if (state.sortEnabled === 'desc') allSwitches.sort((a, b) => b.name.localeCompare(a.name));
   let html = '';
-  state.mergedFOM.switches.forEach(s => {
+  allSwitches.forEach(s => {
     const escapedName = s.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     html += `<div class="tree-item" data-name="${escapedName}" data-type="switches"><span class="icon">🔘</span><span class="name">${s.name}</span></div>`;
   });
@@ -2437,8 +2450,11 @@ function renderSwitchesList() {
 
 function renderTagsList() {
   if (!state.mergedFOM || !state.mergedFOM.tags || state.mergedFOM.tags.length === 0) return '<div class="empty-state">No tags. Tags are typically defined in RPR-Base_v3.0.xml or similar FOM files.</div>';
+  let allTags = [...state.mergedFOM.tags];
+  if (state.sortEnabled === 'asc') allTags.sort((a, b) => a.name.localeCompare(b.name));
+  else if (state.sortEnabled === 'desc') allTags.sort((a, b) => b.name.localeCompare(a.name));
   let html = '';
-  state.mergedFOM.tags.forEach(t => {
+  allTags.forEach(t => {
     const escapedName = t.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     html += `<div class="tree-item" data-name="${escapedName}" data-type="tags"><span class="icon">🏷️</span><span class="name">${t.name}</span></div>`;
   });
@@ -3122,6 +3138,10 @@ initTheme();
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
