@@ -345,6 +345,42 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   transition: all 0.2s; 
 }
 #dropZone:hover { border-color: var(--accent); background: var(--accent-light); }
+
+/* ============================================================================
+   STATS BAR
+   ============================================================================ */
+
+.stats-bar {
+  display: flex;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+.stat-value {
+  font-weight: 700;
+  color: var(--accent);
+}
+.stat-label {
+  color: var(--text-muted);
+}
+.stat-badge {
+  background: var(--accent);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
 </style>
 </head>
 <body>
@@ -397,6 +433,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <p>Load FOM XML files to get started</p>
 <div id="dropZone">Drop files here or click Load FOM</div>
 <button class="btn btn-success" onclick="document.getElementById('fileInput').click()">Load FOM Files</button>
+<div id="welcomeStats" class="stats-bar" style="display: none; margin-top: 20px;"></div>
 </div>
 <div class="detail-header" id="detailHeader">
 <h2 id="detailTitle"></h2>
@@ -2349,6 +2386,8 @@ function renderTimeInfo() {
 
 function updateTabCounts() {
   if (!state.mergedFOM) return;
+  
+  // Update tab counts
   const tabs = [
     { id: 'modules', getCount: () => state.files.length },
     { id: 'objects', getCount: () => state.mergedFOM.objectClasses?.length || 0 },
@@ -2388,6 +2427,33 @@ function updateTabCounts() {
       tabEl.textContent = count > 0 ? `${label} (${count})` : label;
     }
   });
+  
+  // Update welcome screen stats
+  updateWelcomeStats();
+}
+
+function updateWelcomeStats() {
+  const statsEl = document.getElementById('welcomeStats');
+  if (!statsEl || !state.mergedFOM) return;
+  
+  const dt = state.mergedFOM.dataTypes;
+  const totalBasic = dt.basic?.length || 0;
+  const totalSimple = dt.simple?.length || 0;
+  const totalArray = dt.array?.length || 0;
+  const totalFixed = dt.fixed?.length || 0;
+  const totalEnum = dt.enum?.length || 0;
+  const totalVariant = dt.variant?.length || 0;
+  const totalObjects = state.mergedFOM.objectClasses?.length || 0;
+  const totalInteractions = state.mergedFOM.interactionClasses?.length || 0;
+  const totalModules = state.files.length;
+  
+  statsEl.innerHTML = `
+    <div class="stat-item"><span class="stat-value">${totalModules}</span><span class="stat-label">Modules</span></div>
+    <div class="stat-item"><span class="stat-value">${totalObjects}</span><span class="stat-label">Objects</span></div>
+    <div class="stat-item"><span class="stat-value">${totalInteractions}</span><span class="stat-label">Interactions</span></div>
+    <div class="stat-item"><span class="stat-value">${totalBasic + totalSimple + totalArray + totalFixed + totalEnum + totalVariant}</span><span class="stat-label">Data Types</span></div>
+  `;
+  statsEl.style.display = 'flex';
 }
 
 async function loadFiles(files) {
@@ -2968,6 +3034,7 @@ initTheme();
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->

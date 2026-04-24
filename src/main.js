@@ -1940,6 +1940,8 @@ function renderTimeInfo() {
 
 function updateTabCounts() {
   if (!state.mergedFOM) return;
+  
+  // Update tab counts
   const tabs = [
     { id: 'modules', getCount: () => state.files.length },
     { id: 'objects', getCount: () => state.mergedFOM.objectClasses?.length || 0 },
@@ -1979,6 +1981,33 @@ function updateTabCounts() {
       tabEl.textContent = count > 0 ? `${label} (${count})` : label;
     }
   });
+  
+  // Update welcome screen stats
+  updateWelcomeStats();
+}
+
+function updateWelcomeStats() {
+  const statsEl = document.getElementById('welcomeStats');
+  if (!statsEl || !state.mergedFOM) return;
+  
+  const dt = state.mergedFOM.dataTypes;
+  const totalBasic = dt.basic?.length || 0;
+  const totalSimple = dt.simple?.length || 0;
+  const totalArray = dt.array?.length || 0;
+  const totalFixed = dt.fixed?.length || 0;
+  const totalEnum = dt.enum?.length || 0;
+  const totalVariant = dt.variant?.length || 0;
+  const totalObjects = state.mergedFOM.objectClasses?.length || 0;
+  const totalInteractions = state.mergedFOM.interactionClasses?.length || 0;
+  const totalModules = state.files.length;
+  
+  statsEl.innerHTML = `
+    <div class="stat-item"><span class="stat-value">${totalModules}</span><span class="stat-label">Modules</span></div>
+    <div class="stat-item"><span class="stat-value">${totalObjects}</span><span class="stat-label">Objects</span></div>
+    <div class="stat-item"><span class="stat-value">${totalInteractions}</span><span class="stat-label">Interactions</span></div>
+    <div class="stat-item"><span class="stat-value">${totalBasic + totalSimple + totalArray + totalFixed + totalEnum + totalVariant}</span><span class="stat-label">Data Types</span></div>
+  `;
+  statsEl.style.display = 'flex';
 }
 
 async function loadFiles(files) {
