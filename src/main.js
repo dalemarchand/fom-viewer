@@ -1420,7 +1420,7 @@ function renderDataTypeList(type) {
   const items = state.mergedFOM.dataTypes[type];
   const hasConflict = type === 'enum' || type === 'variant';
   if (!items || items.length === 0) return '<div class="empty-state">No ' + type + ' data types in loaded FOM files.</div>';
-  const sortedItems = state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortedItems = state.sortEnabled === 'asc' ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...items].sort((a, b) => b.name.localeCompare(a.name)) : items;
   let html = '';
   sortedItems.forEach(item => {
     const conflict = hasConflict ? state.conflicts.find(c => c.type === type && c.name === item.name) : null;
@@ -1677,7 +1677,7 @@ function showModuleDetails(file, addToHistory = true) {
 }
 
 function renderModuleBody(file) {
-  const sortItems = (items) => state.sortEnabled ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
+  const sortItems = (items) => state.sortEnabled !== false ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
   const makeLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDataType('${d.name}', '${type}'); return false;">${d.name}</a></li>`).join('') + '</ul>';
   const makeClassLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDetail('${d.name}', '${type}', true); return false;">${d.name}</a></li>`).join('') + '</ul>';
   let modelIdentHtml = '<table class="property-table">';
@@ -1743,7 +1743,7 @@ function updateUI() {
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
   if (!state.mergedFOM && state.currentTab !== 'modules') { treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>'; return; }
   if (state.currentTab === 'modules') {
-    const files = state.sortEnabled ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.files;
+    const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
     treeView.innerHTML = '<div class="tree-wrapper">' + (files.length > 0 ? files.map(f => `<div class="tree-item" data-name="${f.name}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded. Use the "Load FOM" button in the header.</div>') + '</div>';
     if (state.selectedItem && state.selectedItem.type === 'module') {
       const selectedItem = treeView.querySelector(`.tree-item[data-name="${state.selectedItem.name}"]`);
@@ -1845,7 +1845,7 @@ function updateUI() {
 function renderTransList() {
   if (!state.mergedFOM || !state.mergedFOM.transportations || state.mergedFOM.transportations.length === 0) return '<div class="empty-state">No transportations. Load a FOM file containing HLAstandardMIM.xml or similar to see transport types (HLAreliable, HLAbestEffort).</div>';
   let html = '';
-  const list = state.sortEnabled ? [...state.mergedFOM.transportations].sort((a, b) => a.name.localeCompare(b.name)) : state.mergedFOM.transportations;
+  const list = state.sortEnabled === 'asc' ? [...state.mergedFOM.transportations].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.mergedFOM.transportations].sort((a, b) => b.name.localeCompare(a.name)) : state.mergedFOM.transportations;
   list.forEach(t => {
     const name = t.name;
     const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -2424,7 +2424,8 @@ function goBack() {
   // Rebuild tree for restoreState.tab
   const treeView = document.getElementById('treeView');
   if (restoreState.tab === 'modules') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + (state.files.length > 0 ? state.files.map(f => `<div class="tree-item" data-name="${f.name.replace(/"/g, '&quot;')}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded.</div>') + '</div>';
+    const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
+    treeView.innerHTML = '<div class="tree-wrapper">' + (files.length > 0 ? files.map(f => `<div class="tree-item" data-name="${f.name.replace(/"/g, '&quot;')}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded.</div>') + '</div>';
   } else if (restoreState.tab === 'objects') {
     const classes = mergeClasses(state.files, 'object');
     const tree = buildClassTree(classes, state.sortEnabled);
