@@ -2626,5 +2626,22 @@ function toggleTheme() {
 // Theme toggle button handler
 document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
 
+// About button handler
+document.getElementById('aboutBtn')?.addEventListener('click', () => {
+  const toast = document.getElementById('toast');
+  toast.innerHTML = `
+    <h3>About FOM Viewer</h3>
+    <p>Single-page HTML viewer for IEEE 1516 FOM files. Load multiple FOM, MIM, and FED files to explore HLA data models.</p>
+    <div class="version">Version 1.0.0 | <a href="https://github.com/dalemarchand/fom-viewer" target="_blank" style="color:var(--accent)">GitHub</a></div>
+  `;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => {
+      toast.classList.remove('show', 'fade-out');
+    }, 300);
+  }, 4000);
+});
+
 initTheme();
 
