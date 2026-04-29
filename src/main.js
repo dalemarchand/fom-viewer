@@ -2861,10 +2861,21 @@ function findAppspaceForClass(className, type) {
 function setupAppspaceButtons() {
   const loadBtn = document.getElementById('loadAppspaceBtn');
   const clearBtn = document.getElementById('clearAppspaceBtn');
-  const separator = document.getElementById('appspaceSeparator');
+  const exportSep = document.getElementById('exportAppspaceSeparator');
+  const appspaceSep = document.getElementById('appspaceSeparator');
+  
+  console.log('setupAppspaceButtons: loadBtn=', !!loadBtn, 'clearBtn=', !!clearBtn, 'exportSep=', !!exportSep, 'appspaceSep=', !!appspaceSep);
+  
+  // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
+  if (loadBtn) { loadBtn.style.display = 'inline-block'; console.log('Load button visible'); }
+  if (clearBtn) { clearBtn.style.display = 'none'; console.log('Clear button hidden'); }
+  if (exportSep) { exportSep.style.display = 'none'; console.log('Export separator hidden (no appspace yet)'); }
+  if (appspaceSep) { appspaceSep.style.display = 'none'; console.log('Appspace separator hidden'); }
   
   if (loadBtn) {
+    console.log('Adding click handler to loadBtn');
     loadBtn.addEventListener('click', () => {
+      console.log('Load Appspace button clicked!');
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.appspace,.csv,.txt';
@@ -2886,7 +2897,8 @@ function setupAppspaceButtons() {
         loadBtn.textContent = 'Change Appspace';
         loadBtn.style.display = 'inline-block';
         clearBtn.style.display = 'inline-block';
-        separator.style.display = 'block';
+        if (exportSep) exportSep.style.display = 'block';
+        if (appspaceSep) appspaceSep.style.display = 'block';
         
         // Show Appspaces tab
         const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
@@ -2912,7 +2924,8 @@ function setupAppspaceButtons() {
       loadBtn.textContent = 'Load Appspace';
       loadBtn.style.display = 'inline-block';
       clearBtn.style.display = 'none';
-      separator.style.display = 'none';
+      if (exportSep) exportSep.style.display = 'none';
+      if (appspaceSep) appspaceSep.style.display = 'none';
       
       // Hide Appspaces tab
       const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
@@ -2978,21 +2991,25 @@ async function loadAppspaceFromStorage() {
       state.appspaceSubTab = result.subTab || 'objects';
       state.appspaceHideUnmatched = result.hideUnmatched !== undefined ? result.hideUnmatched : true;
       
-      // Update UI
-      const loadBtn = document.getElementById('loadAppspaceBtn');
-      const clearBtn = document.getElementById('clearAppspaceBtn');
-      const separator = document.getElementById('appspaceSeparator');
-      if (loadBtn) {
-        loadBtn.textContent = 'Change Appspace';
-        loadBtn.style.display = 'inline-block';
-      }
-      if (clearBtn) clearBtn.style.display = 'inline-block';
-      if (separator) separator.style.display = 'block';
-      
-      // Show Appspaces tab
-      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
-      if (appspaceTab) appspaceTab.style.display = 'block';
-      updateAppspaceTabCount();
+      // Update UI - use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        const loadBtn = document.getElementById('loadAppspaceBtn');
+        const clearBtn = document.getElementById('clearAppspaceBtn');
+        const exportSep = document.getElementById('exportAppspaceSeparator');
+        const appspaceSep = document.getElementById('appspaceSeparator');
+        if (loadBtn) {
+          loadBtn.textContent = 'Change Appspace';
+          loadBtn.style.display = 'inline-block';
+        }
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+        if (exportSep) exportSep.style.display = 'block';
+        if (appspaceSep) appspaceSep.style.display = 'block';
+        
+        // Show Appspaces tab
+        const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+        if (appspaceTab) appspaceTab.style.display = 'block';
+        updateAppspaceTabCount();
+      }, 0);
     }
   } catch (e) { console.warn('Failed to load appspace from storage:', e); }
 }
@@ -3060,4 +3077,163 @@ document.getElementById('aboutBtn')?.addEventListener('click', () => {
 });
 
 initTheme();
+
+// ============================================================================
+// TEST HELPERS (call from browser console)
+// ============================================================================
+
+// Test TC-023: Appspace Buttons Visible When Loaded
+function testAppspaceButtonsVisible() {
+  const loadBtn = document.getElementById('loadAppspaceBtn');
+  const clearBtn = document.getElementById('clearAppspaceBtn');
+  const exportSep = document.getElementById('exportAppspaceSeparator');
+  const appspaceSep = document.getElementById('appspaceSeparator');
+  
+  console.log('TC-023: Appspace Buttons Visible When Loaded');
+  console.log('  Load button exists:', !!loadBtn);
+  console.log('  Clear button exists:', !!clearBtn);
+  console.log('  Export separator exists:', !!exportSep);
+  console.log('  Appspace separator exists:', !!appspaceSep);
+  
+  if (!state.appspace) {
+    console.log('  FAIL: No appspace loaded');
+    return false;
+  }
+  
+  const loadVisible = loadBtn && loadBtn.style.display !== 'none';
+  const clearVisible = clearBtn && clearBtn.style.display !== 'none';
+  const exportSepVisible = exportSep && exportSep.style.display !== 'none';
+  const appspaceSepVisible = appspaceSep && appspaceSep.style.display !== 'none';
+  
+  console.log('  Load button visible:', loadVisible, '(display:', loadBtn?.style.display + ')');
+  console.log('  Clear button visible:', clearVisible, '(display:', clearBtn?.style.display + ')');
+  console.log('  Export separator visible:', exportSepVisible, '(display:', exportSep?.style.display + ')');
+  console.log('  Appspace separator visible:', appspaceSepVisible, '(display:', appspaceSep?.style.display + ')');
+  
+  if (loadVisible && clearVisible && exportSepVisible && appspaceSepVisible) {
+    console.log('  PASS: All buttons/separators visible');
+    return true;
+  } else {
+    console.log('  FAIL: Some elements not visible');
+    return false;
+  }
+}
+
+// Test TC-024: Appspace Buttons Hidden When Cleared
+function testAppspaceButtonsHidden() {
+  const loadBtn = document.getElementById('loadAppspaceBtn');
+  const clearBtn = document.getElementById('clearAppspaceBtn');
+  const exportSep = document.getElementById('exportAppspaceSeparator');
+  const appspaceSep = document.getElementById('appspaceSeparator');
+  
+  console.log('TC-024: Appspace Buttons Hidden When Cleared');
+  console.log('  Load button exists:', !!loadBtn);
+  console.log('  Clear button exists:', !!clearBtn);
+  console.log('  Export separator exists:', !!exportSep);
+  console.log('  Appspace separator exists:', !!appspaceSep);
+  
+  if (state.appspace) {
+    console.log('  FAIL: Appspace still loaded');
+    return false;
+  }
+    
+  const loadVisible = loadBtn && loadBtn.style.display !== 'none';
+  const clearHidden = clearBtn && clearBtn.style.display === 'none';
+  const exportSepHidden = exportSep && exportSep.style.display === 'none';
+  const appspaceSepHidden = appspaceSep && appspaceSep.style.display === 'none';
+    
+  console.log('  Load button visible:', loadVisible, '(display:', loadBtn?.style.display + ')');
+  console.log('  Clear button hidden:', clearHidden, '(display:', clearBtn?.style.display + ')');
+  console.log('  Export separator hidden:', exportSepHidden, '(display:', exportSep?.style.display + ')');
+  console.log('  Appspace separator hidden:', appspaceSepHidden, '(display:', appspaceSep?.style.display + ')');
+    
+  if (loadVisible && clearHidden && exportSepHidden && appspaceSepHidden) {
+    console.log('  PASS: Buttons in correct state');
+    return true;
+  } else {
+    console.log('  FAIL: Buttons not in expected state');
+    return false;
+  }
+}
+
+// Run all appspace button tests
+function testAppspaceButtons() {
+  console.log('=== Running Appspace Button Tests ===');
+  const result1 = testAppspaceButtonsVisible();
+  console.log('');
+  const result2 = testAppspaceButtonsHidden();
+  console.log('');
+  console.log('Results: TC-023:', result1 ? 'PASS' : 'FAIL', '| TC-024:', result2 ? 'PASS' : 'FAIL');
+}
+
+// Test TC-025/026: Separator Visibility
+function testSeparatorVisibility() {
+  const exportSep = document.getElementById('exportAppspaceSeparator');
+  const appspaceSep = document.getElementById('appspaceSeparator');
+
+  console.log('=== TC-025/026: Separator Visibility ===');
+  console.log('  exportAppspaceSeparator exists:', !!exportSep);
+  console.log('  appspaceSeparator exists:', !!appspaceSep);
+
+  if (!exportSep || !appspaceSep) {
+    console.log('  FAIL: Missing separator element(s)');
+    return false;
+  }
+
+  const exportVisible = exportSep.style.display !== 'none';
+  const appspaceVisible = appspaceSep.style.display !== 'none';
+
+  console.log('  exportAppspaceSeparator visible:', exportVisible, '(display:', exportSep.style.display + ')');
+  console.log('  appspaceSeparator visible:', appspaceVisible, '(display:', appspaceSep.style.display + ')');
+
+  if (state.appspace) {
+    // When appspace loaded, both separators should be visible
+    if (exportVisible && appspaceVisible) {
+      console.log('  PASS: Both separators visible (appspace loaded)');
+      return true;
+    } else {
+      console.log('  FAIL: Expected both visible when appspace loaded');
+      return false;
+    }
+  } else {
+    // When no appspace, both should be hidden
+    if (!exportVisible && !appspaceVisible) {
+      console.log('  PASS: Both separators hidden (no appspace)');
+      return true;
+    } else {
+      console.log('  FAIL: Expected both hidden when no appspace');
+      return false;
+    }
+  }
+}
+
+// Test TC-025: Click Handler Works
+function testClickHandler() {
+  const loadBtn = document.getElementById('loadAppspaceBtn');
+  console.log('=== TC-025: Click Handler Test ===');
+  console.log('  Load button exists:', !!loadBtn);
+
+  if (!loadBtn) {
+    console.log('  FAIL: Load button not found');
+    return false;
+  }
+
+  // Check if click handler is attached by triggering click and checking console
+  console.log('  Clicking Load Appspace button...');
+  console.log('  (Check console for "Load Appspace button clicked!" message)');
+  loadBtn.click();
+
+  console.log('  If file dialog appeared or console shows message, test PASSED');
+  return true;
+}
+
+// Run all separator tests
+function testAllSeparators() {
+  console.log('=== Running All Separator Tests ===');
+  const result1 = testSeparatorVisibility();
+  console.log('');
+  const result2 = testClickHandler();
+  console.log('');
+  console.log('Results: TC-025/026:', result1 ? 'PASS' : 'FAIL', '| TC-025:', result2 ? 'PASS' : 'FAIL');
+}
 

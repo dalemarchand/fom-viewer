@@ -342,11 +342,35 @@ state = {
 - **Steps**: Load an appspace file successfully
 - **Expected**: "Change Appspace" button is visible (display != 'none')
 - **Expected**: "Clear Appspace" button is visible (display != 'none')
-- **Expected**: Separator between Export and Appspace buttons is visible
-- **Expected**: Separator between Appspace and Theme buttons is visible
+- **Expected**: `exportAppspaceSeparator` (between Export and Load Appspace) is visible (display != 'none')
+- **Expected**: `appspaceSeparator` (between Clear Appspace and Theme) is visible (display != 'none')
+- **Test**: Run `testAppspaceButtonsVisible()` in console
 
 ### TC-024: Appspace Buttons Hidden When Cleared
 - **Steps**: Load appspace, then click Clear Appspace
 - **Expected**: "Load Appspace" button is visible (text changed back)
 - **Expected**: "Clear Appspace" button is hidden (display = 'none')
-- **Expected**: Separator between Export and Load Appspace is hidden
+- **Expected**: `exportAppspaceSeparator` is hidden (display = 'none')
+- **Expected**: `appspaceSeparator` is hidden (display = 'none')
+- **Test**: Run `testAppspaceButtonsHidden()` in console
+
+### TC-025: Load Appspace Button Click Handler Works
+- **Steps**: Click "Load Appspace" button
+- **Expected**: File picker dialog appears (input.click() is called)
+- **Steps**: Select a valid .appspace file
+- **Expected**: Appspace data is loaded, buttons update, Appspaces tab appears
+- **Test**: Check console for "Load Appspace button clicked!" message
+
+### TC-026: Export/Appspace Separator Only Visible When Appspace Loaded
+- **Steps**: Open page without appspace loaded
+- **Expected**: `exportAppspaceSeparator` is hidden (no separator between Export and Load Appspace)
+- **Steps**: Load an appspace file
+- **Expected**: `exportAppspaceSeparator` becomes visible
+- **Test**: Run `testSeparatorVisibility()` in console
+
+### TC-027: Appspace/Theme Separator Only Visible When Appspace Loaded
+- **Steps**: Open page without appspace loaded
+- **Expected**: `appspaceSeparator` is hidden (no separator between Load Appspace and Theme)
+- **Steps**: Load an appspace file
+- **Expected**: `appspaceSeparator` becomes visible
+- **Test**: Run `testSeparatorVisibility()` in console
