@@ -195,12 +195,14 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   font-size: 18px;
   transition: all 0.2s; 
 }
-.theme-toggle:hover { background: rgba(255,255,255,0.25); } 
-  cursor: pointer; 
-  font-size: 18px; 
-  transition: all 0.2s; 
-}
 .theme-toggle:hover { background: rgba(255,255,255,0.25); }
+.header-separator {
+  width: 1px;
+  height: 24px;
+  background: rgba(255,255,255,0.3);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
 
 /* ============================================================================
    TABS
@@ -255,6 +257,18 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 }
 .subtab:hover { background: var(--bg-secondary); }
 .subtab.active { background: var(--accent); color: white; }
+
+/* Appspace table styles */
+.appspace-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+.appspace-table th, .appspace-table td { text-align: left; padding: 10px 14px; border: 1px solid var(--border); }
+.appspace-table th { background: var(--bg-tertiary); font-weight: 600; }
+.appspace-table tr.unmatched { opacity: 0.5; }
+.appspace-link { color: var(--accent); cursor: pointer; font-weight: 500; }
+.appspace-link:hover { text-decoration: underline; }
+.tree-part { color: var(--text-muted); font-size: 12px; }
+.tree-part.leaf { color: var(--accent); font-weight: 600; font-size: 14px; }
+.apps-list { margin: 0; padding: 0; list-style: none; }
+.apps-list li { padding: 2px 0; }
 
 /* ============================================================================
    MAIN LAYOUT
@@ -477,9 +491,14 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <div class="header-controls">
 <input type="text" id="globalSearch" class="global-search" placeholder="Search all...">
 <button class="header-btn sort-btn" id="sortBtn" title="Click to toggle sort (off, A→Z, Z→A)">Sort: A→Z</button>
+<div class="header-separator"></div>
 <button class="btn header-btn" id="clearBtn">Clear</button>
 <label class="btn header-btn">Load FOM<input type="file" id="fileInput" multiple accept=".xml" style="display:none;"></label>
 <button class="btn header-btn" id="exportBtn">Export</button>
+<div class="header-separator"></div>
+<button class="btn header-btn" id="loadAppspaceBtn" style="display:none;">Load Appspace</button>
+<button class="btn header-btn" id="clearAppspaceBtn" style="display:none;">Clear Appspace</button>
+<div class="header-separator" id="appspaceSeparator" style="display:none;"></div>
 <button class="theme-toggle" id="themeToggle" title="Toggle light/dark theme">☀️</button>
 <button class="theme-toggle" id="aboutBtn" title="About FOM Viewer">?</button>
 <button class="btn header-btn" id="backBtn" style="display:none;">← Back</button>
@@ -492,6 +511,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <div class="tab tab-data-model" data-tab="objects" title="Object classes with attributes and hierarchy">Object Classes</div>
 <div class="tab tab-data-model" data-tab="interactions" title="Interaction classes with parameters and hierarchy">Interaction Classes</div>
 <div class="tab tab-data-model" data-tab="datatypes" title="Basic, Simple, Array, Fixed, Enumerated, and Variant data types">Data Types</div>
+<div class="tab tab-data-model" data-tab="appspaces" title="View appspace assignments for object and interaction classes" style="display:none;">Appspaces</div>
 <div class="tab-section-header">Infrastructure</div>
 <div class="tab tab-infrastructure" data-tab="dims" title="Dimension definitions used for attribute ownership and subscription">Dimensions</div>
 <div class="tab tab-infrastructure" data-tab="trans" title="HLAreliable and HLAbestEffort transportation types">Transportations</div>
@@ -510,6 +530,10 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <div class="subtab" data-subtab="fixed">Fixed Record</div>
 <div class="subtab" data-subtab="enum">Enumerated</div>
 <div class="subtab" data-subtab="variant">Variant Record</div>
+</div>
+<div class="subtab-bar" id="appspaceTabs" style="display:none;">
+<div class="subtab active" data-subtab="objects">Objects (0)</div>
+<div class="subtab" data-subtab="interactions">Interactions (0)</div>
 </div>
 <div class="main">
 <div class="sidebar">

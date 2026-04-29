@@ -19,6 +19,10 @@ const state = {
   conflicts: [],
   errors: [],
   history: [],
+  // Appspace state
+  appspace: null, // { fileName: string, objects: [{ className, apps: [] }], interactions: [{ className, apps: [] }] }
+  appspaceHideUnmatched: true,
+  appspaceSubTab: 'objects', // 'objects' or 'interactions'
   uiState: {
     currentTab: 'modules',
     currentSubTab: 'basic',
@@ -69,6 +73,10 @@ async function saveToStorage() {
     store.clear();
     for (const file of fileData) { store.add(file); }
     store.put({ name: '__uiState__', uiState: uiState });
+    // Save appspace state
+    if (state.appspace) {
+      store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab, hideUnmatched: state.appspaceHideUnmatched });
+    }
   } catch (e) { console.warn('Failed to save to IndexedDB:', e); }
 }
 
@@ -102,13 +110,40 @@ async function loadFromStorage() {
       document.querySelector(`.tab[data-tab="${state.currentTab}"]`).classList.add('active');
       const dtTabs = document.getElementById('dataTypeTabs');
       dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
+      const appspaceTabs = document.getElementById('appspaceTabs');
+      appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
       document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
       const subTabEl = document.querySelector(`.subtab[data-subtab="${state.currentSubTab}"]`);
       if (subTabEl) subTabEl.classList.add('active');
+      // Restore appspace subtab if on appspaces tab
+      if (state.currentTab === 'appspaces') {
+        document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+        const appspaceSubtabEl = document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`);
+        if (appspaceSubtabEl) appspaceSubtabEl.classList.add('active');
+        updateAppspaceTabCount();
+      }
+    }
+    // Load appspace data
+    const appspaceRequest = store.get('__appspace__');
+    const appspaceData = await new Promise((resolve) => { appspaceRequest.onsuccess = () => resolve(appspaceRequest.result); appspaceRequest.onerror = () => resolve(null); });
+    if (appspaceData && appspaceData.data) {
+      state.appspace = appspaceData.data;
+      state.appspaceSubTab = appspaceData.subTab || 'objects';
+      state.appspaceHideUnmatched = appspaceData.hideUnmatched !== undefined ? appspaceData.hideUnmatched : true;
+      // Update UI
+      const loadBtn = document.getElementById('loadAppspaceBtn');
+      const clearBtn = document.getElementById('clearAppspaceBtn');
+      const separator = document.getElementById('appspaceSeparator');
+      if (loadBtn) { loadBtn.textContent = 'Change Appspace'; loadBtn.style.display = 'inline-block'; }
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+      if (separator) separator.style.display = 'block';
+      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+      if (appspaceTab) appspaceTab.style.display = 'block';
+      updateAppspaceTabCount();
     }
     const fileRequest = store.getAll();
     const allData = await new Promise((resolve) => { fileRequest.onsuccess = () => resolve(fileRequest.result); fileRequest.onerror = () => resolve([]); });
-    const fileData = allData.filter(f => f.name !== '__uiState__');
+    const fileData = allData.filter(f => f.name !== '__uiState__' && f.name !== '__appspace__');
     if (Array.isArray(fileData) && fileData.length > 0) {
       fileData.forEach(f => {
         try { const parser = new FOMParser(f.xml); const fom = parser.parse(); state.files.push(fom); }
@@ -824,6 +859,15 @@ function renderDetail(item, type, parents = []) {
     if (item.sharing) html += `<tr><th>Sharing</th><td>${item.sharing}</td></tr>`;
     if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
     if (item.parent) html += `<tr><th>Parent</th><td>${item.parent}</td></tr>`;
+    // Appspaces row
+    if (state.appspace) {
+      const apps = findAppspaceForClass(item.name, type);
+      if (apps && apps.length > 0) {
+        html += '<tr><th>Appspaces</th><td><ul class="apps-list">';
+        apps.forEach(a => { html += `<li>${a}</li>`; });
+        html += '</ul></td></tr>';
+      }
+    }
     if (type === 'interaction') {
       if (item.dimensions && item.dimensions.length > 0) {
         html += '<tr><th>Dimensions</th><td>';
@@ -2113,18 +2157,32 @@ document.querySelectorAll('.tab').forEach(tab => {
     const prevTab = state.currentTab;
     const prevSubTab = state.currentSubTab;
     const prevSelected = state.selectedItem;
-    
+
     if (state.currentTab !== tab.dataset.tab) { 
       if (prevDetailShowing) {
         debugBack('tab click: prevTab=%s, prevSelected=%s', prevTab, prevSelected ? prevSelected.name + '/' + prevSelected.type : 'null');
-        state.history.push({ tab: prevTab, subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+        const historySubTab = prevTab === 'appspaces' ? state.appspaceSubTab : prevSubTab;
+        state.history.push({ tab: prevTab, subTab: historySubTab, selected: prevSelected, detail: 'block' });
       }
     }
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentTab = tab.dataset.tab; state.selectedItem = null;
     const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
+    const appspaceTabs = document.getElementById('appspaceTabs'); appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
     document.getElementById('detailHeader').style.display = 'none'; document.getElementById('detailBody').innerHTML = '';
     saveToStorage(); updateUI();
-    
+
+    // Handle Appspaces tab
+    if (state.currentTab === 'appspaces') {
+      // Ensure a subtab is selected
+      if (!state.appspaceSubTab) state.appspaceSubTab = 'objects';
+      document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+      const activeSubtab = document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`);
+      if (activeSubtab) activeSubtab.classList.add('active');
+      updateAppspaceTabCount();
+      renderAppspacesPanel();
+      return;
+    }
+
     // Auto-select first item WITHOUT pushing to history
     setTimeout(() => {
       const firstItem = document.querySelector('.tree-item');
@@ -2224,6 +2282,104 @@ document.querySelectorAll('.subtab').forEach(tab => {
     }, 50);
   });
 });
+
+// Appspace subtab click handler
+document.querySelectorAll('#appspaceTabs .subtab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const prevDetailShowing = document.getElementById('detailHeader').style.display !== 'none';
+    const prevSubTab = state.appspaceSubTab;
+    const prevSelected = state.selectedItem;
+
+    if (state.appspaceSubTab !== tab.dataset.subtab) { 
+      if (prevDetailShowing) {
+        state.history.push({ tab: 'appspaces', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+      }
+    }
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active');
+    state.appspaceSubTab = tab.dataset.subtab;
+    state.selectedItem = null;
+    document.getElementById('detailHeader').style.display = 'none';
+    document.getElementById('detailBody').innerHTML = '';
+    saveAppspaceToStorage();
+    updateUI();
+    renderAppspacesPanel();
+  });
+});
+
+// Render Appspaces panel
+function renderAppspacesPanel() {
+  const body = document.getElementById('detailBody');
+  const header = document.getElementById('detailHeader');
+  const title = document.getElementById('detailTitle');
+  const meta = document.getElementById('detailMeta');
+  const welcome = document.getElementById('welcomeScreen');
+
+  if (!state.appspace) {
+    body.innerHTML = '<div class="empty-state">No appspace file loaded. Use the "Load Appspace" button to load an appspace file.</div>';
+    return;
+  }
+
+  welcome.style.display = 'none';
+  header.style.display = 'block';
+  title.textContent = 'Appspaces';
+  meta.textContent = `Loaded from ${state.appspace.fileName || 'file'}`;
+
+  const isObjects = state.appspaceSubTab === 'objects';
+  const entries = isObjects ? state.appspace.objects : state.appspace.interactions;
+  const allClasses = isObjects ? state.mergedFOM?.objectClasses : state.mergedFOM?.interactionClasses;
+
+  // Build lookup for class existence
+  const classLookup = {};
+  if (allClasses) {
+    allClasses.forEach(c => { classLookup[c.name] = c; });
+  }
+
+  // Update subtab counts
+  const objCount = state.appspace.objects.length;
+  const intCount = state.appspace.interactions.length;
+  document.querySelector('#appspaceTabs .subtab[data-subtab="objects"]').textContent = `Objects (${objCount})`;
+  document.querySelector('#appspaceTabs .subtab[data-subtab="interactions"]').textContent = `Interactions (${intCount})`;
+
+  // Hide unmatched toggle
+  let html = '<div style="margin-bottom:16px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="hideUnmatched" ' + (state.appspaceHideUnmatched ? 'checked' : '') + ' onchange="state.appspaceHideUnmatched=this.checked;saveAppspaceToStorage();renderAppspacesPanel();"> <span>Hide unmatched items</span></label></div>';
+
+  // Count matched/unmatched
+  let matched = 0, unmatched = 0;
+  entries.forEach(e => { if (classLookup[e.className]) matched++; else unmatched++; });
+
+  html += '<table class="appspace-table">';
+  html += '<tr><th>Class</th><th>App(s)</th></tr>';
+
+  entries.forEach(entry => {
+    const isMatched = !!classLookup[entry.className];
+    if (state.appspaceHideUnmatched && !isMatched) return;
+
+    const className = entry.className;
+    const parts = className.split('.');
+    const prefix = isObjects ? 'HLAobjectRoot.' : 'HLAinteractionRoot.';
+    const displayName = className.startsWith(prefix) ? className.substring(prefix.length) : className;
+    const displayParts = displayName.split('.');
+
+    html += `<tr class="${isMatched ? '' : 'unmatched'}">`;
+    html += '<td>';
+    displayParts.forEach((part, idx) => {
+      const isLeaf = idx === displayParts.length - 1;
+      if (idx > 0) html += '<span class="tree-part">.</span>';
+      if (isLeaf && isMatched) {
+        const clickType = isObjects ? 'object' : 'interaction';
+        html += `<span class="tree-part leaf appspace-link" onclick="showDetail('${className}', '${clickType}', true)">${part}</span>`;
+      } else {
+        html += `<span class="tree-part ${isLeaf ? 'leaf' : 'parent'}">${part}</span>`;
+      }
+    });
+    html += '</td><td><ul class="apps-list">';
+    entry.apps.forEach(app => { html += `<li>${app}</li>`; });
+    html += '</ul></td></tr>';
+  });
+
+  html += '</table>';
+  body.innerHTML = html;
+}
 
 document.getElementById('globalSearch').addEventListener('input', e => {
   const query = e.target.value.toLowerCase().trim();
@@ -2333,20 +2489,28 @@ function goBack() {
   debugBack('goBack: currentTabNow=%s, history.length=%s', currentTabNow, state.history.length);
   debugBack('goBack: full history:', state.history.map(h => ({tab: h.tab, selected: h.selected?.name})));
   
-  // If we're in datatypes tab, just pop the last entry - it's a simple back within datatypes
-  if (currentTabNow === 'datatypes') {
+  // If we're in datatypes or appspaces tab, just pop the last entry
+  if (currentTabNow === 'datatypes' || currentTabNow === 'appspaces') {
     prev = state.history.pop();
     if (!prev || !prev.selected) { document.getElementById('backBtn').style.display = 'none'; saveToStorage(); return; }
     
-    restoreState = {
-      tab: prev.tab || 'datatypes',
-      subTab: prev.selected.type,
-      selected: prev.selected
-    };
+    if (currentTabNow === 'datatypes') {
+      restoreState = {
+        tab: prev.tab || 'datatypes',
+        subTab: prev.selected.type,
+        selected: prev.selected
+      };
+    } else if (currentTabNow === 'appspaces') {
+      restoreState = {
+        tab: prev.tab || 'appspaces',
+        subTab: prev.subTab || state.appspaceSubTab,
+        selected: prev.selected
+      };
+    }
   } else {
     // For other tabs, try to find an entry with the same tab first (for going back within same tab)
     // Otherwise find an entry with a different tab
-    const validTabs = ['modules', 'objects', 'interactions', 'dims', 'trans', 'notes', 'switches', 'tags', 'time', 'datatypes'];
+    const validTabs = ['modules', 'objects', 'interactions', 'dims', 'trans', 'notes', 'switches', 'tags', 'time', 'datatypes', 'appspaces'];
     let sameTabEntry = null;
     let diffTabEntry = null;
     
@@ -2392,9 +2556,17 @@ function goBack() {
     
     debugBack('goBack: chosenEntry: tab=%s, selected.name=%s, selected.type=%s', chosenEntry.tab, chosenEntry.selected?.name, chosenEntry.selected?.type);
     
+    // Determine subtab
+    let subTab = chosenEntry.subTab || 'basic';
+    if (chosenEntry.selected?.type && ['basic','simple','array','fixed','enum','variant'].includes(chosenEntry.selected.type)) {
+      subTab = chosenEntry.selected.type;
+    } else if (chosenEntry.tab === 'appspaces') {
+      subTab = chosenEntry.subTab || state.appspaceSubTab;
+    }
+    
     restoreState = {
       tab: chosenEntry.tab,
-      subTab: chosenEntry.selected.type && ['basic','simple','array','fixed','enum','variant'].includes(chosenEntry.selected.type) ? chosenEntry.selected.type : (chosenEntry.subTab || 'basic'),
+      subTab: subTab,
       selected: chosenEntry.selected
     };
   }
@@ -2417,6 +2589,18 @@ function goBack() {
     document.querySelector(`.subtab[data-subtab="${restoreState.subTab}"]`)?.classList.add('active');
   } else {
     document.getElementById('dataTypeTabs').style.display = 'none';
+  }
+  
+  // For appspaces tab, update the sub-tab UI
+  if (restoreState.tab === 'appspaces') {
+    const appspaceTabs = document.getElementById('appspaceTabs');
+    appspaceTabs.style.display = 'flex';
+    state.appspaceSubTab = restoreState.subTab || 'objects';
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#appspaceTabs .subtab[data-subtab="${restoreState.subTab}"]`)?.classList.add('active');
+    updateAppspaceTabCount();
+  } else {
+    document.getElementById('appspaceTabs').style.display = 'none';
   }
   
   debugBack('goBack: restoreState: tab=%s, subTab=%s, selected=%o', restoreState.tab, restoreState.subTab, restoreState.selected);
@@ -2446,6 +2630,21 @@ function goBack() {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderTagsList() + '</div>';
   } else if (restoreState.tab === 'time') {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderTimeInfo() + '</div>';
+  } else if (restoreState.tab === 'appspaces') {
+    // Show appspaces panel
+    const appspaceTabs = document.getElementById('appspaceTabs');
+    appspaceTabs.style.display = 'flex';
+    state.appspaceSubTab = restoreState.subTab || 'objects';
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`)?.classList.add('active');
+    updateAppspaceTabCount();
+    renderAppspacesPanel();
+    document.getElementById('detailHeader').style.display = 'block';
+    document.getElementById('detailTitle').textContent = 'Appspaces';
+    document.getElementById('detailMeta').textContent = state.appspace?.fileName || '';
+    // Don't show tree for appspaces
+    treeView.innerHTML = '';
+    return;
   } else {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderDataTypeList(restoreState.subTab) + '</div>';
   }
@@ -2591,6 +2790,227 @@ function setupTabScroll() {
     updateTabScrollButtons();
   }
 }
+
+// ============================================================================
+// APPSPACE FUNCTIONALITY
+// ============================================================================
+
+// Parse appspace file content
+function parseAppspaceFile(content) {
+  const lines = content.split('\n');
+  const objects = [];
+  const interactions = [];
+  
+  lines.forEach(line => {
+    line = line.trim();
+    if (!line || line.startsWith('#')) return;
+    
+    const parts = line.split('|');
+    if (parts.length !== 2) return;
+    
+    const className = parts[0].trim();
+    const apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
+    
+    if (className && apps.length > 0) {
+      if (className.startsWith('HLAobjectRoot')) {
+        objects.push({ className, apps });
+      } else if (className.startsWith('HLAinteractionRoot')) {
+        interactions.push({ className, apps });
+      }
+    }
+  });
+  
+  return { objects, interactions };
+}
+
+// Find matching appspace entries for a class
+function findAppspaceForClass(className, type) {
+  if (!state.appspace) return null;
+  const entries = type === 'object' ? state.appspace.objects : state.appspace.interactions;
+  if (!entries) return null;
+  
+  // Find the most specific match (longest right-side match)
+  let bestMatch = null;
+  let bestLength = 0;
+  
+  entries.forEach(entry => {
+    const entryParts = entry.className.split('.');
+    const classParts = className.split('.');
+    
+    // Check if entry matches the right side of className
+    if (classParts.length >= entryParts.length) {
+      const startIdx = classParts.length - entryParts.length;
+      let matches = true;
+      for (let i = 0; i < entryParts.length; i++) {
+        if (classParts[startIdx + i] !== entryParts[i]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches && entryParts.length > bestLength) {
+        bestMatch = entry;
+        bestLength = entryParts.length;
+      }
+    }
+  });
+  
+  return bestMatch ? bestMatch.apps : null;
+}
+
+// Load appspace button click handler
+function setupAppspaceButtons() {
+  const loadBtn = document.getElementById('loadAppspaceBtn');
+  const clearBtn = document.getElementById('clearAppspaceBtn');
+  const separator = document.getElementById('appspaceSeparator');
+  
+  if (loadBtn) {
+    loadBtn.addEventListener('click', () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.appspace,.csv,.txt';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        const content = await file.text();
+        const parsed = parseAppspaceFile(content);
+        
+        state.appspace = {
+          fileName: file.name,
+          objects: parsed.objects,
+          interactions: parsed.interactions
+        };
+        state.appspaceSubTab = 'objects';
+        
+        // Update UI
+        loadBtn.textContent = 'Change Appspace';
+        loadBtn.style.display = 'inline-block';
+        clearBtn.style.display = 'inline-block';
+        separator.style.display = 'block';
+        
+        // Show Appspaces tab
+        const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+        if (appspaceTab) appspaceTab.style.display = 'block';
+        
+        // Update tab count
+        updateAppspaceTabCount();
+        
+        saveAppspaceToStorage();
+        updateUI();
+        showAppspaceSnackbar(file.name, parsed.objects.length + parsed.interactions.length);
+      };
+      input.click();
+    });
+  }
+  
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      state.appspace = null;
+      state.appspaceSubTab = 'objects';
+      
+      // Update UI
+      loadBtn.textContent = 'Load Appspace';
+      loadBtn.style.display = 'inline-block';
+      clearBtn.style.display = 'none';
+      separator.style.display = 'none';
+      
+      // Hide Appspaces tab
+      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+      if (appspaceTab) appspaceTab.style.display = 'none';
+      
+      // If currently on appspaces tab, switch to modules
+      if (state.currentTab === 'appspaces') {
+        document.querySelector('.tab[data-tab="modules"]').click();
+      }
+      
+      clearAppspaceFromStorage();
+      updateUI();
+    });
+  }
+}
+
+// Update Appspaces tab count
+function updateAppspaceTabCount() {
+  const tab = document.querySelector('.tab[data-tab="appspaces"]');
+  if (!tab || !state.appspace) return;
+  const total = state.appspace.objects.length + state.appspace.interactions.length;
+  tab.textContent = `Appspaces (${total})`;
+}
+
+// Show snackbar notification
+function showAppspaceSnackbar(fileName, count) {
+  const toast = document.getElementById('toast');
+  toast.innerHTML = `
+    <h3>Appspace Loaded</h3>
+    <p>Loaded ${count} appspace association${count !== 1 ? 's' : ''} from ${fileName}</p>
+  `;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => {
+      toast.classList.remove('show', 'fade-out');
+    }, 300);
+  }, 4000);
+}
+
+// Save/load appspace from IndexedDB
+async function saveAppspaceToStorage() {
+  try {
+    if (!db) await initDB();
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab, hideUnmatched: state.appspaceHideUnmatched });
+  } catch (e) { console.warn('Failed to save appspace to IndexedDB:', e); }
+}
+
+async function loadAppspaceFromStorage() {
+  try {
+    if (!db) await initDB();
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get('__appspace__');
+    const result = await new Promise((resolve) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    });
+    if (result && result.data) {
+      state.appspace = result.data;
+      state.appspaceSubTab = result.subTab || 'objects';
+      state.appspaceHideUnmatched = result.hideUnmatched !== undefined ? result.hideUnmatched : true;
+      
+      // Update UI
+      const loadBtn = document.getElementById('loadAppspaceBtn');
+      const clearBtn = document.getElementById('clearAppspaceBtn');
+      const separator = document.getElementById('appspaceSeparator');
+      if (loadBtn) {
+        loadBtn.textContent = 'Change Appspace';
+        loadBtn.style.display = 'inline-block';
+      }
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+      if (separator) separator.style.display = 'block';
+      
+      // Show Appspaces tab
+      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+      if (appspaceTab) appspaceTab.style.display = 'block';
+      updateAppspaceTabCount();
+    }
+  } catch (e) { console.warn('Failed to load appspace from storage:', e); }
+}
+
+async function clearAppspaceFromStorage() {
+  try {
+    if (!db) await initDB();
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete('__appspace__');
+  } catch (e) { console.warn('Failed to clear appspace from IndexedDB:', e); }
+}
+
+// Call setup on init
+document.addEventListener('DOMContentLoaded', () => {
+  setupAppspaceButtons();
+  loadAppspaceFromStorage();
+});
 
 // ============================================================================
 // INITIALIZATION
