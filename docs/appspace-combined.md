@@ -337,3 +337,16 @@ state = {
 - **Steps**: Load page, check back button
 - **Expected**: Back button is hidden (no history)
 - **Expected**: Clicking Back when no history does nothing
+
+### TC-023: Appspace Buttons Visible When Loaded
+- **Steps**: Load an appspace file successfully
+- **Expected**: "Change Appspace" button is visible (display != 'none')
+- **Expected**: "Clear Appspace" button is visible (display != 'none')
+- **Expected**: Separator between Export and Appspace buttons is visible
+- **Expected**: Separator between Appspace and Theme buttons is visible
+
+### TC-024: Appspace Buttons Hidden When Cleared
+- **Steps**: Load appspace, then click Clear Appspace
+- **Expected**: "Load Appspace" button is visible (text changed back)
+- **Expected**: "Clear Appspace" button is hidden (display = 'none')
+- **Expected**: Separator between Export and Load Appspace is hidden

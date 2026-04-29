@@ -3006,18 +3006,14 @@ async function clearAppspaceFromStorage() {
   } catch (e) { console.warn('Failed to clear appspace from IndexedDB:', e); }
 }
 
-// Call setup on init
-document.addEventListener('DOMContentLoaded', () => {
-  setupAppspaceButtons();
-  loadAppspaceFromStorage();
-});
-
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
 
 init();
 setupTabScroll();
+setupAppspaceButtons();
+loadAppspaceFromStorage();
 
 // ============================================================================
 // THEME TOGGLE
