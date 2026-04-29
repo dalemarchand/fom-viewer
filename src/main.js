@@ -2859,12 +2859,14 @@ function findAppspaceForClass(className, type) {
 
 // Load appspace button click handler
 function setupAppspaceButtons() {
+  console.log('setupAppspaceButtons() CALLED!');
   const loadBtn = document.getElementById('loadAppspaceBtn');
   const clearBtn = document.getElementById('clearAppspaceBtn');
   const exportSep = document.getElementById('exportAppspaceSeparator');
   const appspaceSep = document.getElementById('appspaceSeparator');
   
   console.log('setupAppspaceButtons: loadBtn=', !!loadBtn, 'clearBtn=', !!clearBtn, 'exportSep=', !!exportSep, 'appspaceSep=', !!appspaceSep);
+  alert('setupAppspaceButtons called! loadBtn=' + !!loadBtn);
   
   // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
   if (loadBtn) { loadBtn.style.display = 'inline-block'; console.log('Load button visible'); }
@@ -3029,8 +3031,26 @@ async function clearAppspaceFromStorage() {
 
 init();
 setupTabScroll();
-setupAppspaceButtons();
-loadAppspaceFromStorage();
+
+// Ensure DOM is ready before setting up appspace buttons
+console.log('About to call setupAppspaceButtons...');
+try {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOM ready, setting up appspace buttons...');
+      setupAppspaceButtons();
+      loadAppspaceFromStorage();
+    });
+  } else {
+    console.log('DOM already ready, setting up appspace buttons...');
+    setupAppspaceButtons();
+    loadAppspaceFromStorage();
+  }
+  console.log('setupAppspaceButtons and loadAppspaceFromStorage calls completed');
+} catch(e) {
+  console.error('ERROR during setup:', e);
+  alert('Error: ' + e.message);
+}
 
 // ============================================================================
 // THEME TOGGLE

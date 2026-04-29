@@ -503,6 +503,15 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <button class="theme-toggle" id="aboutBtn" title="About FOM Viewer">?</button>
 <button class="btn header-btn" id="backBtn" style="display:none;">← Back</button>
 </div>
+<script>
+console.log('Inline script: calling setupAppspaceButtons...');
+if (typeof setupAppspaceButtons === 'function') {
+  setupAppspaceButtons();
+  console.log('Inline script: setupAppspaceButtons called successfully');
+} else {
+  console.error('Inline script: setupAppspaceButtons is NOT defined!');
+}
+</script>
 </header>
 <div class="tab-bar">
 <button class="tab-bar-btn" id="tabScrollLeft" onclick="scrollTabs(-200)">&#9664;</button>
@@ -556,6 +565,14 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 </div>
 </div>
 <script>
+// Catch any runtime errors
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+  console.log('RUNTIME ERROR:', msg, 'at', url, 'line:', lineNo, 'col:', columnNo, 'error:', error);
+  return false;
+};
+
+console.log('Script starting to load...');
+
 // ============================================================================
 // CONSTANTS & STATE
 // ============================================================================
