@@ -3029,8 +3029,11 @@ async function clearAppspaceFromStorage() {
 // INITIALIZATION
 // ============================================================================
 
+console.log('About to call init()...');
 init();
+console.log('init() completed, about to call setupTabScroll()...');
 setupTabScroll();
+console.log('setupTabScroll() completed...');
 
 // Ensure DOM is ready before setting up appspace buttons
 console.log('About to call setupAppspaceButtons...');
