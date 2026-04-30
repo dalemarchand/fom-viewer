@@ -1810,6 +1810,7 @@ function updateUI() {
     treeView.innerHTML = '';
     if (treeControls) treeControls.style.display = 'none';
     if (sidebar) sidebar.style.display = 'none';
+    renderAppspacesPanel();
     return;
   } else {
     if (sidebar) sidebar.style.display = '';
