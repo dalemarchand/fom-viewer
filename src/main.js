@@ -3036,17 +3036,24 @@ setupTabScroll();
 console.log('About to call setupAppspaceButtons...');
 try {
   function doSetup() {
-    console.log('DOM ready, setting up appspace buttons...');
+    console.log('doSetup() called - setting up appspace buttons...');
     setupAppspaceButtons();
     loadAppspaceFromStorage();
+    console.log('doSetup() completed');
   }
   
+  console.log('document.readyState =', document.readyState);
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', doSetup);
+    console.log('Adding DOMContentLoaded listener...');
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('DOMContentLoaded event fired!');
+      doSetup();
+    });
   } else {
+    console.log('DOM already ready, calling doSetup() immediately...');
     doSetup();
   }
-  console.log('setupAppspaceButtons and loadAppspaceFromStorage calls completed');
+  console.log('After doSetup setup');
 } catch(e) {
   console.error('ERROR during setup:', e);
   alert('Error: ' + e.message);
