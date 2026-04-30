@@ -20,9 +20,9 @@ const state = {
   errors: [],
   history: [],
   // Appspace state
-  appspace: null, // { fileName: string, objects: [{ className, apps: [] }], interactions: [{ className, apps: [] }] }
-  appspaceHideUnmatched: true,
-  appspaceSubTab: 'objects', // 'objects' or 'interactions'
+  // Structure: { fileName, entries: [{ className, apps: [] }], interactions: [{ className, apps: [], matchedClass }], unknown: [{ className, apps: [] }]
+  appspace: null, // { fileName, entries, interactions, unknown }
+  appspaceSubTab: 'objects', // 'objects', 'interactions', or 'unknown'
   uiState: {
     currentTab: 'modules',
     currentSubTab: 'basic',
@@ -75,7 +75,7 @@ async function saveToStorage() {
     store.put({ name: '__uiState__', uiState: uiState });
     // Save appspace state
     if (state.appspace) {
-      store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab, hideUnmatched: state.appspaceHideUnmatched });
+      store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab });
     }
   } catch (e) { console.warn('Failed to save to IndexedDB:', e); }
 }
@@ -129,7 +129,7 @@ async function loadFromStorage() {
     if (appspaceData && appspaceData.data) {
       state.appspace = appspaceData.data;
       state.appspaceSubTab = appspaceData.subTab || 'objects';
-      state.appspaceHideUnmatched = appspaceData.hideUnmatched !== undefined ? appspaceData.hideUnmatched : true;
+      // No longer using hideUnmatched - entries are classified as objects/interactions/unknown
       // Update UI
       const loadBtn = document.getElementById('loadAppspaceBtn');
       const clearBtn = document.getElementById('clearAppspaceBtn');
@@ -190,6 +190,22 @@ async function loadFromStorage() {
 
 class FOMParser {
   constructor(xml) { this.xml = xml; this.parser = new DOMParser(); }
+
+  // Build full hierarchical name by walking up the DOM tree
+  buildFullName(el, validTagNames) {
+    if (!el) return '';
+    const name = el.querySelector('name')?.textContent || '';
+    if (!name) return '';
+    // HLAobjectRoot and HLAinteractionRoot are roots - don't prepend anything
+    if (name === 'HLAobjectRoot' || name === 'HLAinteractionRoot') return name;
+    const parentEl = el.parentElement;
+    if (parentEl && validTagNames.includes(parentEl.tagName)) {
+      const parentFullName = this.buildFullName(parentEl, validTagNames);
+      return parentFullName + '.' + name;
+    }
+    return name;
+  }
+
   parse() {
     const doc = this.parser.parseFromString(this.xml, 'text/xml');
     const parseError = doc.querySelector('parsererror');
@@ -472,11 +488,17 @@ class FOMParser {
     });
     return deps;
   }
+
   parseObjectClasses(doc) {
     const classes = [];
     const elements = doc.querySelectorAll('objectClass, objectClassRTI');
     elements.forEach(el => {
       const name = el.querySelector('name')?.textContent || '';
+      if (!name) return;
+      // Build full hierarchical name by walking up the DOM
+      const fullName = this.buildFullName(el, ['objectClass', 'objectClassRTI']);
+      const parentEl = el.parentElement;
+      const fullParentName = (parentEl && (parentEl.tagName === 'objectClass' || parentEl.tagName === 'objectClassRTI')) ? this.buildFullName(parentEl, ['objectClass', 'objectClassRTI']) : '';
       const sharing = el.querySelector('sharing')?.textContent || '';
       const semantics = el.querySelector('semantics')?.textContent || '';
       const classNotes = el.getAttribute('notes') || '';
@@ -498,20 +520,21 @@ class FOMParser {
           if (attrName) attributes.push({ name: attrName, sharing: attrSharing, semantics: attrSemantics, notes: attrNotes, dataType: dt, updateType, updateCondition, ownership, transportation, order });
         }
       });
-      let parent = '';
-      const parentEl = el.parentElement;
-      if (parentEl && (parentEl.tagName === 'objectClass' || parentEl.tagName === 'objectClassRTI')) {
-        parent = parentEl.querySelector('name')?.textContent || '';
-      }
-      classes.push({ name, sharing, semantics, notes: classNotes, attributes, parent, _source: this.getSource(doc) });
+      classes.push({ name: fullName, sharing, semantics, notes: classNotes, attributes, parent: fullParentName, _source: this.getSource(doc) });
     });
     return classes;
   }
+
   parseInteractionClasses(doc) {
     const classes = [];
     const elements = doc.querySelectorAll('interactionClass, interactionClassRTI');
     elements.forEach(el => {
       const name = el.querySelector('name')?.textContent || '';
+      if (!name) return;
+      // Build full hierarchical name by walking up the DOM
+      const fullName = this.buildFullName(el, ['interactionClass', 'interactionClassRTI']);
+      const parentEl = el.parentElement;
+      const fullParentName = (parentEl && (parentEl.tagName === 'interactionClass' || parentEl.tagName === 'interactionClassRTI')) ? this.buildFullName(parentEl, ['interactionClass', 'interactionClassRTI']) : '';
       const sharing = el.querySelector('sharing')?.textContent || '';
       const semantics = el.querySelector('semantics')?.textContent || '';
       const classNotes = el.getAttribute('notes') || '';
@@ -533,12 +556,7 @@ class FOMParser {
           if (paramName) parameters.push({ name: paramName, sharing: paramSharing, semantics: paramSemantics, notes: paramNotes, dataType: dt, order });
         }
       });
-      let parent = '';
-      const parentEl = el.parentElement;
-      if (parentEl && (parentEl.tagName === 'interactionClass' || parentEl.tagName === 'interactionClassRTI')) {
-        parent = parentEl.querySelector('name')?.textContent || '';
-      }
-      classes.push({ name, sharing, semantics, notes: classNotes, dimensions, transportation, order, parameters, parent, _source: this.getSource(doc) });
+      classes.push({ name: fullName, sharing, semantics, notes: classNotes, dimensions, transportation, order, parameters, parent: fullParentName, _source: this.getSource(doc) });
     });
     return classes;
   }
@@ -1782,15 +1800,19 @@ function updateUI() {
   const exportBtn = document.getElementById('exportBtn');
   const backBtn = document.getElementById('backBtn');
   const treeControls = document.getElementById('treeControls');
+  const sidebar = document.querySelector('.sidebar');
   const hasData = state.files.length > 0;
   exportBtn.style.display = hasData ? 'inline-block' : 'none';
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
   
-  // Hide tree for Appspaces tab (uses main panel, not sidebar)
+  // Hide tree/sidebar for Appspaces tab (uses main panel, not sidebar)
   if (state.currentTab === 'appspaces') {
     treeView.innerHTML = '';
     if (treeControls) treeControls.style.display = 'none';
+    if (sidebar) sidebar.style.display = 'none';
     return;
+  } else {
+    if (sidebar) sidebar.style.display = '';
   }
   
   if (!state.mergedFOM && state.currentTab !== 'modules') { treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>'; return; }
@@ -2332,62 +2354,96 @@ function renderAppspacesPanel() {
   title.textContent = 'Appspaces';
   meta.textContent = `Loaded from ${state.appspace.fileName || 'file'}`;
 
-  const isObjects = state.appspaceSubTab === 'objects';
-  const entries = isObjects ? state.appspace.objects : state.appspace.interactions;
-  const allClasses = isObjects ? state.mergedFOM?.objectClasses : state.mergedFOM?.interactionClasses;
+  const subTab = state.appspaceSubTab;
+  let entries = [];
+  let clickType = 'object';
 
-  // Build lookup for class existence
-  const classLookup = {};
-  if (allClasses) {
-    allClasses.forEach(c => { classLookup[c.name] = c; });
+  if (subTab === 'objects') {
+    entries = state.appspace.entries || [];
+    clickType = 'object';
+  } else if (subTab === 'interactions') {
+    entries = state.appspace.interactions || [];
+    clickType = 'interaction';
+  } else if (subTab === 'unknown') {
+    entries = state.appspace.unknown || [];
   }
 
-  // Update subtab counts
-  const objCount = state.appspace.objects.length;
-  const intCount = state.appspace.interactions.length;
-  document.querySelector('#appspaceTabs .subtab[data-subtab="objects"]').textContent = `Objects (${objCount})`;
-  document.querySelector('#appspaceTabs .subtab[data-subtab="interactions"]').textContent = `Interactions (${intCount})`;
+  let html = '';
 
-  // Hide unmatched toggle
-  let html = '<div style="margin-bottom:16px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="hideUnmatched" ' + (state.appspaceHideUnmatched ? 'checked' : '') + ' onchange="state.appspaceHideUnmatched=this.checked;saveAppspaceToStorage();renderAppspacesPanel();"> <span>Hide unmatched items</span></label></div>';
+  if (entries.length === 0) {
+    if (subTab === 'unknown') {
+      html = '<div class="empty-state">All appspace entries are matched to known classes.</div>';
+    } else {
+      html = '<div class="empty-state">No matched ' + subTab + ' found.</div>';
+    }
+  } else {
+    // Sort entries based on state.sortEnabled
+    const sortedEntries = [...entries];
+    if (state.sortEnabled === 'asc') {
+      sortedEntries.sort((a, b) => a.className.localeCompare(b.className));
+    } else if (state.sortEnabled === 'desc') {
+      sortedEntries.sort((a, b) => b.className.localeCompare(a.className));
+    }
 
-  // Count matched/unmatched
-  let matched = 0, unmatched = 0;
-  entries.forEach(e => { if (classLookup[e.className]) matched++; else unmatched++; });
-
-  html += '<table class="appspace-table">';
-  html += '<tr><th>Class</th><th>App(s)</th></tr>';
-
-  entries.forEach(entry => {
-    const isMatched = !!classLookup[entry.className];
-    if (state.appspaceHideUnmatched && !isMatched) return;
-
-    const className = entry.className;
-    const parts = className.split('.');
-    const prefix = isObjects ? 'HLAobjectRoot.' : 'HLAinteractionRoot.';
-    const displayName = className.startsWith(prefix) ? className.substring(prefix.length) : className;
-    const displayParts = displayName.split('.');
-
-    html += `<tr class="${isMatched ? '' : 'unmatched'}">`;
-    html += '<td>';
-    displayParts.forEach((part, idx) => {
-      const isLeaf = idx === displayParts.length - 1;
-      if (idx > 0) html += '<span class="tree-part">.</span>';
-      if (isLeaf && isMatched) {
-        const clickType = isObjects ? 'object' : 'interaction';
-        html += `<span class="tree-part leaf appspace-link" onclick="showDetail('${className}', '${clickType}', true)">${part}</span>`;
-      } else {
-        html += `<span class="tree-part ${isLeaf ? 'leaf' : 'parent'}">${part}</span>`;
-      }
+    html += '<table class="appspace-table">';
+    html += '<tr><th>Class</th><th>App(s)</th></tr>';
+    sortedEntries.forEach(entry => {
+      const fullClassName = entry.matchedClass || entry.className;
+      const displayName = entry.className;
+      const displayParts = displayName.split('.');
+      const isUnknown = subTab === 'unknown';
+      html += `<tr ${isUnknown ? 'class="unmatched"' : ''}>`;
+      html += '<td>';
+      displayParts.forEach((part, idx) => {
+        const isLeaf = idx === displayParts.length - 1;
+        if (idx > 0) html += '<span class="tree-part">.</span>';
+        if (isUnknown) {
+          html += `<span class="tree-part leaf">${part}</span>`;
+        } else if (isLeaf) {
+          html += `<span class="tree-part leaf appspace-link" onclick="showDetail('${fullClassName}', '${clickType}', true)">${part}</span>`;
+        } else {
+          html += `<span class="tree-part parent">${part}</span>`;
+        }
+      });
+      html += '</td><td><ul class="apps-list">';
+      entry.apps.forEach(app => { html += `<li>${app}</li>`; });
+      html += '</ul></td></tr>';
     });
-    html += '</td><td><ul class="apps-list">';
-    entry.apps.forEach(app => { html += `<li>${app}</li>`; });
-    html += '</ul></td></tr>';
-  });
+    html += '</table>';
+  }
 
-  html += '</table>';
   body.innerHTML = html;
 }
+
+// Find a class in the list using right-side matching (like findAppspaceForClass does)
+function findClassByRightSideMatch(entryName, classList) {
+  let bestMatch = null;
+  let bestLength = 0;
+
+  classList.forEach(cls => {
+    const entryParts = entryName.split('.');
+    const classParts = cls.name.split('.');
+
+    // Check if entry matches the right side of className
+    if (classParts.length >= entryParts.length) {
+      const startIdx = classParts.length - entryParts.length;
+      let matches = true;
+      for (let i = 0; i < entryParts.length; i++) {
+        if (classParts[startIdx + i] !== entryParts[i]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches && entryParts.length > bestLength) {
+        bestMatch = cls;
+        bestLength = entryParts.length;
+      }
+    }
+  });
+
+  return bestMatch;
+}
+
 
 document.getElementById('globalSearch').addEventListener('input', e => {
   const query = e.target.value.toLowerCase().trim();
@@ -2427,15 +2483,11 @@ document.getElementById('globalSearch').addEventListener('input', e => {
 });
 
 async function init() {
-  console.log('init() called');
   try {
     document.getElementById('welcomeScreen').style.display = 'none';
     document.getElementById('detailHeader').style.display = 'none';
-    console.log('init(): calling updateUI()...');
     updateUI();
-    console.log('init(): calling loadFromStorage()...');
     await loadFromStorage();
-    console.log('init(): loadFromStorage() completed');
   } catch(e) {
     console.error('ERROR in init():', e);
     alert('Error in init: ' + e.message);
@@ -2816,8 +2868,7 @@ function setupTabScroll() {
 // Parse appspace file content
 function parseAppspaceFile(content) {
   const lines = content.split('\n');
-  const objects = [];
-  const interactions = [];
+  const entries = [];
   let lineCount = 0;
   let parsedCount = 0;
   
@@ -2827,31 +2878,25 @@ function parseAppspaceFile(content) {
     lineCount++;
     
     const parts = line.split('|');
-    if (parts.length !== 2) { console.log('parseAppspaceFile: skipping line (not 2 parts):', line); return; }
+    if (parts.length !== 2) return;
     
     const className = parts[0].trim();
     const apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
     
     if (className && apps.length > 0) {
       parsedCount++;
-      if (className.startsWith('HLAobjectRoot')) {
-        objects.push({ className, apps });
-      } else if (className.startsWith('HLAinteractionRoot')) {
-        interactions.push({ className, apps });
-      } else {
-        console.log('parseAppspaceFile: unknown prefix:', className);
-      }
+      entries.push({ className, apps });
     }
   });
   
-  console.log('parseAppspaceFile: processed', lineCount, 'lines, parsed', parsedCount, 'entries (objects:', objects.length, 'interactions:', interactions.length, ')');
-  return { objects, interactions };
+  return entries;
 }
 
 // Find matching appspace entries for a class
 function findAppspaceForClass(className, type) {
   if (!state.appspace) return null;
-  const entries = type === 'object' ? state.appspace.objects : state.appspace.interactions;
+  // Get the appropriate entries based on type
+  const entries = type === 'object' ? state.appspace.entries : state.appspace.interactions;
   if (!entries) return null;
   
   // Find the most specific match (longest right-side match)
@@ -2884,27 +2929,19 @@ function findAppspaceForClass(className, type) {
 
 // Load appspace button click handler
 function setupAppspaceButtons() {
-  console.log('setupAppspaceButtons() CALLED!');
-  alert('setupAppspaceButtons() CALLED!');
   const loadBtn = document.getElementById('loadAppspaceBtn');
   const clearBtn = document.getElementById('clearAppspaceBtn');
   const exportSep = document.getElementById('exportAppspaceSeparator');
   const appspaceSep = document.getElementById('appspaceSeparator');
   
-  console.log('setupAppspaceButtons: loadBtn=', !!loadBtn, 'clearBtn=', !!clearBtn, 'exportSep=', !!exportSep, 'appspaceSep=', !!appspaceSep);
-  alert('setupAppspaceButtons called! loadBtn=' + !!loadBtn);
-  alert('setupAppspaceButtons called! loadBtn=' + !!loadBtn);
-  
   // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
-  if (loadBtn) { loadBtn.style.display = 'inline-block'; console.log('Load button visible'); }
-  if (clearBtn) { clearBtn.style.display = 'none'; console.log('Clear button hidden'); }
-  if (exportSep) { exportSep.style.display = 'none'; console.log('Export separator hidden (no appspace yet)'); }
-  if (appspaceSep) { appspaceSep.style.display = 'none'; console.log('Appspace separator hidden'); }
+  if (loadBtn) loadBtn.style.display = 'inline-block';
+  if (clearBtn) clearBtn.style.display = 'none';
+  if (exportSep) exportSep.style.display = 'none';
+  if (appspaceSep) appspaceSep.style.display = 'none';
   
   if (loadBtn) {
-    console.log('Adding click handler to loadBtn');
     loadBtn.addEventListener('click', () => {
-      console.log('Load Appspace button clicked!');
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.appspace,.csv,.txt';
@@ -2913,14 +2950,19 @@ function setupAppspaceButtons() {
         if (!file) return;
         
         const content = await file.text();
-        console.log('File content length:', content.length);
-        const parsed = parseAppspaceFile(content);
-        console.log('Parsed result:', 'objects=', parsed.objects.length, 'interactions=', parsed.interactions.length);
+        const entries = parseAppspaceFile(content);
+        
+        // Classify entries: check object classes first, then interactions, then unknown
+        const objectClasses = state.mergedFOM?.objectClasses || [];
+        const interactionClasses = state.mergedFOM?.interactionClasses || [];
+        
+        const classified = classifyAppspaceEntries(entries, objectClasses, interactionClasses);
         
         state.appspace = {
           fileName: file.name,
-          objects: parsed.objects,
-          interactions: parsed.interactions
+          entries: classified.objects,
+          interactions: classified.interactions,
+          unknown: classified.unknown
         };
         state.appspaceSubTab = 'objects';
         
@@ -2940,7 +2982,8 @@ function setupAppspaceButtons() {
         
         saveAppspaceToStorage();
         updateUI();
-        showAppspaceSnackbar(file.name, parsed.objects.length + parsed.interactions.length);
+        const totalMatched = classified.objects.length + classified.interactions.length;
+        showAppspaceSnackbar(file.name, totalMatched);
       };
       input.click();
     });
@@ -2973,12 +3016,55 @@ function setupAppspaceButtons() {
   }
 }
 
+// Classify appspace entries: check object classes first, then interactions, then unknown
+function classifyAppspaceEntries(entries, objectClasses, interactionClasses) {
+  const objects = [];
+  const interactions = [];
+  const unknown = [];
+  
+  entries.forEach(entry => {
+    // Check object classes first
+    const objectMatch = findClassByRightSideMatch(entry.className, objectClasses);
+    if (objectMatch) {
+      objects.push({ ...entry, matchedClass: objectMatch.name });
+      return;
+    }
+    
+    // Check interaction classes next
+    const interactionMatch = findClassByRightSideMatch(entry.className, interactionClasses);
+    if (interactionMatch) {
+      interactions.push({ ...entry, matchedClass: interactionMatch.name });
+      return;
+    }
+    
+    // No match found
+    unknown.push({ ...entry });
+  });
+  
+  return { objects, interactions, unknown };
+}
+
 // Update Appspaces tab count
 function updateAppspaceTabCount() {
   const tab = document.querySelector('.tab[data-tab="appspaces"]');
   if (!tab || !state.appspace) return;
-  const total = state.appspace.objects.length + state.appspace.interactions.length;
+  const total = (state.appspace.entries?.length || 0) + 
+                (state.appspace.interactions?.length || 0) + 
+                (state.appspace.unknown?.length || 0);
   tab.textContent = `Appspaces (${total})`;
+  
+  // Update subtab counts
+  const objCount = state.appspace.entries?.length || 0;
+  const intCount = state.appspace.interactions?.length || 0;
+  const unkCount = state.appspace.unknown?.length || 0;
+  
+  const objTab = document.querySelector('#appspaceTabs .subtab[data-subtab="objects"]');
+  const intTab = document.querySelector('#appspaceTabs .subtab[data-subtab="interactions"]');
+  const unkTab = document.querySelector('#appspaceTabs .subtab[data-subtab="unknown"]');
+  
+  if (objTab) objTab.textContent = `Objects (${objCount})`;
+  if (intTab) intTab.textContent = `Interactions (${intCount})`;
+  if (unkTab) unkTab.textContent = `Unknown (${unkCount})`;
 }
 
 // Show snackbar notification
@@ -3003,7 +3089,7 @@ async function saveAppspaceToStorage() {
     if (!db) await initDB();
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab, hideUnmatched: state.appspaceHideUnmatched });
+    store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab });
   } catch (e) { console.warn('Failed to save appspace to IndexedDB:', e); }
 }
 
@@ -3020,7 +3106,6 @@ async function loadAppspaceFromStorage() {
     if (result && result.data) {
       state.appspace = result.data;
       state.appspaceSubTab = result.subTab || 'objects';
-      state.appspaceHideUnmatched = result.hideUnmatched !== undefined ? result.hideUnmatched : true;
       
       // Update UI - use setTimeout to ensure DOM is ready
       setTimeout(() => {
@@ -3039,10 +3124,11 @@ async function loadAppspaceFromStorage() {
         // Show Appspaces tab
         const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
         if (appspaceTab) appspaceTab.style.display = 'block';
+        
         updateAppspaceTabCount();
       }, 0);
     }
-  } catch (e) { console.warn('Failed to load appspace from storage:', e); }
+  } catch (e) { console.warn('Failed to load appspace from IndexedDB:', e); }
 }
 
 async function clearAppspaceFromStorage() {
@@ -3061,36 +3147,24 @@ async function clearAppspaceFromStorage() {
 try {
   console.log('About to call init()...');
   init();
-  console.log('init() completed, about to call setupTabScroll()...');
   setupTabScroll();
-  console.log('setupTabScroll() completed...');
 } catch(e) {
   console.error('ERROR in init/setupTabScroll:', e);
   alert('Error in init: ' + e.message);
 }
 
 // Ensure DOM is ready before setting up appspace buttons
-console.log('About to call setupAppspaceButtons...');
 try {
   function doSetup() {
-    console.log('doSetup() called - setting up appspace buttons...');
     setupAppspaceButtons();
     loadAppspaceFromStorage();
-    console.log('doSetup() completed');
   }
   
-  console.log('document.readyState =', document.readyState);
   if (document.readyState === 'loading') {
-    console.log('Adding DOMContentLoaded listener...');
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('DOMContentLoaded event fired!');
-      doSetup();
-    });
+    document.addEventListener('DOMContentLoaded', doSetup);
   } else {
-    console.log('DOM already ready, calling doSetup() immediately...');
     doSetup();
   }
-  console.log('After doSetup setup');
 } catch(e) {
   console.error('ERROR during setup:', e);
   alert('Error: ' + e.message);
@@ -3143,161 +3217,6 @@ document.getElementById('aboutBtn')?.addEventListener('click', () => {
 initTheme();
 
 // ============================================================================
-// TEST HELPERS (call from browser console)
+// END OF FILE
 // ============================================================================
-
-// Test TC-023: Appspace Buttons Visible When Loaded
-function testAppspaceButtonsVisible() {
-  const loadBtn = document.getElementById('loadAppspaceBtn');
-  const clearBtn = document.getElementById('clearAppspaceBtn');
-  const exportSep = document.getElementById('exportAppspaceSeparator');
-  const appspaceSep = document.getElementById('appspaceSeparator');
-  
-  console.log('TC-023: Appspace Buttons Visible When Loaded');
-  console.log('  Load button exists:', !!loadBtn);
-  console.log('  Clear button exists:', !!clearBtn);
-  console.log('  Export separator exists:', !!exportSep);
-  console.log('  Appspace separator exists:', !!appspaceSep);
-  
-  if (!state.appspace) {
-    console.log('  FAIL: No appspace loaded');
-    return false;
-  }
-  
-  const loadVisible = loadBtn && loadBtn.style.display !== 'none';
-  const clearVisible = clearBtn && clearBtn.style.display !== 'none';
-  const exportSepVisible = exportSep && exportSep.style.display !== 'none';
-  const appspaceSepVisible = appspaceSep && appspaceSep.style.display !== 'none';
-  
-  console.log('  Load button visible:', loadVisible, '(display:', loadBtn?.style.display + ')');
-  console.log('  Clear button visible:', clearVisible, '(display:', clearBtn?.style.display + ')');
-  console.log('  Export separator visible:', exportSepVisible, '(display:', exportSep?.style.display + ')');
-  console.log('  Appspace separator visible:', appspaceSepVisible, '(display:', appspaceSep?.style.display + ')');
-  
-  if (loadVisible && clearVisible && exportSepVisible && appspaceSepVisible) {
-    console.log('  PASS: All buttons/separators visible');
-    return true;
-  } else {
-    console.log('  FAIL: Some elements not visible');
-    return false;
-  }
-}
-
-// Test TC-024: Appspace Buttons Hidden When Cleared
-function testAppspaceButtonsHidden() {
-  const loadBtn = document.getElementById('loadAppspaceBtn');
-  const clearBtn = document.getElementById('clearAppspaceBtn');
-  const exportSep = document.getElementById('exportAppspaceSeparator');
-  const appspaceSep = document.getElementById('appspaceSeparator');
-  
-  console.log('TC-024: Appspace Buttons Hidden When Cleared');
-  console.log('  Load button exists:', !!loadBtn);
-  console.log('  Clear button exists:', !!clearBtn);
-  console.log('  Export separator exists:', !!exportSep);
-  console.log('  Appspace separator exists:', !!appspaceSep);
-  
-  if (state.appspace) {
-    console.log('  FAIL: Appspace still loaded');
-    return false;
-  }
-    
-  const loadVisible = loadBtn && loadBtn.style.display !== 'none';
-  const clearHidden = clearBtn && clearBtn.style.display === 'none';
-  const exportSepHidden = exportSep && exportSep.style.display === 'none';
-  const appspaceSepHidden = appspaceSep && appspaceSep.style.display === 'none';
-    
-  console.log('  Load button visible:', loadVisible, '(display:', loadBtn?.style.display + ')');
-  console.log('  Clear button hidden:', clearHidden, '(display:', clearBtn?.style.display + ')');
-  console.log('  Export separator hidden:', exportSepHidden, '(display:', exportSep?.style.display + ')');
-  console.log('  Appspace separator hidden:', appspaceSepHidden, '(display:', appspaceSep?.style.display + ')');
-    
-  if (loadVisible && clearHidden && exportSepHidden && appspaceSepHidden) {
-    console.log('  PASS: Buttons in correct state');
-    return true;
-  } else {
-    console.log('  FAIL: Buttons not in expected state');
-    return false;
-  }
-}
-
-// Run all appspace button tests
-function testAppspaceButtons() {
-  console.log('=== Running Appspace Button Tests ===');
-  const result1 = testAppspaceButtonsVisible();
-  console.log('');
-  const result2 = testAppspaceButtonsHidden();
-  console.log('');
-  console.log('Results: TC-023:', result1 ? 'PASS' : 'FAIL', '| TC-024:', result2 ? 'PASS' : 'FAIL');
-}
-
-// Test TC-025/026: Separator Visibility
-function testSeparatorVisibility() {
-  const exportSep = document.getElementById('exportAppspaceSeparator');
-  const appspaceSep = document.getElementById('appspaceSeparator');
-
-  console.log('=== TC-025/026: Separator Visibility ===');
-  console.log('  exportAppspaceSeparator exists:', !!exportSep);
-  console.log('  appspaceSeparator exists:', !!appspaceSep);
-
-  if (!exportSep || !appspaceSep) {
-    console.log('  FAIL: Missing separator element(s)');
-    return false;
-  }
-
-  const exportVisible = exportSep.style.display !== 'none';
-  const appspaceVisible = appspaceSep.style.display !== 'none';
-
-  console.log('  exportAppspaceSeparator visible:', exportVisible, '(display:', exportSep.style.display + ')');
-  console.log('  appspaceSeparator visible:', appspaceVisible, '(display:', appspaceSep.style.display + ')');
-
-  if (state.appspace) {
-    // When appspace loaded, both separators should be visible
-    if (exportVisible && appspaceVisible) {
-      console.log('  PASS: Both separators visible (appspace loaded)');
-      return true;
-    } else {
-      console.log('  FAIL: Expected both visible when appspace loaded');
-      return false;
-    }
-  } else {
-    // When no appspace, both should be hidden
-    if (!exportVisible && !appspaceVisible) {
-      console.log('  PASS: Both separators hidden (no appspace)');
-      return true;
-    } else {
-      console.log('  FAIL: Expected both hidden when no appspace');
-      return false;
-    }
-  }
-}
-
-// Test TC-025: Click Handler Works
-function testClickHandler() {
-  const loadBtn = document.getElementById('loadAppspaceBtn');
-  console.log('=== TC-025: Click Handler Test ===');
-  console.log('  Load button exists:', !!loadBtn);
-
-  if (!loadBtn) {
-    console.log('  FAIL: Load button not found');
-    return false;
-  }
-
-  // Check if click handler is attached by triggering click and checking console
-  console.log('  Clicking Load Appspace button...');
-  console.log('  (Check console for "Load Appspace button clicked!" message)');
-  loadBtn.click();
-
-  console.log('  If file dialog appeared or console shows message, test PASSED');
-  return true;
-}
-
-// Run all separator tests
-function testAllSeparators() {
-  console.log('=== Running All Separator Tests ===');
-  const result1 = testSeparatorVisibility();
-  console.log('');
-  const result2 = testClickHandler();
-  console.log('');
-  console.log('Results: TC-025/026:', result1 ? 'PASS' : 'FAIL', '| TC-025:', result2 ? 'PASS' : 'FAIL');
-}
 

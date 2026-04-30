@@ -96,10 +96,7 @@ When Appspaces tab is selected:
 **Subtabs**:
 - Objects (X) - shows count of matching object classes
 - Interactions (Y) - shows count of matching interaction classes
-
-**Controls**:
-- Switch: "Hide unmatched items" - toggles showing rows where class not found in FOM
-- Default: On (hide unmatched)
+- Unknown (Z) - shows count of unmatched entries (red text)
 
 **Table**:
 | Class | App(s) |
@@ -116,6 +113,11 @@ When Appspaces tab is selected:
 #### Apps Column Display
 - Unbulleted text list format
 - One app per line, no bullet points
+
+#### Unknown Tab
+- Shows entries that don't match any object or interaction class
+- All entries displayed in red text
+- No clickable links (no match found)
 
 ### 3.4 Class Information (In Object/Interaction Detail)
 
@@ -177,13 +179,20 @@ historyEntry = {
 state = {
   appspace: null | {
     fileName: string,
-    objects: [{ className: string, apps: string[] }],
-    interactions: [{ className: string, apps: string[] }]
+    entries: [{ className: string, apps: string[], matchedClass: string }],  // Matched to object classes
+    interactions: [{ className: string, apps: string[], matchedClass: string }],  // Matched to interaction classes  
+    unknown: [{ className: string, apps: string[] }]  // No match found
   },
-  appspaceHideUnmatched: boolean,  // default: true
-  appspaceSubTab: 'objects' | 'interactions'
+  appspaceSubTab: 'objects' | 'interactions' | 'unknown'
 }
 ```
+
+**Classification Logic:**
+- Parse ALL entries into a single array first
+- For each entry:
+  1. Check against object classes (right-side match) → Add to `entries`
+  2. If no match, check against interaction classes → Add to `interactions`
+  3. If still no match → Add to `unknown`
 
 ## 5. Storage
 - Appspace data persists in IndexedDB
@@ -305,15 +314,15 @@ state = {
 - **Expected**: Separator between Export and Load Appspace (no Appspace button yet)
 - **Expected**: Separator between Load Appspace and Theme when appspace not loaded
 
-### TC-017: Hide Unmatched Toggle
-- **Steps**: Load appspace with some unmatched classes, toggle "Hide unmatched items"
-- **Expected**: Unmatched rows hidden when toggle is ON
-- **Expected**: Unmatched rows shown when toggle is OFF
-- **Expected**: Unmatched rows have `.unmatched` class
+### TC-017: Unknown Tab Functionality
+- **Steps**: Load appspace with unmatched entries, click Unknown subtab
+- **Expected**: Shows only unmatched entries (red text)
+- **Steps**: Click Objects/Interactions subtab
+- **Expected**: Shows only matched entries with clickable links
 
 ### TC-018: Class Link Navigation from Appspaces
-- **Steps**: In Appspaces tab, click a class link
-- **Expected**: Navigates to Objects/Interactions tab
+- **Steps**: In Appspaces tab (Objects), click a class link
+- **Expected**: Navigates to Objects tab
 - **Expected**: Correct class is selected and detail shown
 - **Expected**: Back button can return to Appspaces tab
 
@@ -338,39 +347,82 @@ state = {
 - **Expected**: Back button is hidden (no history)
 - **Expected**: Clicking Back when no history does nothing
 
-### TC-023: Appspace Buttons Visible When Loaded
+### TC-021: Appspace Buttons Visible When Loaded
 - **Steps**: Load an appspace file successfully
 - **Expected**: "Change Appspace" button is visible (display != 'none')
 - **Expected**: "Clear Appspace" button is visible (display != 'none')
 - **Expected**: `exportAppspaceSeparator` (between Export and Load Appspace) is visible (display != 'none')
 - **Expected**: `appspaceSeparator` (between Clear Appspace and Theme) is visible (display != 'none')
-- **Test**: Run `testAppspaceButtonsVisible()` in console
 
-### TC-024: Appspace Buttons Hidden When Cleared
+### TC-022: Appspace Buttons Hidden When Cleared
 - **Steps**: Load appspace, then click Clear Appspace
 - **Expected**: "Load Appspace" button is visible (text changed back)
 - **Expected**: "Clear Appspace" button is hidden (display = 'none')
 - **Expected**: `exportAppspaceSeparator` is hidden (display = 'none')
 - **Expected**: `appspaceSeparator` is hidden (display = 'none')
-- **Test**: Run `testAppspaceButtonsHidden()` in console
 
-### TC-025: Load Appspace Button Click Handler Works
+### TC-023: Load Appspace Button Click Handler Works
 - **Steps**: Click "Load Appspace" button
 - **Expected**: File picker dialog appears (input.click() is called)
 - **Steps**: Select a valid .appspace file
 - **Expected**: Appspace data is loaded, buttons update, Appspaces tab appears
-- **Test**: Check console for "Load Appspace button clicked!" message
 
-### TC-026: Export/Appspace Separator Only Visible When Appspace Loaded
+### TC-024: Export/Appspace Separator Only Visible When Appspace Loaded
 - **Steps**: Open page without appspace loaded
 - **Expected**: `exportAppspaceSeparator` is hidden (no separator between Export and Load Appspace)
 - **Steps**: Load an appspace file
 - **Expected**: `exportAppspaceSeparator` becomes visible
-- **Test**: Run `testSeparatorVisibility()` in console
 
-### TC-027: Appspace/Theme Separator Only Visible When Appspace Loaded
+### TC-025: Appspace/Theme Separator Only Visible When Appspace Loaded
 - **Steps**: Open page without appspace loaded
 - **Expected**: `appspaceSeparator` is hidden (no separator between Load Appspace and Theme)
 - **Steps**: Load an appspace file
 - **Expected**: `appspaceSeparator` becomes visible
-- **Test**: Run `testSeparatorVisibility()` in console
+
+### TC-026: FOM Class Parsing - Duplicate Simple Names
+- **Steps**: Load `HLAstandardMIM.xml` (has classes with same simple name in different hierarchies)
+- **Expected**: Object Classes tab shows ALL object classes (none missing)
+- **Expected**: Interaction Classes tab shows ALL interaction classes (none missing)
+- **Expected**: Classes with same simple name but different parents get correct full hierarchical names
+- **Test**: Run `node --check /home/marchand/src/fom-viewer/src/main.js` after any parser changes
+- **Test**: Rebuild with `npm run build` and verify no "buildFullName is not defined" error
+
+### TC-027: Appspace Sorting - Ascending Order
+- **Steps**: Load an appspace file with multiple entries
+- **Steps**: Click the Sort button to enable ascending sort (state.sortEnabled = 'asc')
+- **Steps**: Navigate to Objects subtab
+- **Expected**: Entries are sorted alphabetically by class name (A → Z)
+- **Steps**: Navigate to Interactions subtab
+- **Expected**: Entries are sorted alphabetically by class name (A → Z)
+- **Steps**: Navigate to Unknown subtab
+- **Expected**: Entries are sorted alphabetically by class name (A → Z)
+
+### TC-028: Appspace Sorting - Descending Order
+- **Steps**: Load an appspace file with multiple entries
+- **Steps**: Click the Sort button twice to enable descending sort (state.sortEnabled = 'desc')
+- **Steps**: Navigate to Objects subtab
+- **Expected**: Entries are sorted reverse alphabetically by class name (Z → A)
+- **Steps**: Navigate to Interactions subtab
+- **Expected**: Entries are sorted reverse alphabetically by class name (Z → A)
+- **Steps**: Navigate to Unknown subtab
+- **Expected**: Entries are sorted reverse alphabetically by class name (Z → A)
+
+### TC-029: Appspace Sorting - Disabled
+- **Steps**: Load an appspace file with multiple entries
+- **Steps**: Click the Sort button three times to disable sorting (state.sortEnabled = false)
+- **Steps**: Navigate to Objects subtab
+- **Expected**: Entries are displayed in original order (as parsed from appspace file)
+- **Steps**: Navigate to Interactions subtab
+- **Expected**: Entries are displayed in original order
+- **Steps**: Navigate to Unknown subtab
+- **Expected**: Entries are displayed in original order
+
+### TC-030: Sort Button Persists Across Subtabs
+- **Steps**: Load an appspace file
+- **Steps**: Click Sort button to enable ascending sort
+- **Steps**: Switch between Objects, Interactions, Unknown subtabs
+- **Expected**: Sorting remains applied (entries sorted in all subtabs)
+- **Steps**: Click Sort button to change to descending
+- **Expected**: All subtabs now show descending sort
+- **Steps**: Click Sort button again to disable
+- **Expected**: All subtabs show original order
