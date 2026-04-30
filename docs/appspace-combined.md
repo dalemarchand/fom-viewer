@@ -454,3 +454,27 @@ state = {
 - **Expected**: Note icons appear next to the name in each table
 - **Expected**: Multiple note references show multiple icons
 - **Expected**: All icons are clickable and link to the Notes tab
+
+### TC-034: Load Appspace Switches to Appspaces Tab
+- **Steps**: Select an item in a tab (e.g., Object Classes tab, select "HLAobjectRoot.DynamicObject")
+- **Steps**: Click "Load Appspace" button
+- **Steps**: Select a valid .appspace file
+- **Expected**: Tab automatically switches to "Appspaces" tab
+- **Expected**: Appspaces tab shows the loaded file data
+- **Expected**: Previous tab selection is no longer active
+
+### TC-035: Cancel File Load Preserves State
+- **Steps**: Select an item in a tab (e.g., Objects tab, select "HLAobjectRoot.DynamicObject")
+- **Steps**: Click "Load Appspace" button
+- **Steps**: Click "Cancel" in the file picker dialog
+- **Expected**: Original tab remains selected (e.g., Objects tab still active)
+- **Expected**: Originally selected item is still selected
+- **Expected**: No appspace is loaded (state.appspace remains null)
+- **Expected**: Appspaces tab remains hidden (if it was hidden before)
+
+### TC-036: History Preserved on Cancel
+- **Steps**: Navigate to some items to build history (click through a few items)
+- **Steps**: Click "Load Appspace" button
+- **Steps**: Click "Cancel" in the file picker dialog
+- **Expected**: Back button history is preserved (same as before)
+- **Expected**: Can still use Back button to navigate through history

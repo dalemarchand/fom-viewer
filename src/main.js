@@ -2969,12 +2969,25 @@ function setupAppspaceButtons() {
   
   if (loadBtn) {
     loadBtn.addEventListener('click', () => {
+      // Save current state in case user cancels
+      const prevTab = state.currentTab;
+      const prevSubTab = state.currentSubTab;
+      const prevSelected = state.selectedItem;
+      const prevHistory = [...state.history];
+      
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.appspace,.csv,.txt';
       input.onchange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
+        if (!file) {
+          // User cancelled - restore previous state
+          state.currentTab = prevTab;
+          state.currentSubTab = prevSubTab;
+          state.selectedItem = prevSelected;
+          state.history = prevHistory;
+          return;
+        }
         
         const content = await file.text();
         const entries = parseAppspaceFile(content);
@@ -3008,6 +3021,13 @@ function setupAppspaceButtons() {
         updateAppspaceTabCount();
         
         saveAppspaceToStorage();
+        
+        // Switch to Appspaces tab
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        if (appspaceTab) appspaceTab.classList.add('active');
+        state.currentTab = 'appspaces';
+        state.selectedItem = null;
+        
         updateUI();
         const totalMatched = classified.objects.length + classified.interactions.length;
         showAppspaceSnackbar(file.name, totalMatched);
