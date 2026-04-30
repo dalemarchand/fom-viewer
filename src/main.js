@@ -3035,16 +3035,16 @@ setupTabScroll();
 // Ensure DOM is ready before setting up appspace buttons
 console.log('About to call setupAppspaceButtons...');
 try {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      console.log('DOM ready, setting up appspace buttons...');
-      setupAppspaceButtons();
-      loadAppspaceFromStorage();
-    });
-  } else {
-    console.log('DOM already ready, setting up appspace buttons...');
+  function doSetup() {
+    console.log('DOM ready, setting up appspace buttons...');
     setupAppspaceButtons();
     loadAppspaceFromStorage();
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', doSetup);
+  } else {
+    doSetup();
   }
   console.log('setupAppspaceButtons and loadAppspaceFromStorage calls completed');
 } catch(e) {
