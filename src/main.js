@@ -1785,6 +1785,14 @@ function updateUI() {
   const hasData = state.files.length > 0;
   exportBtn.style.display = hasData ? 'inline-block' : 'none';
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
+  
+  // Hide tree for Appspaces tab (uses main panel, not sidebar)
+  if (state.currentTab === 'appspaces') {
+    treeView.innerHTML = '';
+    if (treeControls) treeControls.style.display = 'none';
+    return;
+  }
+  
   if (!state.mergedFOM && state.currentTab !== 'modules') { treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>'; return; }
   if (state.currentTab === 'modules') {
     const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
@@ -2810,26 +2818,33 @@ function parseAppspaceFile(content) {
   const lines = content.split('\n');
   const objects = [];
   const interactions = [];
+  let lineCount = 0;
+  let parsedCount = 0;
   
   lines.forEach(line => {
     line = line.trim();
     if (!line || line.startsWith('#')) return;
+    lineCount++;
     
     const parts = line.split('|');
-    if (parts.length !== 2) return;
+    if (parts.length !== 2) { console.log('parseAppspaceFile: skipping line (not 2 parts):', line); return; }
     
     const className = parts[0].trim();
     const apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
     
     if (className && apps.length > 0) {
+      parsedCount++;
       if (className.startsWith('HLAobjectRoot')) {
         objects.push({ className, apps });
       } else if (className.startsWith('HLAinteractionRoot')) {
         interactions.push({ className, apps });
+      } else {
+        console.log('parseAppspaceFile: unknown prefix:', className);
       }
     }
   });
   
+  console.log('parseAppspaceFile: processed', lineCount, 'lines, parsed', parsedCount, 'entries (objects:', objects.length, 'interactions:', interactions.length, ')');
   return { objects, interactions };
 }
 
@@ -2870,12 +2885,14 @@ function findAppspaceForClass(className, type) {
 // Load appspace button click handler
 function setupAppspaceButtons() {
   console.log('setupAppspaceButtons() CALLED!');
+  alert('setupAppspaceButtons() CALLED!');
   const loadBtn = document.getElementById('loadAppspaceBtn');
   const clearBtn = document.getElementById('clearAppspaceBtn');
   const exportSep = document.getElementById('exportAppspaceSeparator');
   const appspaceSep = document.getElementById('appspaceSeparator');
   
   console.log('setupAppspaceButtons: loadBtn=', !!loadBtn, 'clearBtn=', !!clearBtn, 'exportSep=', !!exportSep, 'appspaceSep=', !!appspaceSep);
+  alert('setupAppspaceButtons called! loadBtn=' + !!loadBtn);
   alert('setupAppspaceButtons called! loadBtn=' + !!loadBtn);
   
   // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
@@ -2896,7 +2913,9 @@ function setupAppspaceButtons() {
         if (!file) return;
         
         const content = await file.text();
+        console.log('File content length:', content.length);
         const parsed = parseAppspaceFile(content);
+        console.log('Parsed result:', 'objects=', parsed.objects.length, 'interactions=', parsed.interactions.length);
         
         state.appspace = {
           fileName: file.name,
