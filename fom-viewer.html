@@ -3564,16 +3564,20 @@ function setupAppspaceButtons() {
   if (exportSep) exportSep.style.display = 'none';
   if (appspaceSep) appspaceSep.style.display = 'none';
   
-  // Add info button next to Load/Change Appspace
-  if (loadBtn && !document.getElementById('appspaceInfoBtn')) {
-    const infoBtn = document.createElement('button');
-    infoBtn.id = 'appspaceInfoBtn';
-    infoBtn.className = 'theme-toggle';
-    infoBtn.textContent = 'ℹ️';
-    infoBtn.title = 'Appspace file format help';
-    infoBtn.style.cssText = 'font-size: 16px; padding: 8px 10px;';
-    loadBtn.parentNode.insertBefore(infoBtn, clearBtn);
-    infoBtn.addEventListener('click', showAppspaceFormatModal);
+  // Add info button next to Theme toggle (before About button)
+  if (!document.getElementById('appspaceInfoBtn')) {
+    const themeBtn = document.getElementById('themeToggle');
+    const aboutBtn = document.getElementById('aboutBtn');
+    if (themeBtn && aboutBtn) {
+      const infoBtn = document.createElement('button');
+      infoBtn.id = 'appspaceInfoBtn';
+      infoBtn.className = 'theme-toggle';
+      infoBtn.textContent = 'ℹ️';
+      infoBtn.title = 'Appspace file format help';
+      infoBtn.style.cssText = 'font-size: 16px; padding: 8px 10px;';
+      themeBtn.parentNode.insertBefore(infoBtn, aboutBtn);
+      infoBtn.addEventListener('click', showAppspaceFormatModal);
+    }
   }
   
   if (loadBtn) {
@@ -3662,8 +3666,8 @@ function showAppspaceFormatModal() {
   modal.id = 'appspaceFormatModal';
   modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
   
-  const exampleContent = `# Application Space Mapping File
-# Format: ClassName|app1,app2,app3
+  const exampleContent = `# Appspace Mapping File
+# Format: ClassName|appspace1,appspace2,appspace3
 
 HLAobjectRoot.DynamicObject|SIM_APP,LOG_APP
 HLAobjectRoot.DynamicObject.Vehicle|SIM_APP
@@ -3686,9 +3690,9 @@ HLAinteractionRoot.Warfare|SIM_APP`;
           <span style="font-size:20px;margin-right:8px;">📋</span>
           <strong style="color:var(--text-primary);">Syntax:</strong>
           <ul style="margin:8px 0 0 20px;color:var(--text-secondary);">
-            <li>Each line: <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">ClassName|app1,app2,app3</code></li>
-            <li>Use <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">|</code> to separate class name from applications</li>
-            <li>Use <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">,</code> to separate multiple applications</li>
+            <li>Each line: <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">ClassName|appspace1,appspace2,appspace3</code></li>
+            <li>Use <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">|</code> to separate class name from appspaces</li>
+            <li>Use <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">,</code> to separate multiple appspaces</li>
             <li>Lines starting with <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">#</code> are comments</li>
           </ul>
         </div>
@@ -3702,7 +3706,7 @@ HLAinteractionRoot.Warfare|SIM_APP`;
         </div>
         <div style="background:var(--bg-tertiary);padding:12px 16px;border-radius:var(--radius-sm);margin-top:16px;">
           <span style="font-size:16px;margin-right:8px;">ℹ️</span>
-          <span style="color:var(--text-secondary);font-size:13px;">Appspace files map HLA class names to applications. Used to track which FOM classes are used by which apps.</span>
+          <span style="color:var(--text-secondary);font-size:13px;">Appspace files map HLA class names to default appspaces. Appspaces are used in the creation of DDM (Data Distribution Management) regions.</span>
         </div>
       </div>
     </div>
@@ -3720,10 +3724,36 @@ HLAinteractionRoot.Warfare|SIM_APP`;
 async function copyAppspaceExample() {
   const example = document.getElementById('appspaceExample').textContent;
   await navigator.clipboard.writeText(example);
-  const btn = event.target;
-  const originalText = btn.textContent;
-  btn.textContent = '✓ Copied!';
-  setTimeout(() => { btn.textContent = originalText; }, 2000);
+  showToast('✓ Example copied to clipboard!');
+}
+
+// Show toast notification
+function showToast(message) {
+  const existing = document.querySelector('.toast-notification');
+  if (existing) existing.remove();
+  
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:white;padding:12px 24px;border-radius:var(--radius-sm);box-shadow:var(--card-shadow);z-index:10001;font-size:14px;animation:fadeInOut 3s ease-in-out;';
+  
+  // Add animation
+  if (!document.getElementById('toastAnimation')) {
+    const style = document.createElement('style');
+    style.id = 'toastAnimation';
+    style.textContent = `
+      @keyframes fadeInOut {
+        0% { opacity:0; transform:translateX(-50%) translateY(20px); }
+        10% { opacity:1; transform:translateX(-50%) translateY(0); }
+        90% { opacity:1; transform:translateX(-50%) translateY(0); }
+        100% { opacity:0; transform:translateX(-50%) translateY(20px); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3000);
 }
 
 // Download sample appspace file
@@ -3953,6 +3983,7 @@ initTheme();
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
