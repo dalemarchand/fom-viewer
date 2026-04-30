@@ -426,3 +426,31 @@ state = {
 - **Expected**: All subtabs now show descending sort
 - **Steps**: Click Sort button again to disable
 - **Expected**: All subtabs show original order
+
+### TC-031: Multiple Space-Delimited Note References
+- **Steps**: Load FOM files that have attributes/enums with multiple note references (space-delimited)
+- **Example**: An attribute with `notes="NOTE1 NOTE2 NOTE3"` (space-delimited)
+- **Expected**: Each note reference gets its own 📝 icon
+- **Expected**: Each icon links to the correct note in the Notes tab
+- **Expected**: Each icon has a tooltip with the note's semantics (truncated to 100 chars)
+- **Expected**: If a note is not found, a ⚠️ icon appears with "Note not found: [noteName]"
+- **Test**: Check attributes, enumerators, alternatives, and fields for multiple note icons
+
+### TC-032: Single Note Reference Still Works
+- **Steps**: Load FOM files with single note references
+- **Example**: An attribute with `notes="NOTE1"`
+- **Expected**: One 📝 icon appears (not multiple)
+- **Expected**: Clicking the icon navigates to the correct note in Notes tab
+- **Expected**: Tooltip shows the note semantics correctly
+
+### TC-033: Note Icon Placement in Tables
+- **Steps**: Load FOM files and check various tables:
+  - Object/Interaction class detail (item.notes)
+  - Attributes table (attr.notes)
+  - Parameters table (param.notes)
+  - Enumeration values table (value.notes)
+  - Alternatives table (alt.notes)
+  - Fields table (field.notes)
+- **Expected**: Note icons appear next to the name in each table
+- **Expected**: Multiple note references show multiple icons
+- **Expected**: All icons are clickable and link to the Notes tab

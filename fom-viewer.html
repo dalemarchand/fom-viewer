@@ -1898,13 +1898,23 @@ function findNoteByName(noteName) {
   return null;
 }
 
-function renderNoteIcon(noteName) {
-  if (!noteName) return '';
-  const note = findNoteByName(noteName);
-  if (!note) return `<span class="note-icon" title="Note not found: ${noteName}">⚠️</span>`;
-  const semantics = typeof note === 'string' ? '' : (note.semantics || '');
-  const tooltip = semantics ? `${noteName}: ${semantics.substring(0, 100)}${semantics.length > 100 ? '...' : ''}` : noteName;
-  return `<span class="note-icon clickable-item" onclick="showDetail('${noteName.replace(/'/g, "\\'")}', 'notes', true)" title="${tooltip.replace(/"/g, '&quot;')}">📝</span>`;
+function renderNoteIcon(noteNames) {
+  if (!noteNames) return '';
+  const notes = noteNames.split(' ').filter(n => n.trim());
+  if (notes.length === 0) return '';
+  
+  let html = '';
+  notes.forEach(noteName => {
+    const note = findNoteByName(noteName);
+    if (!note) {
+      html += `<span class="note-icon" title="Note not found: ${noteName}">⚠️</span>`;
+    } else {
+      const semantics = typeof note === 'string' ? '' : (note.semantics || '');
+      const tooltip = semantics ? `${noteName}: ${semantics.substring(0, 100)}${semantics.length > 100 ? '...' : ''}` : noteName;
+      html += `<span class="note-icon clickable-item" onclick="showDetail('${noteName.replace(/'/g, "\\'")}', 'notes', true)" title="${tooltip.replace(/"/g, '&quot;')}">📝</span>`;
+    }
+  });
+  return html;
 }
 
 function findNoteUsages(noteName) {
@@ -3837,6 +3847,7 @@ initTheme();
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
