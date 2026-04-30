@@ -2419,9 +2419,19 @@ document.getElementById('globalSearch').addEventListener('input', e => {
 });
 
 async function init() {
-  document.getElementById('welcomeScreen').style.display = 'none';
-  document.getElementById('detailHeader').style.display = 'none';
-  updateUI(); await loadFromStorage();
+  console.log('init() called');
+  try {
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('detailHeader').style.display = 'none';
+    console.log('init(): calling updateUI()...');
+    updateUI();
+    console.log('init(): calling loadFromStorage()...');
+    await loadFromStorage();
+    console.log('init(): loadFromStorage() completed');
+  } catch(e) {
+    console.error('ERROR in init():', e);
+    alert('Error in init: ' + e.message);
+  }
 }
 
 // ============================================================================
@@ -3029,11 +3039,16 @@ async function clearAppspaceFromStorage() {
 // INITIALIZATION
 // ============================================================================
 
-console.log('About to call init()...');
-init();
-console.log('init() completed, about to call setupTabScroll()...');
-setupTabScroll();
-console.log('setupTabScroll() completed...');
+try {
+  console.log('About to call init()...');
+  init();
+  console.log('init() completed, about to call setupTabScroll()...');
+  setupTabScroll();
+  console.log('setupTabScroll() completed...');
+} catch(e) {
+  console.error('ERROR in init/setupTabScroll:', e);
+  alert('Error in init: ' + e.message);
+}
 
 // Ensure DOM is ready before setting up appspace buttons
 console.log('About to call setupAppspaceButtons...');
