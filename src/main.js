@@ -2949,7 +2949,7 @@ function setupAppspaceButtons() {
   if (loadBtn) loadBtn.style.display = 'inline-block';
   if (clearBtn) clearBtn.style.display = 'none';
   // exportAppspaceSeparator is always visible (spacer between Export and Load)
-  // appspaceSep is hidden until appspace loaded (spacer between Load and Theme)
+  // appspaceSep is always visible as spacer (between Load and Theme)
   
   // Add info button next to Theme toggle (before About button)
   if (!document.getElementById('appspaceInfoBtn')) {
@@ -3019,8 +3019,7 @@ function setupAppspaceButtons() {
         loadBtn.textContent = 'Change Appspace';
         loadBtn.style.display = 'inline-block';
         clearBtn.style.display = 'inline-block';
-        if (exportSep) exportSep.style.display = 'block';
-        if (appspaceSep) appspaceSep.style.display = 'block';
+        // exportSep and appspaceSep are spacers - always visible
         
         // Show Appspaces tab
         const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
@@ -3054,8 +3053,7 @@ function setupAppspaceButtons() {
       loadBtn.textContent = 'Load Appspace';
       loadBtn.style.display = 'inline-block';
       clearBtn.style.display = 'none';
-      if (exportSep) exportSep.style.display = 'none';
-      if (appspaceSep) appspaceSep.style.display = 'none';
+      // exportSep and appspaceSep are spacers - always visible
       
       // Hide Appspaces tab
       const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
