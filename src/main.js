@@ -2967,19 +2967,11 @@ function setupAppspaceButtons() {
     }
   }
   
-  // Add right separator after Load Appspace button (before Clear Appspace)
-  if (!document.getElementById('loadAppspaceSep')) {
-    const loadBtn = document.getElementById('loadAppspaceBtn');
-    const clearBtn = document.getElementById('clearAppspaceBtn');
-    if (loadBtn && clearBtn) {
-      const sep = document.createElement('div');
-      sep.id = 'loadAppspaceSep';
-      sep.className = 'header-separator';
-      sep.style.display = 'none'; // Hidden until appspace loaded
-      loadBtn.parentNode.insertBefore(sep, clearBtn);
-    }
+  // Move appspaceSeparator to be between Load Appspace and Clear Appspace (before Theme)
+  if (appspaceSep && loadBtn && clearBtn) {
+    loadBtn.parentNode.insertBefore(appspaceSep, clearBtn);
   }
-
+  
   if (loadBtn) {
     loadBtn.addEventListener('click', () => {
       // Save current state in case user cancels
