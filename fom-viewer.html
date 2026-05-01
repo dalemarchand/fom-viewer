@@ -3561,8 +3561,8 @@ function setupAppspaceButtons() {
   // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
   if (loadBtn) loadBtn.style.display = 'inline-block';
   if (clearBtn) clearBtn.style.display = 'none';
-  if (exportSep) exportSep.style.display = 'none';
-  if (appspaceSep) appspaceSep.style.display = 'none';
+  // exportAppspaceSeparator is always visible (spacer between Export and Load)
+  // appspaceSep is hidden until appspace loaded (spacer between Load and Theme)
   
   // Add info button next to Theme toggle (before About button)
   if (!document.getElementById('appspaceInfoBtn')) {
@@ -4012,6 +4012,7 @@ initTheme();
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
