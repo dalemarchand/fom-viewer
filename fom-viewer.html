@@ -88,6 +88,7 @@ header {
 }
 header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 .header-controls { display: flex; gap: 12px; align-items: center; flex-shrink: 0; }
+.header-separator { width: 1px; height: 24px; background: rgba(255,255,255,0.3); flex-shrink: 0; }
 .header-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; }
 .global-search { 
   padding: 10px 14px; 
@@ -467,6 +468,73 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 #toast h3 { color: var(--accent); font-size: 14px; margin: 0 0 8px; }
 #toast p { color: var(--text-secondary); font-size: 13px; margin: 0; line-height: 1.5; }
 #toast .version { font-size: 12px; color: var(--text-muted); margin-top: 10px; }
+/* ============================================================================
+   APPSPACE TABLE
+   ============================================================================ */
+
+.appspace-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.appspace-table th {
+  background: var(--bg-tertiary);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-bottom: 2px solid var(--border);
+}
+
+.appspace-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.appspace-table tr:last-child td {
+  border-bottom: none;
+}
+
+.appspace-table tr:hover {
+  background: var(--bg-tertiary);
+}
+
+.appspace-table tr.unmatched {
+  color: var(--danger);
+}
+
+.appspace-table tr.unmatched td {
+  color: var(--danger);
+}
+
+/* Apps list - no bullets */
+.apps-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.apps-list li {
+  padding: 2px 0;
+}
+
+/* Appspace links */
+.appspace-link {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.appspace-link:hover {
+  color: var(--accent-hover);
+}
+
 </style>
 </head>
 <body>
@@ -477,9 +545,14 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <div class="header-controls">
 <input type="text" id="globalSearch" class="global-search" placeholder="Search all...">
 <button class="header-btn sort-btn" id="sortBtn" title="Click to toggle sort (off, A→Z, Z→A)">Sort: A→Z</button>
+<div class="header-separator"></div>
 <button class="btn header-btn" id="clearBtn">Clear</button>
 <label class="btn header-btn">Load FOM<input type="file" id="fileInput" multiple accept=".xml" style="display:none;"></label>
 <button class="btn header-btn" id="exportBtn">Export</button>
+<div class="header-separator" id="exportAppspaceSeparator"></div>
+<button class="btn header-btn" id="loadAppspaceBtn">Load Appspace</button>
+<button class="btn header-btn" id="clearAppspaceBtn" style="display:none;">Clear Appspace</button>
+<div class="header-separator" id="appspaceSeparator"></div>
 <button class="theme-toggle" id="themeToggle" title="Toggle light/dark theme">☀️</button>
 <button class="theme-toggle" id="aboutBtn" title="About FOM Viewer">?</button>
 <button class="btn header-btn" id="backBtn" style="display:none;">← Back</button>
@@ -492,6 +565,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <div class="tab tab-data-model" data-tab="objects" title="Object classes with attributes and hierarchy">Object Classes</div>
 <div class="tab tab-data-model" data-tab="interactions" title="Interaction classes with parameters and hierarchy">Interaction Classes</div>
 <div class="tab tab-data-model" data-tab="datatypes" title="Basic, Simple, Array, Fixed, Enumerated, and Variant data types">Data Types</div>
+<div class="tab tab-data-model" data-tab="appspaces" title="View appspace assignments for object and interaction classes" style="display:none;">Appspaces</div>
 <div class="tab-section-header">Infrastructure</div>
 <div class="tab tab-infrastructure" data-tab="dims" title="Dimension definitions used for attribute ownership and subscription">Dimensions</div>
 <div class="tab tab-infrastructure" data-tab="trans" title="HLAreliable and HLAbestEffort transportation types">Transportations</div>
@@ -510,6 +584,11 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 <div class="subtab" data-subtab="fixed">Fixed Record</div>
 <div class="subtab" data-subtab="enum">Enumerated</div>
 <div class="subtab" data-subtab="variant">Variant Record</div>
+</div>
+<div class="subtab-bar" id="appspaceTabs" style="display:none;">
+<div class="subtab active" data-subtab="objects">Objects (0)</div>
+<div class="subtab" data-subtab="interactions">Interactions (0)</div>
+<div class="subtab" data-subtab="unknown">Unknown (0)</div>
 </div>
 <div class="main">
 <div class="sidebar">
@@ -553,6 +632,10 @@ const state = {
   conflicts: [],
   errors: [],
   history: [],
+  // Appspace state
+  // Structure: { fileName, entries: [{ className, apps: [] }], interactions: [{ className, apps: [], matchedClass }], unknown: [{ className, apps: [] }]
+  appspace: null, // { fileName, entries, interactions, unknown }
+  appspaceSubTab: 'objects', // 'objects', 'interactions', or 'unknown'
   uiState: {
     currentTab: 'modules',
     currentSubTab: 'basic',
@@ -603,6 +686,10 @@ async function saveToStorage() {
     store.clear();
     for (const file of fileData) { store.add(file); }
     store.put({ name: '__uiState__', uiState: uiState });
+    // Save appspace state
+    if (state.appspace) {
+      store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab });
+    }
   } catch (e) { console.warn('Failed to save to IndexedDB:', e); }
 }
 
@@ -636,13 +723,40 @@ async function loadFromStorage() {
       document.querySelector(`.tab[data-tab="${state.currentTab}"]`).classList.add('active');
       const dtTabs = document.getElementById('dataTypeTabs');
       dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
+      const appspaceTabs = document.getElementById('appspaceTabs');
+      appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
       document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
       const subTabEl = document.querySelector(`.subtab[data-subtab="${state.currentSubTab}"]`);
       if (subTabEl) subTabEl.classList.add('active');
+      // Restore appspace subtab if on appspaces tab
+      if (state.currentTab === 'appspaces') {
+        document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+        const appspaceSubtabEl = document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`);
+        if (appspaceSubtabEl) appspaceSubtabEl.classList.add('active');
+        updateAppspaceTabCount();
+      }
+    }
+    // Load appspace data
+    const appspaceRequest = store.get('__appspace__');
+    const appspaceData = await new Promise((resolve) => { appspaceRequest.onsuccess = () => resolve(appspaceRequest.result); appspaceRequest.onerror = () => resolve(null); });
+    if (appspaceData && appspaceData.data) {
+      state.appspace = appspaceData.data;
+      state.appspaceSubTab = appspaceData.subTab || 'objects';
+      // No longer using hideUnmatched - entries are classified as objects/interactions/unknown
+      // Update UI
+      const loadBtn = document.getElementById('loadAppspaceBtn');
+      const clearBtn = document.getElementById('clearAppspaceBtn');
+      const separator = document.getElementById('appspaceSeparator');
+      if (loadBtn) { loadBtn.textContent = 'Change Appspace'; loadBtn.style.display = 'inline-block'; }
+      if (clearBtn) clearBtn.style.display = 'inline-block';
+      if (separator) separator.style.display = 'block';
+      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+      if (appspaceTab) appspaceTab.style.display = 'block';
+      updateAppspaceTabCount();
     }
     const fileRequest = store.getAll();
     const allData = await new Promise((resolve) => { fileRequest.onsuccess = () => resolve(fileRequest.result); fileRequest.onerror = () => resolve([]); });
-    const fileData = allData.filter(f => f.name !== '__uiState__');
+    const fileData = allData.filter(f => f.name !== '__uiState__' && f.name !== '__appspace__');
     if (Array.isArray(fileData) && fileData.length > 0) {
       fileData.forEach(f => {
         try { const parser = new FOMParser(f.xml); const fom = parser.parse(); state.files.push(fom); }
@@ -689,6 +803,22 @@ async function loadFromStorage() {
 
 class FOMParser {
   constructor(xml) { this.xml = xml; this.parser = new DOMParser(); }
+
+  // Build full hierarchical name by walking up the DOM tree
+  buildFullName(el, validTagNames) {
+    if (!el) return '';
+    const name = el.querySelector('name')?.textContent || '';
+    if (!name) return '';
+    // HLAobjectRoot and HLAinteractionRoot are roots - don't prepend anything
+    if (name === 'HLAobjectRoot' || name === 'HLAinteractionRoot') return name;
+    const parentEl = el.parentElement;
+    if (parentEl && validTagNames.includes(parentEl.tagName)) {
+      const parentFullName = this.buildFullName(parentEl, validTagNames);
+      return parentFullName + '.' + name;
+    }
+    return name;
+  }
+
   parse() {
     const doc = this.parser.parseFromString(this.xml, 'text/xml');
     const parseError = doc.querySelector('parsererror');
@@ -971,11 +1101,17 @@ class FOMParser {
     });
     return deps;
   }
+
   parseObjectClasses(doc) {
     const classes = [];
     const elements = doc.querySelectorAll('objectClass, objectClassRTI');
     elements.forEach(el => {
       const name = el.querySelector('name')?.textContent || '';
+      if (!name) return;
+      // Build full hierarchical name by walking up the DOM
+      const fullName = this.buildFullName(el, ['objectClass', 'objectClassRTI']);
+      const parentEl = el.parentElement;
+      const fullParentName = (parentEl && (parentEl.tagName === 'objectClass' || parentEl.tagName === 'objectClassRTI')) ? this.buildFullName(parentEl, ['objectClass', 'objectClassRTI']) : '';
       const sharing = el.querySelector('sharing')?.textContent || '';
       const semantics = el.querySelector('semantics')?.textContent || '';
       const classNotes = el.getAttribute('notes') || '';
@@ -997,20 +1133,21 @@ class FOMParser {
           if (attrName) attributes.push({ name: attrName, sharing: attrSharing, semantics: attrSemantics, notes: attrNotes, dataType: dt, updateType, updateCondition, ownership, transportation, order });
         }
       });
-      let parent = '';
-      const parentEl = el.parentElement;
-      if (parentEl && (parentEl.tagName === 'objectClass' || parentEl.tagName === 'objectClassRTI')) {
-        parent = parentEl.querySelector('name')?.textContent || '';
-      }
-      classes.push({ name, sharing, semantics, notes: classNotes, attributes, parent, _source: this.getSource(doc) });
+      classes.push({ name: fullName, sharing, semantics, notes: classNotes, attributes, parent: fullParentName, _source: this.getSource(doc) });
     });
     return classes;
   }
+
   parseInteractionClasses(doc) {
     const classes = [];
     const elements = doc.querySelectorAll('interactionClass, interactionClassRTI');
     elements.forEach(el => {
       const name = el.querySelector('name')?.textContent || '';
+      if (!name) return;
+      // Build full hierarchical name by walking up the DOM
+      const fullName = this.buildFullName(el, ['interactionClass', 'interactionClassRTI']);
+      const parentEl = el.parentElement;
+      const fullParentName = (parentEl && (parentEl.tagName === 'interactionClass' || parentEl.tagName === 'interactionClassRTI')) ? this.buildFullName(parentEl, ['interactionClass', 'interactionClassRTI']) : '';
       const sharing = el.querySelector('sharing')?.textContent || '';
       const semantics = el.querySelector('semantics')?.textContent || '';
       const classNotes = el.getAttribute('notes') || '';
@@ -1032,12 +1169,7 @@ class FOMParser {
           if (paramName) parameters.push({ name: paramName, sharing: paramSharing, semantics: paramSemantics, notes: paramNotes, dataType: dt, order });
         }
       });
-      let parent = '';
-      const parentEl = el.parentElement;
-      if (parentEl && (parentEl.tagName === 'interactionClass' || parentEl.tagName === 'interactionClassRTI')) {
-        parent = parentEl.querySelector('name')?.textContent || '';
-      }
-      classes.push({ name, sharing, semantics, notes: classNotes, dimensions, transportation, order, parameters, parent, _source: this.getSource(doc) });
+      classes.push({ name: fullName, sharing, semantics, notes: classNotes, dimensions, transportation, order, parameters, parent: fullParentName, _source: this.getSource(doc) });
     });
     return classes;
   }
@@ -1358,6 +1490,15 @@ function renderDetail(item, type, parents = []) {
     if (item.sharing) html += `<tr><th>Sharing</th><td>${item.sharing}</td></tr>`;
     if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
     if (item.parent) html += `<tr><th>Parent</th><td>${item.parent}</td></tr>`;
+    // Appspaces row
+    if (state.appspace) {
+      const apps = findAppspaceForClass(item.name, type);
+      if (apps && apps.length > 0) {
+        html += '<tr><th>Appspaces</th><td><ul class="apps-list">';
+        apps.forEach(a => { html += `<li>${a}</li>`; });
+        html += '</ul></td></tr>';
+      }
+    }
     if (type === 'interaction') {
       if (item.dimensions && item.dimensions.length > 0) {
         html += '<tr><th>Dimensions</th><td>';
@@ -1757,13 +1898,23 @@ function findNoteByName(noteName) {
   return null;
 }
 
-function renderNoteIcon(noteName) {
-  if (!noteName) return '';
-  const note = findNoteByName(noteName);
-  if (!note) return `<span class="note-icon" title="Note not found: ${noteName}">⚠️</span>`;
-  const semantics = typeof note === 'string' ? '' : (note.semantics || '');
-  const tooltip = semantics ? `${noteName}: ${semantics.substring(0, 100)}${semantics.length > 100 ? '...' : ''}` : noteName;
-  return `<span class="note-icon clickable-item" onclick="showDetail('${noteName.replace(/'/g, "\\'")}', 'notes', true)" title="${tooltip.replace(/"/g, '&quot;')}">📝</span>`;
+function renderNoteIcon(noteNames) {
+  if (!noteNames) return '';
+  const notes = noteNames.split(' ').filter(n => n.trim());
+  if (notes.length === 0) return '';
+  
+  let html = '';
+  notes.forEach(noteName => {
+    const note = findNoteByName(noteName);
+    if (!note) {
+      html += `<span class="note-icon" title="Note not found: ${noteName}">⚠️</span>`;
+    } else {
+      const semantics = typeof note === 'string' ? '' : (note.semantics || '');
+      const tooltip = semantics ? `${noteName}: ${semantics.substring(0, 100)}${semantics.length > 100 ? '...' : ''}` : noteName;
+      html += `<span class="note-icon clickable-item" onclick="showDetail('${noteName.replace(/'/g, "\\'")}', 'notes', true)" title="${tooltip.replace(/"/g, '&quot;')}">📝</span>`;
+    }
+  });
+  return html;
 }
 
 function findNoteUsages(noteName) {
@@ -2272,9 +2423,22 @@ function updateUI() {
   const exportBtn = document.getElementById('exportBtn');
   const backBtn = document.getElementById('backBtn');
   const treeControls = document.getElementById('treeControls');
+  const sidebar = document.querySelector('.sidebar');
   const hasData = state.files.length > 0;
   exportBtn.style.display = hasData ? 'inline-block' : 'none';
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
+  
+  // Hide tree/sidebar for Appspaces tab (uses main panel, not sidebar)
+  if (state.currentTab === 'appspaces') {
+    treeView.innerHTML = '';
+    if (treeControls) treeControls.style.display = 'none';
+    if (sidebar) sidebar.style.display = 'none';
+    renderAppspacesPanel();
+    return;
+  } else {
+    if (sidebar) sidebar.style.display = '';
+  }
+  
   if (!state.mergedFOM && state.currentTab !== 'modules') { treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>'; return; }
   if (state.currentTab === 'modules') {
     const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
@@ -2647,18 +2811,32 @@ document.querySelectorAll('.tab').forEach(tab => {
     const prevTab = state.currentTab;
     const prevSubTab = state.currentSubTab;
     const prevSelected = state.selectedItem;
-    
+
     if (state.currentTab !== tab.dataset.tab) { 
       if (prevDetailShowing) {
         debugBack('tab click: prevTab=%s, prevSelected=%s', prevTab, prevSelected ? prevSelected.name + '/' + prevSelected.type : 'null');
-        state.history.push({ tab: prevTab, subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+        const historySubTab = prevTab === 'appspaces' ? state.appspaceSubTab : prevSubTab;
+        state.history.push({ tab: prevTab, subTab: historySubTab, selected: prevSelected, detail: 'block' });
       }
     }
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentTab = tab.dataset.tab; state.selectedItem = null;
     const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
+    const appspaceTabs = document.getElementById('appspaceTabs'); appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
     document.getElementById('detailHeader').style.display = 'none'; document.getElementById('detailBody').innerHTML = '';
     saveToStorage(); updateUI();
-    
+
+    // Handle Appspaces tab
+    if (state.currentTab === 'appspaces') {
+      // Ensure a subtab is selected
+      if (!state.appspaceSubTab) state.appspaceSubTab = 'objects';
+      document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+      const activeSubtab = document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`);
+      if (activeSubtab) activeSubtab.classList.add('active');
+      updateAppspaceTabCount();
+      renderAppspacesPanel();
+      return;
+    }
+
     // Auto-select first item WITHOUT pushing to history
     setTimeout(() => {
       const firstItem = document.querySelector('.tree-item');
@@ -2759,6 +2937,138 @@ document.querySelectorAll('.subtab').forEach(tab => {
   });
 });
 
+// Appspace subtab click handler
+document.querySelectorAll('#appspaceTabs .subtab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const prevDetailShowing = document.getElementById('detailHeader').style.display !== 'none';
+    const prevSubTab = state.appspaceSubTab;
+    const prevSelected = state.selectedItem;
+
+    if (state.appspaceSubTab !== tab.dataset.subtab) { 
+      if (prevDetailShowing) {
+        state.history.push({ tab: 'appspaces', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+      }
+    }
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active');
+    state.appspaceSubTab = tab.dataset.subtab;
+    state.selectedItem = null;
+    document.getElementById('detailHeader').style.display = 'none';
+    document.getElementById('detailBody').innerHTML = '';
+    saveAppspaceToStorage();
+    updateUI();
+    renderAppspacesPanel();
+  });
+});
+
+// Render Appspaces panel
+function renderAppspacesPanel() {
+  const body = document.getElementById('detailBody');
+  const header = document.getElementById('detailHeader');
+  const title = document.getElementById('detailTitle');
+  const meta = document.getElementById('detailMeta');
+  const welcome = document.getElementById('welcomeScreen');
+
+  if (!state.appspace) {
+    body.innerHTML = '<div class="empty-state">No appspace file loaded. Use the "Load Appspace" button to load an appspace file.</div>';
+    return;
+  }
+
+  welcome.style.display = 'none';
+  header.style.display = 'block';
+  title.textContent = 'Appspaces';
+  meta.textContent = `Loaded from ${state.appspace.fileName || 'file'}`;
+
+  const subTab = state.appspaceSubTab;
+  let entries = [];
+  let clickType = 'object';
+
+  if (subTab === 'objects') {
+    entries = state.appspace.entries || [];
+    clickType = 'object';
+  } else if (subTab === 'interactions') {
+    entries = state.appspace.interactions || [];
+    clickType = 'interaction';
+  } else if (subTab === 'unknown') {
+    entries = state.appspace.unknown || [];
+  }
+
+  let html = '';
+
+  if (entries.length === 0) {
+    if (subTab === 'unknown') {
+      html = '<div class="empty-state">All appspace entries are matched to known classes.</div>';
+    } else {
+      html = '<div class="empty-state">No matched ' + subTab + ' found.</div>';
+    }
+  } else {
+    // Sort entries based on state.sortEnabled
+    const sortedEntries = [...entries];
+    if (state.sortEnabled === 'asc') {
+      sortedEntries.sort((a, b) => a.className.localeCompare(b.className));
+    } else if (state.sortEnabled === 'desc') {
+      sortedEntries.sort((a, b) => b.className.localeCompare(a.className));
+    }
+
+    html += '<table class="appspace-table">';
+    html += '<tr><th>Class</th><th>App(s)</th></tr>';
+    sortedEntries.forEach(entry => {
+      const fullClassName = entry.matchedClass || entry.className;
+      const displayName = entry.className;
+      const displayParts = displayName.split('.');
+      const isUnknown = subTab === 'unknown';
+      html += `<tr ${isUnknown ? 'class="unmatched"' : ''}>`;
+      html += '<td>';
+      displayParts.forEach((part, idx) => {
+        const isLeaf = idx === displayParts.length - 1;
+        if (idx > 0) html += '<span class="tree-part">.</span>';
+        if (isUnknown) {
+          html += `<span class="tree-part leaf">${part}</span>`;
+        } else if (isLeaf) {
+          html += `<span class="tree-part leaf appspace-link" onclick="showDetail('${fullClassName}', '${clickType}', true)">${part}</span>`;
+        } else {
+          html += `<span class="tree-part parent">${part}</span>`;
+        }
+      });
+      html += '</td><td><ul class="apps-list">';
+      entry.apps.forEach(app => { html += `<li>${app}</li>`; });
+      html += '</ul></td></tr>';
+    });
+    html += '</table>';
+  }
+
+  body.innerHTML = html;
+}
+
+// Find a class in the list using right-side matching (like findAppspaceForClass does)
+function findClassByRightSideMatch(entryName, classList) {
+  let bestMatch = null;
+  let bestLength = 0;
+
+  classList.forEach(cls => {
+    const entryParts = entryName.split('.');
+    const classParts = cls.name.split('.');
+
+    // Check if entry matches the right side of className
+    if (classParts.length >= entryParts.length) {
+      const startIdx = classParts.length - entryParts.length;
+      let matches = true;
+      for (let i = 0; i < entryParts.length; i++) {
+        if (classParts[startIdx + i] !== entryParts[i]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches && entryParts.length > bestLength) {
+        bestMatch = cls;
+        bestLength = entryParts.length;
+      }
+    }
+  });
+
+  return bestMatch;
+}
+
+
 document.getElementById('globalSearch').addEventListener('input', e => {
   const query = e.target.value.toLowerCase().trim();
   if (!query) {
@@ -2797,9 +3107,15 @@ document.getElementById('globalSearch').addEventListener('input', e => {
 });
 
 async function init() {
-  document.getElementById('welcomeScreen').style.display = 'none';
-  document.getElementById('detailHeader').style.display = 'none';
-  updateUI(); await loadFromStorage();
+  try {
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('detailHeader').style.display = 'none';
+    updateUI();
+    await loadFromStorage();
+  } catch(e) {
+    console.error('ERROR in init():', e);
+    alert('Error in init: ' + e.message);
+  }
 }
 
 // ============================================================================
@@ -2867,20 +3183,28 @@ function goBack() {
   debugBack('goBack: currentTabNow=%s, history.length=%s', currentTabNow, state.history.length);
   debugBack('goBack: full history:', state.history.map(h => ({tab: h.tab, selected: h.selected?.name})));
   
-  // If we're in datatypes tab, just pop the last entry - it's a simple back within datatypes
-  if (currentTabNow === 'datatypes') {
+  // If we're in datatypes or appspaces tab, just pop the last entry
+  if (currentTabNow === 'datatypes' || currentTabNow === 'appspaces') {
     prev = state.history.pop();
     if (!prev || !prev.selected) { document.getElementById('backBtn').style.display = 'none'; saveToStorage(); return; }
     
-    restoreState = {
-      tab: prev.tab || 'datatypes',
-      subTab: prev.selected.type,
-      selected: prev.selected
-    };
+    if (currentTabNow === 'datatypes') {
+      restoreState = {
+        tab: prev.tab || 'datatypes',
+        subTab: prev.selected.type,
+        selected: prev.selected
+      };
+    } else if (currentTabNow === 'appspaces') {
+      restoreState = {
+        tab: prev.tab || 'appspaces',
+        subTab: prev.subTab || state.appspaceSubTab,
+        selected: prev.selected
+      };
+    }
   } else {
     // For other tabs, try to find an entry with the same tab first (for going back within same tab)
     // Otherwise find an entry with a different tab
-    const validTabs = ['modules', 'objects', 'interactions', 'dims', 'trans', 'notes', 'switches', 'tags', 'time', 'datatypes'];
+    const validTabs = ['modules', 'objects', 'interactions', 'dims', 'trans', 'notes', 'switches', 'tags', 'time', 'datatypes', 'appspaces'];
     let sameTabEntry = null;
     let diffTabEntry = null;
     
@@ -2926,9 +3250,17 @@ function goBack() {
     
     debugBack('goBack: chosenEntry: tab=%s, selected.name=%s, selected.type=%s', chosenEntry.tab, chosenEntry.selected?.name, chosenEntry.selected?.type);
     
+    // Determine subtab
+    let subTab = chosenEntry.subTab || 'basic';
+    if (chosenEntry.selected?.type && ['basic','simple','array','fixed','enum','variant'].includes(chosenEntry.selected.type)) {
+      subTab = chosenEntry.selected.type;
+    } else if (chosenEntry.tab === 'appspaces') {
+      subTab = chosenEntry.subTab || state.appspaceSubTab;
+    }
+    
     restoreState = {
       tab: chosenEntry.tab,
-      subTab: chosenEntry.selected.type && ['basic','simple','array','fixed','enum','variant'].includes(chosenEntry.selected.type) ? chosenEntry.selected.type : (chosenEntry.subTab || 'basic'),
+      subTab: subTab,
       selected: chosenEntry.selected
     };
   }
@@ -2951,6 +3283,18 @@ function goBack() {
     document.querySelector(`.subtab[data-subtab="${restoreState.subTab}"]`)?.classList.add('active');
   } else {
     document.getElementById('dataTypeTabs').style.display = 'none';
+  }
+  
+  // For appspaces tab, update the sub-tab UI
+  if (restoreState.tab === 'appspaces') {
+    const appspaceTabs = document.getElementById('appspaceTabs');
+    appspaceTabs.style.display = 'flex';
+    state.appspaceSubTab = restoreState.subTab || 'objects';
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#appspaceTabs .subtab[data-subtab="${restoreState.subTab}"]`)?.classList.add('active');
+    updateAppspaceTabCount();
+  } else {
+    document.getElementById('appspaceTabs').style.display = 'none';
   }
   
   debugBack('goBack: restoreState: tab=%s, subTab=%s, selected=%o', restoreState.tab, restoreState.subTab, restoreState.selected);
@@ -2980,6 +3324,21 @@ function goBack() {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderTagsList() + '</div>';
   } else if (restoreState.tab === 'time') {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderTimeInfo() + '</div>';
+  } else if (restoreState.tab === 'appspaces') {
+    // Show appspaces panel
+    const appspaceTabs = document.getElementById('appspaceTabs');
+    appspaceTabs.style.display = 'flex';
+    state.appspaceSubTab = restoreState.subTab || 'objects';
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`)?.classList.add('active');
+    updateAppspaceTabCount();
+    renderAppspacesPanel();
+    document.getElementById('detailHeader').style.display = 'block';
+    document.getElementById('detailTitle').textContent = 'Appspaces';
+    document.getElementById('detailMeta').textContent = state.appspace?.fileName || '';
+    // Don't show tree for appspaces
+    treeView.innerHTML = '';
+    return;
   } else {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderDataTypeList(restoreState.subTab) + '</div>';
   }
@@ -3127,11 +3486,476 @@ function setupTabScroll() {
 }
 
 // ============================================================================
+// APPSPACE FUNCTIONALITY
+// ============================================================================
+
+// Parse appspace file content
+function parseAppspaceFile(content) {
+  const lines = content.split('\n');
+  const entries = [];
+  let lineCount = 0;
+  let parsedCount = 0;
+  
+  lines.forEach(line => {
+    line = line.trim();
+    if (!line || line.startsWith('#')) return;
+    lineCount++;
+    
+    const parts = line.split('|');
+    if (parts.length !== 2) return;
+    
+    const className = parts[0].trim();
+    const apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
+    
+    if (className && apps.length > 0) {
+      parsedCount++;
+      entries.push({ className, apps });
+    }
+  });
+  
+  return entries;
+}
+
+// Find matching appspace entries for a class
+function findAppspaceForClass(className, type) {
+  if (!state.appspace) return null;
+  // Get the appropriate entries based on type
+  const entries = type === 'object' ? state.appspace.entries : state.appspace.interactions;
+  if (!entries) return null;
+  
+  // Find the most specific match (longest right-side match)
+  let bestMatch = null;
+  let bestLength = 0;
+  
+  entries.forEach(entry => {
+    const entryParts = entry.className.split('.');
+    const classParts = className.split('.');
+    
+    // Check if entry matches the right side of className
+    if (classParts.length >= entryParts.length) {
+      const startIdx = classParts.length - entryParts.length;
+      let matches = true;
+      for (let i = 0; i < entryParts.length; i++) {
+        if (classParts[startIdx + i] !== entryParts[i]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches && entryParts.length > bestLength) {
+        bestMatch = entry;
+        bestLength = entryParts.length;
+      }
+    }
+  });
+  
+  return bestMatch ? bestMatch.apps : null;
+}
+
+// Load appspace button click handler
+function setupAppspaceButtons() {
+  const loadBtn = document.getElementById('loadAppspaceBtn');
+  const clearBtn = document.getElementById('clearAppspaceBtn');
+  const exportSep = document.getElementById('exportAppspaceSeparator');
+  const appspaceSep = document.getElementById('appspaceSeparator');
+  
+  // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
+  if (loadBtn) loadBtn.style.display = 'inline-block';
+  if (clearBtn) clearBtn.style.display = 'none';
+  // exportAppspaceSeparator is always visible (spacer between Export and Load)
+  // appspaceSep is always visible as spacer (between Load and Theme)
+  
+  // Add info button next to Theme toggle (before About button)
+  if (!document.getElementById('appspaceInfoBtn')) {
+    const themeBtn = document.getElementById('themeToggle');
+    const aboutBtn = document.getElementById('aboutBtn');
+    if (themeBtn && aboutBtn) {
+      const infoBtn = document.createElement('button');
+      infoBtn.id = 'appspaceInfoBtn';
+      infoBtn.className = 'theme-toggle';
+      infoBtn.textContent = 'ℹ️';
+      infoBtn.title = 'Appspace file format help';
+      infoBtn.style.cssText = 'font-size: 16px; padding: 8px 10px;';
+      themeBtn.parentNode.insertBefore(infoBtn, aboutBtn);
+      infoBtn.addEventListener('click', showAppspaceFormatModal);
+    }
+  }
+  
+  // Move appspaceSeparator to be between Load Appspace and Theme button (spacer, not separator)
+  if (appspaceSep && loadBtn) {
+    const themeBtn = document.getElementById('themeToggle');
+    if (themeBtn) {
+      // Insert before theme button (will be after clearBtn when it's shown)
+      loadBtn.parentNode.insertBefore(appspaceSep, themeBtn);
+    }
+  }
+  
+  if (loadBtn) {
+    loadBtn.addEventListener('click', () => {
+      // Save current state in case user cancels
+      const prevTab = state.currentTab;
+      const prevSubTab = state.currentSubTab;
+      const prevSelected = state.selectedItem;
+      const prevHistory = [...state.history];
+      
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.appspace,.csv,.txt';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+          // User cancelled - restore previous state
+          state.currentTab = prevTab;
+          state.currentSubTab = prevSubTab;
+          state.selectedItem = prevSelected;
+          state.history = prevHistory;
+          return;
+        }
+        
+        const content = await file.text();
+        const entries = parseAppspaceFile(content);
+        
+        // Classify entries: check object classes first, then interactions, then unknown
+        const objectClasses = state.mergedFOM?.objectClasses || [];
+        const interactionClasses = state.mergedFOM?.interactionClasses || [];
+        
+        const classified = classifyAppspaceEntries(entries, objectClasses, interactionClasses);
+        
+        state.appspace = {
+          fileName: file.name,
+          entries: classified.objects,
+          interactions: classified.interactions,
+          unknown: classified.unknown
+        };
+        state.appspaceSubTab = 'objects';
+        
+        // Update UI
+        loadBtn.textContent = 'Change Appspace';
+        loadBtn.style.display = 'inline-block';
+        clearBtn.style.display = 'inline-block';
+        // exportSep and appspaceSep are spacers - always visible
+        
+        // Show Appspaces tab
+        const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+        if (appspaceTab) appspaceTab.style.display = 'block';
+        
+        // Update tab count
+        updateAppspaceTabCount();
+        
+        saveAppspaceToStorage();
+        
+        // Switch to Appspaces tab
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        if (appspaceTab) appspaceTab.classList.add('active');
+        state.currentTab = 'appspaces';
+        state.selectedItem = null;
+        
+        updateUI();
+        const totalMatched = classified.objects.length + classified.interactions.length;
+        showAppspaceSnackbar(file.name, totalMatched);
+      };
+      input.click();
+    });
+  }
+   
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      state.appspace = null;
+      state.appspaceSubTab = 'objects';
+      
+      // Update UI
+      loadBtn.textContent = 'Load Appspace';
+      loadBtn.style.display = 'inline-block';
+      clearBtn.style.display = 'none';
+      // exportSep and appspaceSep are spacers - always visible
+      
+      // Hide Appspaces tab
+      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+      if (appspaceTab) appspaceTab.style.display = 'none';
+      
+      // If currently on appspaces tab, switch to modules
+      if (state.currentTab === 'appspaces') {
+        document.querySelector('.tab[data-tab="modules"]').click();
+      }
+      
+      clearAppspaceFromStorage();
+      updateUI();
+    });
+  }
+}
+
+// Show appspace format modal
+function showAppspaceFormatModal() {
+  // Remove existing modal if any
+  const existing = document.getElementById('appspaceFormatModal');
+  if (existing) existing.remove();
+  
+  const modal = document.createElement('div');
+  modal.id = 'appspaceFormatModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+  
+  const exampleContent = `# Appspace Mapping File
+# Format: ClassName|appspace1,appspace2,appspace3
+
+HLAobjectRoot.DynamicObject|SIM_APP,LOG_APP
+HLAobjectRoot.DynamicObject.Vehicle|SIM_APP
+HLAobjectRoot.DynamicObject.Person|SIM_APP,LOG_APP
+HLAinteractionRoot.Communication|SIM_APP,NET_APP
+HLAinteractionRoot.Warfare|SIM_APP`;
+  
+  modal.innerHTML = `
+    <div style="background:var(--bg-secondary);border-radius:var(--radius-lg);max-width:600px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--card-shadow);">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border);">
+        <h2 style="margin:0;font-size:20px;color:var(--text-primary);">Appspace File Format</h2>
+        <button onclick="document.getElementById('appspaceFormatModal').remove()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-secondary);">&times;</button>
+      </div>
+      <div style="padding:24px;">
+        <div style="margin-bottom:16px;">
+          <span style="font-size:20px;margin-right:8px;">📄</span>
+          <strong style="color:var(--text-primary);">Format:</strong> <span style="color:var(--text-secondary);">Plain Text (.appspace, .csv, .txt)</span>
+        </div>
+        <div style="margin-bottom:16px;">
+          <span style="font-size:20px;margin-right:8px;">📋</span>
+          <strong style="color:var(--text-primary);">Syntax:</strong>
+          <ul style="margin:8px 0 0 20px;color:var(--text-secondary);">
+            <li>Each line: <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">ClassName|appspace1,appspace2,appspace3</code></li>
+            <li>Use <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">|</code> to separate class name from appspaces</li>
+            <li>Use <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">,</code> to separate multiple appspaces</li>
+            <li>Lines starting with <code style="background:var(--bg-tertiary);padding:2px 6px;border-radius:4px;">#</code> are comments</li>
+          </ul>
+        </div>
+        <div style="margin-bottom:16px;">
+          <strong style="color:var(--text-primary);">📝 Example:</strong>
+          <pre id="appspaceExample" style="background:var(--bg-tertiary);padding:16px;border-radius:var(--radius-sm);overflow-x:auto;font-family:monospace;font-size:13px;color:var(--text-primary);margin-top:8px;white-space:pre;">${exampleContent}</pre>
+          <div style="display:flex;gap:12px;margin-top:12px;">
+            <button onclick="copyAppspaceExample()" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;">📋 Copy Example</button>
+            <button onclick="downloadAppspaceSample()" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;">⬇️ Download Sample</button>
+          </div>
+        </div>
+        <div style="background:var(--bg-tertiary);padding:12px 16px;border-radius:var(--radius-sm);margin-top:16px;">
+          <span style="font-size:16px;margin-right:8px;">ℹ️</span>
+          <span style="color:var(--text-secondary);font-size:13px;">Appspace files map HLA class names to default appspaces. Appspaces are used in the creation of DDM (Data Distribution Management) regions.</span>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Close on background click
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+  
+  document.body.appendChild(modal);
+}
+
+// Copy appspace example to clipboard
+async function copyAppspaceExample() {
+  const example = document.getElementById('appspaceExample').textContent;
+  await navigator.clipboard.writeText(example);
+  showToast('✓ Example copied to clipboard!');
+}
+
+// Show toast notification
+function showToast(message) {
+  const existing = document.querySelector('.toast-notification');
+  if (existing) existing.remove();
+  
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:white;padding:12px 24px;border-radius:var(--radius-sm);box-shadow:var(--card-shadow);z-index:10001;font-size:14px;animation:fadeInOut 3s ease-in-out;';
+  
+  // Add animation
+  if (!document.getElementById('toastAnimation')) {
+    const style = document.createElement('style');
+    style.id = 'toastAnimation';
+    style.textContent = `
+      @keyframes fadeInOut {
+        0% { opacity:0; transform:translateX(-50%) translateY(20px); }
+        10% { opacity:1; transform:translateX(-50%) translateY(0); }
+        90% { opacity:1; transform:translateX(-50%) translateY(0); }
+        100% { opacity:0; transform:translateX(-50%) translateY(20px); }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  
+  document.body.appendChild(toast);
+  setTimeout(() => { if (toast.parentNode) toast.remove(); }, 3000);
+}
+
+// Download sample appspace file
+function downloadAppspaceSample() {
+  const content = `# Application Space Mapping File
+# Format: ClassName|app1,app2,app3
+
+HLAobjectRoot.DynamicObject|SIM_APP,LOG_APP
+HLAobjectRoot.DynamicObject.Vehicle|SIM_APP
+HLAobjectRoot.DynamicObject.Person|SIM_APP,LOG_APP
+HLAinteractionRoot.Communication|SIM_APP,NET_APP
+HLAinteractionRoot.Warfare|SIM_APP`;
+  
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'sample.appspace';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Classify appspace entries: check object classes first, then interactions, then unknown
+function classifyAppspaceEntries(entries, objectClasses, interactionClasses) {
+  const objects = [];
+  const interactions = [];
+  const unknown = [];
+  
+  entries.forEach(entry => {
+    // Check object classes first
+    const objectMatch = findClassByRightSideMatch(entry.className, objectClasses);
+    if (objectMatch) {
+      objects.push({ ...entry, matchedClass: objectMatch.name });
+      return;
+    }
+    
+    // Check interaction classes next
+    const interactionMatch = findClassByRightSideMatch(entry.className, interactionClasses);
+    if (interactionMatch) {
+      interactions.push({ ...entry, matchedClass: interactionMatch.name });
+      return;
+    }
+    
+    // No match found
+    unknown.push({ ...entry });
+  });
+  
+  return { objects, interactions, unknown };
+}
+
+// Update Appspaces tab count
+function updateAppspaceTabCount() {
+  const tab = document.querySelector('.tab[data-tab="appspaces"]');
+  if (!tab || !state.appspace) return;
+  const total = (state.appspace.entries?.length || 0) + 
+                (state.appspace.interactions?.length || 0) + 
+                (state.appspace.unknown?.length || 0);
+  tab.textContent = `Appspaces (${total})`;
+  
+  // Update subtab counts
+  const objCount = state.appspace.entries?.length || 0;
+  const intCount = state.appspace.interactions?.length || 0;
+  const unkCount = state.appspace.unknown?.length || 0;
+  
+  const objTab = document.querySelector('#appspaceTabs .subtab[data-subtab="objects"]');
+  const intTab = document.querySelector('#appspaceTabs .subtab[data-subtab="interactions"]');
+  const unkTab = document.querySelector('#appspaceTabs .subtab[data-subtab="unknown"]');
+  
+  if (objTab) objTab.textContent = `Objects (${objCount})`;
+  if (intTab) intTab.textContent = `Interactions (${intCount})`;
+  if (unkTab) unkTab.textContent = `Unknown (${unkCount})`;
+}
+
+// Show snackbar notification
+function showAppspaceSnackbar(fileName, count) {
+  const toast = document.getElementById('toast');
+  toast.innerHTML = `
+    <h3>Appspace Loaded</h3>
+    <p>Loaded ${count} appspace association${count !== 1 ? 's' : ''} from ${fileName}</p>
+  `;
+  toast.classList.add('show');
+  setTimeout(() => {
+    toast.classList.add('fade-out');
+    setTimeout(() => {
+      toast.classList.remove('show', 'fade-out');
+    }, 300);
+  }, 4000);
+}
+
+// Save/load appspace from IndexedDB
+async function saveAppspaceToStorage() {
+  try {
+    if (!db) await initDB();
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab });
+  } catch (e) { console.warn('Failed to save appspace to IndexedDB:', e); }
+}
+
+async function loadAppspaceFromStorage() {
+  try {
+    if (!db) await initDB();
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get('__appspace__');
+    const result = await new Promise((resolve) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    });
+    if (result && result.data) {
+      state.appspace = result.data;
+      state.appspaceSubTab = result.subTab || 'objects';
+      
+      // Update UI - use setTimeout to ensure DOM is ready
+      setTimeout(() => {
+        const loadBtn = document.getElementById('loadAppspaceBtn');
+        const clearBtn = document.getElementById('clearAppspaceBtn');
+        const exportSep = document.getElementById('exportAppspaceSeparator');
+        const appspaceSep = document.getElementById('appspaceSeparator');
+        if (loadBtn) {
+          loadBtn.textContent = 'Change Appspace';
+          loadBtn.style.display = 'inline-block';
+        }
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+        if (exportSep) exportSep.style.display = 'block';
+        if (appspaceSep) appspaceSep.style.display = 'block';
+        
+        // Show Appspaces tab
+        const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
+        if (appspaceTab) appspaceTab.style.display = 'block';
+        
+        updateAppspaceTabCount();
+      }, 0);
+    }
+  } catch (e) { console.warn('Failed to load appspace from IndexedDB:', e); }
+}
+
+async function clearAppspaceFromStorage() {
+  try {
+    if (!db) await initDB();
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete('__appspace__');
+  } catch (e) { console.warn('Failed to clear appspace from IndexedDB:', e); }
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
-init();
-setupTabScroll();
+try {
+  console.log('About to call init()...');
+  init();
+  setupTabScroll();
+} catch(e) {
+  console.error('ERROR in init/setupTabScroll:', e);
+  alert('Error in init: ' + e.message);
+}
+
+// Ensure DOM is ready before setting up appspace buttons
+try {
+  function doSetup() {
+    setupAppspaceButtons();
+    loadAppspaceFromStorage();
+  }
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', doSetup);
+  } else {
+    doSetup();
+  }
+} catch(e) {
+  console.error('ERROR during setup:', e);
+  alert('Error: ' + e.message);
+}
 
 // ============================================================================
 // THEME TOGGLE
@@ -3179,9 +4003,45 @@ document.getElementById('aboutBtn')?.addEventListener('click', () => {
 
 initTheme();
 
+// ============================================================================
+// END OF FILE
+// ============================================================================
+
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
