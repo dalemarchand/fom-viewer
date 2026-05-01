@@ -2975,6 +2975,11 @@ function setupAppspaceButtons() {
     }
   }
   
+  // Move clearAppspaceBtn to be AFTER appspaceSeparator (right side)
+  if (clearBtn && appspaceSep) {
+    appspaceSep.parentNode.insertBefore(clearBtn, appspaceSep.nextSibling);
+  }
+    
   if (loadBtn) {
     loadBtn.addEventListener('click', () => {
       // Save current state in case user cancels
@@ -3020,8 +3025,6 @@ function setupAppspaceButtons() {
         clearBtn.style.display = 'inline-block';
         if (exportSep) exportSep.style.display = 'block';
         if (appspaceSep) appspaceSep.style.display = 'block';
-        const loadSep = document.getElementById('loadAppspaceSep');
-        if (loadSep) loadSep.style.display = 'block';
         
         // Show Appspaces tab
         const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
@@ -3045,7 +3048,7 @@ function setupAppspaceButtons() {
       input.click();
     });
   }
-  
+   
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
       state.appspace = null;
@@ -3057,8 +3060,6 @@ function setupAppspaceButtons() {
       clearBtn.style.display = 'none';
       if (exportSep) exportSep.style.display = 'none';
       if (appspaceSep) appspaceSep.style.display = 'none';
-      const loadSep = document.getElementById('loadAppspaceSep');
-      if (loadSep) loadSep.style.display = 'none';
       
       // Hide Appspaces tab
       const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
