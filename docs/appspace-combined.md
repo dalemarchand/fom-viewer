@@ -141,16 +141,17 @@ Test cases for the Appspace feature in FOM Viewer.
 - **Expected**: Back button history is preserved (same as before)
 - **Expected**: Can still use Back button to navigate through history
 
-### TC-037: Separators Visible on Both Sides of Load Appspace
+### TC-037: Spacers Visible on Both Sides of Load Appspace
 - **Steps**: Load an appspace file
 - **Expected**: `exportAppspaceSeparator` visible (spacer between Export and Load Appspace)
 - **Expected**: `appspaceSeparator` visible (spacer between Load Appspace and Theme button)
 - **Expected**: No separator between "Change Appspace" and "Clear Appspace" buttons
 - **Steps**: Clear the appspace
-- **Expected**: Both separators are hidden (display: none)
+- **Expected**: `appspaceSeparator` hidden (display: none)
+- **Expected**: `exportAppspaceSeparator` remains visible (always shown)
 
-### TC-038: Separator Visibility Without Appspace
+### TC-038: Spacer Visibility Without Appspace
 - **Steps**: Open page without loading appspace
-- **Expected**: `exportAppspaceSeparator` is hidden (display: none)
+- **Expected**: `exportAppspaceSeparator` is visible (always shown as spacer)
 - **Expected**: `appspaceSeparator` is hidden (display: none)
 - **Expected**: Only "Load Appspace" button is visible (no "Clear Appspace")
