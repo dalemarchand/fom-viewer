@@ -143,15 +143,14 @@ Test cases for the Appspace feature in FOM Viewer.
 
 ### TC-037: Separators Visible on Both Sides of Load Appspace
 - **Steps**: Load an appspace file
-- **Expected**: `exportAppspaceSeparator` visible (left side of Load/Change Appspace)
-- **Expected**: `loadAppspaceSep` visible (right side of Load/Change Appspace, before Clear)
-- **Expected**: `appspaceSeparator` visible (right side of Clear Appspace, before Theme)
+- **Expected**: `exportAppspaceSeparator` visible (spacer between Export and Load Appspace)
+- **Expected**: `appspaceSeparator` visible (spacer between Load Appspace and Theme button)
+- **Expected**: No separator between "Change Appspace" and "Clear Appspace" buttons
 - **Steps**: Clear the appspace
-- **Expected**: All three separators are hidden (display: none)
+- **Expected**: Both separators are hidden (display: none)
 
 ### TC-038: Separator Visibility Without Appspace
 - **Steps**: Open page without loading appspace
 - **Expected**: `exportAppspaceSeparator` is hidden (display: none)
-- **Expected**: `loadAppspaceSep` is hidden (display: none)
 - **Expected**: `appspaceSeparator` is hidden (display: none)
 - **Expected**: Only "Load Appspace" button is visible (no "Clear Appspace")

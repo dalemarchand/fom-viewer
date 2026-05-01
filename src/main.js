@@ -2967,19 +2967,15 @@ function setupAppspaceButtons() {
     }
   }
   
-  // Add separator on the RIGHT side of Load Appspace (before Theme button)
+  // Move appspaceSeparator to be between Load Appspace and Theme button (spacer, not separator)
   if (appspaceSep && loadBtn) {
     const themeBtn = document.getElementById('themeToggle');
     if (themeBtn) {
+      // Insert before theme button (will be after clearBtn when it's shown)
       loadBtn.parentNode.insertBefore(appspaceSep, themeBtn);
     }
   }
   
-  // Move clearAppspaceBtn to be AFTER appspaceSeparator (right side)
-  if (clearBtn && appspaceSep) {
-    appspaceSep.parentNode.insertBefore(clearBtn, appspaceSep.nextSibling);
-  }
-    
   if (loadBtn) {
     loadBtn.addEventListener('click', () => {
       // Save current state in case user cancels
