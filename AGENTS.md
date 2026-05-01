@@ -46,6 +46,7 @@ Steps to debug:
 
 ### Important Notes
 
+- **This is a GitHub repository (not GitLab)**
 - The HTML file (`fom-viewer.html`) is AUTO-GENERATED from `src/main.js` during build
 - NEVER edit `fom-viewer.html` directly - always edit `src/main.js` and rebuild
 - Test cases are documented in `docs/appspace-combined.md`

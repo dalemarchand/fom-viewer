@@ -67,7 +67,7 @@ body {
   background: var(--bg-primary); 
   color: var(--text-primary); 
 }
-#app { display: flex; flex-direction: column; min-height: 100vh; flex: 1; }
+#app { display: flex; flex-direction: column; height: 100vh; }
 
 /* ============================================================================
    HEADER
@@ -263,10 +263,11 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 
 .main { 
   display: flex; 
-  flex: 1; 
+  height: 100%; 
   overflow: hidden; 
   padding: 20px 24px; 
   gap: 20px; 
+  min-height: 0; 
 }
 
 /* ============================================================================
@@ -281,6 +282,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   display: flex; 
   flex-direction: column; 
   flex-shrink: 0; 
+  height: 100%; 
   overflow: hidden; 
   border: 1px solid var(--border); 
 }
@@ -300,7 +302,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   color: var(--text-primary); 
 }
 .sidebar-header input:focus { outline: none; border-color: var(--accent); }
-.tree-wrapper { flex: 1; overflow-y: auto; padding: 8px; }
+.tree-wrapper { flex: 1; overflow-y: auto; padding: 8px; min-height: 0; }
 .tree-header { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); }
 .tree-item { 
   padding: 10px 12px; 
@@ -1130,7 +1132,9 @@ class FOMParser {
           const ownership = node.querySelector('ownership')?.textContent || '';
           const transportation = node.querySelector('transportation')?.textContent || '';
           const order = node.querySelector('order')?.textContent || '';
-          if (attrName) attributes.push({ name: attrName, sharing: attrSharing, semantics: attrSemantics, notes: attrNotes, dataType: dt, updateType, updateCondition, ownership, transportation, order });
+          const dimensionEls = node.querySelectorAll('dimensions > dimension');
+          const dimensions = Array.from(dimensionEls).map(d => d.textContent.trim()).filter(d => d);
+          if (attrName) attributes.push({ name: attrName, sharing: attrSharing, semantics: attrSemantics, notes: attrNotes, dataType: dt, updateType, updateCondition, ownership, transportation, order, dimensions });
         }
       });
       classes.push({ name: fullName, sharing, semantics, notes: classNotes, attributes, parent: fullParentName, _source: this.getSource(doc) });
@@ -1479,17 +1483,18 @@ function renderDetail(item, type, parents = []) {
     if (parents.length > 0) {
       html += '<div class="detail-section"><div class="breadcrumb">';
       parents.forEach((p, idx) => {
-        html += `<span class="breadcrumb-item clickable-item" onclick="showDetail('${p.name.replace(/'/g, "\\'")}', '${type}', true); return false;">${p.name}</span>`;
-        if (idx < parents.length - 1) html += ' <span class="breadcrumb-sep">›</span> ';
+        const baseName = p.name.split('.').pop();
+        html += `<span class="breadcrumb-item clickable-item" onclick="showDetail('${p.name.replace(/'/g, "\\'")}', '${type}', true); return false;">${baseName}</span>`;
+        if (idx < parents.length - 1) html += ' <span class="breadcrumb-sep">></span> ';
       });
-      html += ` <span class="breadcrumb-sep">›</span> <span class="breadcrumb-current">${item.name}</span>`;
+      html += ` <span class="breadcrumb-sep">></span> <span class="breadcrumb-current">${item.name.split('.').pop()}</span>`;
       html += '</div></div>';
     }
     html += '<div class="detail-section"><h3>Class Information</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
+    html += `<tr><th>Name</th><td>${item.name.split('.').pop()}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
     if (item.sharing) html += `<tr><th>Sharing</th><td>${item.sharing}</td></tr>`;
     if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    if (item.parent) html += `<tr><th>Parent</th><td>${item.parent}</td></tr>`;
+    if (item.parent) { const parentBase = item.parent.split('.').pop(); html += `<tr><th>Parent</th><td><span class="clickable-item" onclick="showDetail('${item.parent.replace(/'/g, "\\'")}', '${type}', true)">${parentBase}</span></td></tr>`; }
     // Appspaces row
     if (state.appspace) {
       const apps = findAppspaceForClass(item.name, type);
@@ -1502,10 +1507,24 @@ function renderDetail(item, type, parents = []) {
     if (type === 'interaction') {
       if (item.dimensions && item.dimensions.length > 0) {
         html += '<tr><th>Dimensions</th><td>';
-        item.dimensions.forEach(d => { html += `<div>${d}</div>`; });
+        item.dimensions.forEach(d => {
+          const dimExists = findDimensionByName(d);
+          if (dimExists) {
+            html += `<div><span class="clickable-item" onclick="showDetail('${d.replace(/'/g, "\\'")}', 'dims', true)">${d}</span></div>`;
+          } else {
+            html += `<div><span style="color:red;">${d}</span></div>`;
+          }
+        });
         html += '</td></tr>';
       }
-      if (item.transportation) html += `<tr><th>Transportation</th><td><span class="clickable-item" onclick="showDetail('${item.transportation}', 'trans', true)">${item.transportation}</span></td></tr>`;
+      if (item.transportation) {
+        const transportExists = state.mergedFOM?.transportations?.some(t => t.name.trim() === item.transportation.trim());
+        if (transportExists) {
+          html += `<tr><th>Transportation</th><td><span class="clickable-item" onclick="showDetail('${item.transportation.replace(/'/g, "\\'")}', 'trans', true)">${item.transportation}</span></td></tr>`;
+        } else {
+          html += `<tr><th>Transportation</th><td><span style="color:red;">${item.transportation}</span></td></tr>`;
+        }
+      }
       if (item.order) html += `<tr><th>Order</th><td>${item.order}</td></tr>`;
     }
 const sources = item._sources || (item._source ? [item._source] : []);
@@ -1516,14 +1535,37 @@ const sources = item._sources || (item._source ? [item._source] : []);
     }
     html += '</table></div>';
     
-    if (props && props.length > 0) {
+      if (props && props.length > 0) {
       html += '<h4 style="margin:12px 0 8px">' + (isObject ? 'Attributes' : 'Parameters') + '</h4>';
-      html += '<table class="property-table"><tr><th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th>' + (isObject ? '<th>Update Type</th><th>Update Condition</th><th>Ownership</th><th>Transportation</th><th>Order</th>' : '<th>Order</th>') + '</tr>';
+      html += '<table class="property-table"><tr><th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th>' + (isObject ? '<th>Update Type</th><th>Update Condition</th><th>Ownership</th><th>Transportation</th><th>Dimensions</th><th>Order</th>' : '<th>Order</th>') + '</tr>';
       props.forEach(p => {
         const dataTypeLink = p.dataType ? `<span class="clickable-item" onclick="showDataType('${p.dataType.replace(/'/g, "\\'")}', getPreferredType('${p.dataType.replace(/'/g, "\\'")}'))">${p.dataType}</span>` : '';
         html += `<tr><td>${p.name}${p.notes ? ' ' + renderNoteIcon(p.notes) : ''}</td><td>${dataTypeLink}</td><td>${p.sharing || ''}</td><td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">${p.semantics || ''}</td>`;
         if (isObject) {
-          html += `<td>${p.updateType || ''}</td><td>${p.updateCondition || ''}</td><td>${p.ownership || ''}</td><td>${p.transportation || ''}</td><td>${p.order || ''}</td>`;
+          let transportHtml = p.transportation || '';
+          if (p.transportation) {
+            const transportExists = state.mergedFOM?.transportations?.some(t => t.name.trim() === p.transportation.trim());
+            if (transportExists) {
+              transportHtml = `<span class="clickable-item" onclick="showDetail('${p.transportation.replace(/'/g, "\\'")}', 'trans', true)">${p.transportation}</span>`;
+            } else {
+              transportHtml = `<span style="color:red;">${p.transportation}</span>`;
+            }
+          }
+          // Build dimensions HTML
+          let dimsHtml = '';
+          if (p.dimensions && p.dimensions.length > 0) {
+            dimsHtml = '<ul style="list-style:none;margin:0;padding:0;">';
+            p.dimensions.forEach(dim => {
+              const dimExists = findDimensionByName(dim);
+              if (dimExists) {
+                dimsHtml += `<li><span class="clickable-item" onclick="showDetail('${dim.replace(/'/g, "\\'")}', 'dims', true)">${dim}</span></li>`;
+              } else {
+                dimsHtml += `<li><span style="color:red;">${dim}</span></li>`;
+              }
+            });
+            dimsHtml += '</ul>';
+          }
+          html += `<td>${p.updateType || ''}</td><td>${p.updateCondition || ''}</td><td>${p.ownership || ''}</td><td>${transportHtml}</td><td>${dimsHtml}</td><td>${p.order || ''}</td>`;
         } else {
           html += `<td>${p.order || ''}</td>`;
         }
@@ -1745,7 +1787,19 @@ const sources = item._sources || (item._source ? [item._source] : []);
     html += '<div class="detail-section"><h3>Dimension</h3><table class="property-table">';
     html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
     if (item.isComplex && item.rows && item.rows.length > 0) {
-      item.rows.forEach(r => { html += `<tr><th>${r.key}</th><td>${r.value}</td></tr>`; });
+      item.rows.forEach(r => {
+        let valueHtml = r.value;
+        if (r.key === 'dataType' && r.value) {
+          const dt = r.value;
+          const dtType = getPreferredType(dt);
+          if (dtType) {
+            valueHtml = `<span class="clickable-item" onclick="showDataType('${dt.replace(/'/g, "\\'")}', '${dtType}')">${dt}</span>`;
+          } else {
+            valueHtml = `<span style="color:red;">${dt}</span>`;
+          }
+        }
+        html += `<tr><th>${r.key}</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${valueHtml}</td></tr>`;
+      });
     }
     html += '</table></div>';
   } else if (type === 'trans') {
@@ -1885,6 +1939,18 @@ function findBasicTypeUsages(basicTypeName) {
   });
   
   return usages;
+}
+
+function findDimensionByName(dimName) {
+  if (!dimName || !state.files) return false;
+  const trimmed = dimName.trim();
+  for (const f of state.files) {
+    if (f.dimensions && f.dimensions.length > 0) {
+      const found = f.dimensions.find(d => (d.name || d).trim() === trimmed);
+      if (found) return true;
+    }
+  }
+  return false;
 }
 
 function findNoteByName(noteName) {
@@ -2395,7 +2461,18 @@ function renderModuleBody(file) {
       <tr><th>Object Classes</th><td>${makeClassLinks(file.objectClasses, 'object')}</td></tr>
       <tr><th>Interaction Classes</th><td>${makeClassLinks(file.interactionClasses, 'interaction')}</td></tr>
       <tr><th>Dimensions</th><td>${file.dimensions && file.dimensions.length > 0 ? (() => { let html = ''; file.dimensions.forEach(d => { const name = d.name || d; if (!name) return; if (d.isComplex) { html += '<div style="margin:4px 0;"><table class="property-table" style="margin:4px 0;border:1px solid #ddd;">';
-        d.rows.forEach(r => { html += '<tr><th style="white-space:nowrap;">' + r.key + '</th><td>' + r.value + '</td></tr>'; }); html += '</table></div>'; } else { html += '<div>' + name + '</div>'; } }); return html; })() : 'None'}</td></tr>
+        d.rows.forEach(r => { 
+          let valueHtml = r.value;
+          if (r.key === 'dataType' && r.value) {
+            const dtType = getPreferredType(r.value);
+            if (dtType) {
+              valueHtml = '<span class="clickable-item" onclick="showDataType(\'' + r.value.replace(/'/g, "\\'") + '\', \'' + dtType + '\')">' + r.value + '</span>';
+            } else {
+              valueHtml = '<span style="color:red;">' + r.value + '</span>';
+            }
+          }
+          html += '<tr><th style="white-space:nowrap;">' + r.key + '</th><td>' + valueHtml + '</td></tr>'; 
+        }); html += '</table></div>'; } else { html += '<div>' + name + '</div>'; } }); return html; })() : 'None'}</td></tr>
     </table>
     <h4 style="margin:16px 0 8px">Data Types</h4>
     <table class="property-table">
@@ -2562,8 +2639,19 @@ function renderNotesList() {
       });
     }
   });
-  if (state.sortEnabled === 'asc') allNotes.sort((a, b) => a.localeCompare(b));
-  else if (state.sortEnabled === 'desc') allNotes.sort((a, b) => b.localeCompare(a));
+  // Sort with numeric-aware logic for trailing numbers
+  const noteSort = (a, b) => {
+    const regex = /^(.*?)(\d+)$/;
+    const matchA = a.match(regex);
+    const matchB = b.match(regex);
+    if (matchA && matchB && matchA[1] === matchB[1]) {
+      // Same prefix, sort by numeric suffix
+      return parseInt(matchA[2]) - parseInt(matchB[2]);
+    }
+    return a.localeCompare(b);
+  };
+  if (state.sortEnabled === 'asc') allNotes.sort(noteSort);
+  else if (state.sortEnabled === 'desc') allNotes.sort((a, b) => noteSort(b, a));
   let html = '';
   allNotes.forEach(name => {
     const displayName = name.length > 30 ? name.substring(0, 30) + '...' : name;
@@ -2823,8 +2911,20 @@ document.querySelectorAll('.tab').forEach(tab => {
     const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
     const appspaceTabs = document.getElementById('appspaceTabs'); appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
     document.getElementById('detailHeader').style.display = 'none'; document.getElementById('detailBody').innerHTML = '';
+    
+    // Handle Data Types tab - ensure a subtab is selected BEFORE updateUI
+    if (state.currentTab === 'datatypes') {
+      const validSubTabs = ['basic', 'simple', 'array', 'fixed', 'enum', 'variant'];
+      if (!state.currentSubTab || !validSubTabs.includes(state.currentSubTab)) {
+        state.currentSubTab = 'basic';
+      }
+      document.querySelectorAll('#dataTypeTabs .subtab').forEach(t => t.classList.remove('active'));
+      const activeSubtab = document.querySelector(`#dataTypeTabs .subtab[data-subtab="${state.currentSubTab}"]`);
+      if (activeSubtab) activeSubtab.classList.add('active');
+    }
+    
     saveToStorage(); updateUI();
-
+    
     // Handle Appspaces tab
     if (state.currentTab === 'appspaces') {
       // Ensure a subtab is selected
@@ -3010,7 +3110,7 @@ function renderAppspacesPanel() {
     }
 
     html += '<table class="appspace-table">';
-    html += '<tr><th>Class</th><th>App(s)</th></tr>';
+    html += '<tr><th>Class</th><th>Appspace(s)</th></tr>';
     sortedEntries.forEach(entry => {
       const fullClassName = entry.matchedClass || entry.className;
       const displayName = entry.className;
@@ -3935,6 +4035,18 @@ try {
   console.log('About to call init()...');
   init();
   setupTabScroll();
+  // Initialize sidebar height for scrollbar
+  function initSidebarHeight() {
+    const sidebar = document.querySelector('.sidebar');
+    if (sidebar) {
+      const header = document.querySelector('header');
+      const headerHeight = header ? header.offsetHeight : 80;
+      sidebar.style.height = `calc(100vh - ${headerHeight + 40}px)`;
+      sidebar.style.overflowY = 'auto';
+    }
+  }
+  initSidebarHeight();
+  window.addEventListener('resize', initSidebarHeight);
 } catch(e) {
   console.error('ERROR in init/setupTabScroll:', e);
   alert('Error in init: ' + e.message);
@@ -4010,6 +4122,46 @@ initTheme();
 
 </script>
 </div>
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
+<!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
 <!-- FOM Viewer v1.0.0 -->
