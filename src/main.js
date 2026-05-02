@@ -2217,6 +2217,7 @@ async function loadFiles(files) {
       tags: mergeTags(sorted),
       time: mergeTime(sorted)
     }; 
+    state.history = [];
     state.currentTab = 'modules';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.tab[data-tab="modules"]').classList.add('active');
@@ -3112,6 +3113,7 @@ function setupAppspaceButtons() {
           unknown: classified.unknown
         };
         state.appspaceSubTab = 'objects';
+        state.history = [];
         
         // Update UI
         loadBtn.textContent = 'Change Appspace';
@@ -3378,6 +3380,7 @@ async function loadAppspaceFromStorage() {
     if (result && result.data) {
       state.appspace = result.data;
       state.appspaceSubTab = result.subTab || 'objects';
+      state.history = [];
       
       // Update UI - use setTimeout to ensure DOM is ready
       setTimeout(() => {
@@ -3409,6 +3412,7 @@ async function clearAppspaceFromStorage() {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     store.delete('__appspace__');
+    state.history = [];
   } catch (e) { console.warn('Failed to clear appspace from IndexedDB:', e); }
 }
 
