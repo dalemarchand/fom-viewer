@@ -60,7 +60,7 @@ body {
   background: var(--bg-primary); 
   color: var(--text-primary); 
 }
-#app { display: flex; flex-direction: column; min-height: 100vh; flex: 1; }
+#app { display: flex; flex-direction: column; height: 100vh; }
 
 /* ============================================================================
    HEADER
@@ -260,6 +260,8 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   overflow: hidden; 
   padding: 20px 24px; 
   gap: 20px; 
+  min-height: 0; 
+  height: 0; 
 }
 
 /* ============================================================================
@@ -274,6 +276,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   display: flex; 
   flex-direction: column; 
   flex-shrink: 0; 
+  height: 100%; 
   overflow: hidden; 
   border: 1px solid var(--border); 
 }
@@ -293,7 +296,7 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   color: var(--text-primary); 
 }
 .sidebar-header input:focus { outline: none; border-color: var(--accent); }
-.tree-wrapper { flex: 1; overflow-y: auto; padding: 8px; }
+.tree-wrapper { flex: 1; overflow-y: auto; padding: 8px; min-height: 0; }
 .tree-header { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--border); }
 .tree-item { 
   padding: 10px 12px; 

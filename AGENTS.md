@@ -12,6 +12,8 @@ node --check /home/marchand/src/fom-viewer/src/main.js
 
 This will catch syntax errors BEFORE building and deploying.
 
+**IMPORTANT:** Never commit code that has syntax errors. Always run `node --check` before `npm run build`.
+
 ### Build and Test Cycle
 
 1. After editing `src/main.js` or `src/styles.css`, ALWAYS rebuild:
@@ -46,6 +48,7 @@ Steps to debug:
 
 ### Important Notes
 
+- **This is a GitHub repository (not GitLab)**
 - The HTML file (`fom-viewer.html`) is AUTO-GENERATED from `src/main.js` during build
 - NEVER edit `fom-viewer.html` directly - always edit `src/main.js` and rebuild
 - Test cases are documented in `docs/appspace-combined.md`
