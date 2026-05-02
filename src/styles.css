@@ -256,11 +256,12 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 
 .main { 
   display: flex; 
-  height: 100%; 
+  flex: 1; 
   overflow: hidden; 
   padding: 20px 24px; 
   gap: 20px; 
   min-height: 0; 
+  height: 0; 
 }
 
 /* ============================================================================

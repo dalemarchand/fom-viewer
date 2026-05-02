@@ -3420,18 +3420,6 @@ try {
   console.log('About to call init()...');
   init();
   setupTabScroll();
-  // Initialize sidebar height for scrollbar
-  function initSidebarHeight() {
-    const sidebar = document.querySelector('.sidebar');
-    if (sidebar) {
-      const header = document.querySelector('header');
-      const headerHeight = header ? header.offsetHeight : 80;
-      sidebar.style.height = `calc(100vh - ${headerHeight + 40}px)`;
-      sidebar.style.overflowY = 'auto';
-    }
-  }
-  initSidebarHeight();
-  window.addEventListener('resize', initSidebarHeight);
 } catch(e) {
   console.error('ERROR in init/setupTabScroll:', e);
   alert('Error in init: ' + e.message);

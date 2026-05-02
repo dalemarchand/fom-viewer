@@ -12,6 +12,8 @@ node --check /home/marchand/src/fom-viewer/src/main.js
 
 This will catch syntax errors BEFORE building and deploying.
 
+**IMPORTANT:** Never commit code that has syntax errors. Always run `node --check` before `npm run build`.
+
 ### Build and Test Cycle
 
 1. After editing `src/main.js` or `src/styles.css`, ALWAYS rebuild:
