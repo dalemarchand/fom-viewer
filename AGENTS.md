@@ -54,6 +54,40 @@ Steps to debug:
 - Test cases are documented in `docs/appspace-combined.md`
 - All appspace features should be tested according to the test cases in the documentation
 
+## Navigation Requirements
+
+### Back Button Behavior
+- The back button (`state.history`) must be reset when:
+  - FOM files are loaded (`loadFiles()`)
+  - Appspace file is loaded from file (`loadAppspaceFromFile()`)
+  - Appspace is loaded from IndexedDB (`loadAppspaceFromStorage()`)
+  - Appspace is cleared (`clearAppspaceFromStorage()`)
+  - FOM files are cleared (clear button handler)
+
+### Selection Visibility
+- Any user input that changes the view must result in:
+  - A selection in the left pane (if visible)
+  - An update to the central view (detail panel)
+- Back button navigation must result in:
+  - Previous selections restored
+  - Previous views restored
+  - Selected item scrolled into view if not visible
+
+### scrollIntoView Usage
+- Use `scrollIntoView({ block: 'nearest' })` to make selections visible
+- Apply after adding 'selected' class to tree items
+- Required in these functions:
+  - `goBack()` - after restoring selection
+  - `updateUI()` - after selecting items in all tabs
+  - `showDataType()` - after selecting data type items
+  - `showDetail()` - after selecting detail items
+
+### Testing Navigation
+- Test navigation across ALL tabs: modules, objects, interactions, dims, trans, notes, switches, tags, time
+- Test navigation across ALL datatypes subtabs: basic, simple, array, fixed, enum, variant
+- Test navigation across ALL appspaces subtabs: objects, interactions, unknown
+- Verify back button works correctly in all cases
+
 ### Testing After Fixes
 
 After making ANY fix:
