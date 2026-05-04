@@ -163,6 +163,99 @@ async function test_TabNavigation() {
   }
 }
 
+// About dialog version reading tests
+async function test_AboutVersion_MetaTag() {
+  log('Testing: About dialog uses version from meta tag (valid value)...');
+  try {
+    await openApp();
+    // Ensure meta[name="version"] exists with a valid value
+    await page.evaluate(() => {
+      let meta = document.querySelector('meta[name="version"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'version');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', '9.8.7');
+    });
+    await page.click('#aboutBtn');
+    // Wait for the toast to be shown
+    await page.waitForFunction(() => {
+      const t = document.getElementById('toast');
+      return t && t.classList.contains('show');
+    }, { timeout: 2000 });
+    const versionLine = await page.evaluate(() => document.querySelector('#toast .version')?.textContent || '');
+    if (!versionLine.includes('Version 9.8.7')) throw new Error('Expected version string not found in About toast');
+    log('About shows correct version from meta tag', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_AboutVersion_MetaTag_failed');
+    logError('About version metaTag test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_AboutVersion_MetaMissing() {
+  log('Testing: About dialog fallback when meta tag is missing...');
+  try {
+    await openApp();
+    // Remove meta tag if present
+    await page.evaluate(() => {
+      const m = document.querySelector('meta[name="version"]');
+      if (m) m.remove();
+    });
+    await page.click('#aboutBtn');
+    await page.waitForFunction(() => {
+      const t = document.getElementById('toast');
+      return t && t.classList.contains('show');
+    }, { timeout: 2000 });
+    const versionLine = await page.evaluate(() => document.querySelector('#toast .version')?.textContent || '');
+    if (!versionLine.includes('Version -1.-1.-1')) throw new Error('Expected fallback version not found in About toast');
+    log('About fallback for missing meta tag works', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_AboutVersion_MetaMissing_failed');
+    logError('About version missing-meta test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_AboutVersion_MetaPlaceholder() {
+  log('Testing: About dialog fallback when meta content is placeholder value __VERSION__...');
+  try {
+    await openApp();
+    // Set placeholder value
+    await page.evaluate(() => {
+      let meta = document.querySelector('meta[name="version"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'version');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', '__VERSION__');
+    });
+    await page.click('#aboutBtn');
+    await page.waitForFunction(() => {
+      const t = document.getElementById('toast');
+      return t && t.classList.contains('show');
+    }, { timeout: 2000 });
+    const versionLine = await page.evaluate(() => document.querySelector('#toast .version')?.textContent || '');
+    if (!versionLine.includes('Version -1.-1.-1')) throw new Error('Expected fallback for placeholder not found');
+    log('About placeholder meta value falls back correctly', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_AboutVersion_MetaPlaceholder_failed');
+    logError('About version placeholder test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
 async function test_FileLoading() {
   log('Testing: File loading...');
   try {
@@ -800,7 +893,10 @@ async function runAllTests() {
     { name: 'SortToggle', fn: test_SortToggle },
     { name: 'DataTypeSubtabSorting', fn: test_DataTypeSubtabSorting },
     { name: 'Export', fn: test_ExportFunctionality },
-    { name: 'DataType', fn: test_DataTypeSelection }
+    { name: 'DataType', fn: test_DataTypeSelection },
+    { name: 'AboutVersion_MetaTag', fn: test_AboutVersion_MetaTag },
+    { name: 'AboutVersion_MetaMissing', fn: test_AboutVersion_MetaMissing },
+    { name: 'AboutVersion_MetaPlaceholder', fn: test_AboutVersion_MetaPlaceholder }
   ];
   
   for (const test of tests) {
