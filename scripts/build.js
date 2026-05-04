@@ -1,9 +1,30 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
 
 const pkg = require('../package.json');
-const version = pkg.version;
+let version;
+try {
+  const branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
+  if (branch === 'main') {
+    version = pkg.version;
+  } else {
+    const gitDescribe = execSync('git describe --tags --always', { encoding: 'utf8' }).trim();
+    // git describe outputs <tag>-<n>-g<hash> when not at a tag
+    const match = gitDescribe.match(/^(.*)-(\d+)-g([0-9a-f]+)$/);
+    if (match) {
+      // Extract tag name and commit count from describe output
+      version = `${match[1]}-${branch}.${match[2]}`;
+    } else {
+      // At a tag exactly, or no tags exist (uses commit hash)
+      const commitsAhead = execSync(`git rev-list --count ${gitDescribe}..HEAD`, { encoding: 'utf8' }).trim();
+      version = `${gitDescribe}-${branch}.${commitsAhead}`;
+    }
+  }
+} catch (e) {
+  version = pkg.version; // fallback
+}
 
 const srcDir = path.join(__dirname, '..', 'src');
 const distDir = path.join(__dirname, '..', 'dist');
@@ -84,8 +105,6 @@ function build({ sourcemap = false, external = false } = {}) {
       }
       htmlContent = htmlContent.replace(scriptRegex, `<script>\n${wrappedJs}\n</script>`);
     }
-
-    htmlContent = htmlContent.replace('</body>', `<!-- FOM Viewer v${version} -->\n</body>`);
   }
 
   if (!fs.existsSync(distDir)) {
