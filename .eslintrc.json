@@ -10,6 +10,9 @@
   "overrides": [
     {
       "files": ["test/*.js"],
+      "parserOptions": {
+        "sourceType": "module"
+      },
       "rules": {
         "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
         "no-undef": "off"
