@@ -1907,7 +1907,10 @@ function updateUI() {
     treeView.innerHTML = '<div class="tree-wrapper">' + (files.length > 0 ? files.map(f => `<div class="tree-item" data-name="${f.name}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded. Use the "Load FOM" button in the header.</div>') + '</div>';
     if (state.selectedItem && state.selectedItem.type === 'module') {
       const selectedItem = treeView.querySelector(`.tree-item[data-name="${state.selectedItem.name}"]`);
-      if (selectedItem) selectedItem.classList.add('selected');
+      if (selectedItem) {
+        selectedItem.classList.add('selected');
+        selectedItem.scrollIntoView({ block: 'nearest' });
+      }
     }
   } else if (state.currentTab === 'objects') {
     const classes = mergeClasses(state.files, 'object');
@@ -1923,6 +1926,7 @@ function updateUI() {
       const firstItem = treeView.querySelector('.tree-item');
       if (firstItem) {
         firstItem.classList.add('selected');
+        firstItem.scrollIntoView({ block: 'nearest' });
         const name = firstItem.dataset.name;
         if (name) showDetail(name, 'dims');
       }
@@ -1933,6 +1937,7 @@ function updateUI() {
       const firstItem = treeView.querySelector('.tree-item');
       if (firstItem) {
         firstItem.classList.add('selected');
+        firstItem.scrollIntoView({ block: 'nearest' });
         const name = firstItem.dataset.name;
         if (name) showDetail(name, 'trans');
       }
@@ -1943,6 +1948,7 @@ function updateUI() {
       const firstItem = treeView.querySelector('.tree-item');
       if (firstItem) {
         firstItem.classList.add('selected');
+        firstItem.scrollIntoView({ block: 'nearest' });
         const name = firstItem.dataset.name;
         if (name) showDetail(name, 'notes', true);
       }
@@ -1953,6 +1959,7 @@ function updateUI() {
       const firstItem = treeView.querySelector('.tree-item');
       if (firstItem) {
         firstItem.classList.add('selected');
+        firstItem.scrollIntoView({ block: 'nearest' });
         const name = firstItem.dataset.name;
         if (name) showDetail(name, 'switches');
       }
@@ -1963,6 +1970,7 @@ function updateUI() {
       const firstItem = treeView.querySelector('.tree-item');
       if (firstItem) {
         firstItem.classList.add('selected');
+        firstItem.scrollIntoView({ block: 'nearest' });
         const name = firstItem.dataset.name;
         if (name) showDetail(name, 'tags');
       }
@@ -1973,6 +1981,7 @@ function updateUI() {
       const firstItem = treeView.querySelector('.tree-item');
       if (firstItem) {
         firstItem.classList.add('selected');
+        firstItem.scrollIntoView({ block: 'nearest' });
         showDetail('time', 'time');
       }
     }
@@ -2217,6 +2226,7 @@ async function loadFiles(files) {
       tags: mergeTags(sorted),
       time: mergeTime(sorted)
     }; 
+    state.history = [];
     state.currentTab = 'modules';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.tab[data-tab="modules"]').classList.add('active');
@@ -2845,6 +2855,7 @@ function goBack() {
   
   if (selectedItem) {
     selectedItem.classList.add('selected');
+    selectedItem.scrollIntoView({ block: 'nearest' });
   }
   
   // Show detail
@@ -3112,6 +3123,7 @@ function setupAppspaceButtons() {
           unknown: classified.unknown
         };
         state.appspaceSubTab = 'objects';
+        state.history = [];
         
         // Update UI
         loadBtn.textContent = 'Change Appspace';
@@ -3378,6 +3390,7 @@ async function loadAppspaceFromStorage() {
     if (result && result.data) {
       state.appspace = result.data;
       state.appspaceSubTab = result.subTab || 'objects';
+      state.history = [];
       
       // Update UI - use setTimeout to ensure DOM is ready
       setTimeout(() => {
@@ -3409,6 +3422,7 @@ async function clearAppspaceFromStorage() {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     store.delete('__appspace__');
+    state.history = [];
   } catch (e) { console.warn('Failed to clear appspace from IndexedDB:', e); }
 }
 
