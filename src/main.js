@@ -3485,11 +3485,13 @@ document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
 
 // About button handler
 document.getElementById('aboutBtn')?.addEventListener('click', () => {
+  const metaVersion = document.querySelector('meta[name="version"]')?.content;
+  const version = (metaVersion && metaVersion !== '__VERSION__') ? metaVersion : '-1.-1.-1';
   const toast = document.getElementById('toast');
   toast.innerHTML = `
     <h3>About FOM Viewer</h3>
     <p>Single-page HTML viewer for IEEE 1516 FOM files. Load multiple FOM, MIM, and FED files to explore HLA data models.</p>
-    <div class="version">Version 1.0.0 | <a href="https://github.com/dalemarchand/fom-viewer" target="_blank" style="color:var(--accent)">GitHub</a></div>
+    <div class="version">Version ${version} | <a href="https://github.com/dalemarchand/fom-viewer" target="_blank" style="color:var(--accent)">GitHub</a></div>
   `;
   toast.classList.add('show');
   setTimeout(() => {

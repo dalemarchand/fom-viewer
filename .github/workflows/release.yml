@@ -37,6 +37,23 @@ jobs:
           NEXT="v$major.$minor.$PATCH"
           echo "version=$NEXT" >> $GITHUB_OUTPUT
 
+      - name: Configure git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update package.json version
+        run: |
+          VERSION="${{ steps.next_version.outputs.version }}"
+          VERSION=${VERSION#v}
+          npm pkg set version=$VERSION
+          npm install --package-lock-only
+
+      - name: Commit package.json version update
+        run: |
+          git add package.json package-lock.json
+          git commit -m "Bump version to ${{ steps.next_version.outputs.version }}"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

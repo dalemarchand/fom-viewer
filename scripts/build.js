@@ -23,6 +23,9 @@ function generateSourceMap(jsContent, sourceFile) {
 function build({ sourcemap = false, external = false } = {}) {
   let htmlContent = fs.readFileSync(path.join(rootDir, 'fom-viewer.html'), 'utf8');
 
+  // Replace __VERSION__ placeholder with actual version from package.json
+  htmlContent = htmlContent.replace('__VERSION__', version);
+
   const cssPath = path.join(srcDir, 'styles.css');
   let cssContent = '';
   if (fs.existsSync(cssPath)) {
