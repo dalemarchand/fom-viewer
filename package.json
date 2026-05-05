@@ -1,6 +1,6 @@
 {
   "name": "fom-viewer",
-  "version": "1.0.0",
+  "version": "0.0.11",
   "description": "Single page HTML viewer for IEEE 1516 FOM files",
   "scripts": {
     "lint": "eslint test/",
