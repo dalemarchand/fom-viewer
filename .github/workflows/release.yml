@@ -24,7 +24,13 @@ jobs:
       - name: Get latest tag
         id: latest_tag
         run: |
-          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          # Fetch all tags first (including dangling ones)
+          git fetch --tags origin
+          # Get ALL tags sorted by version, pick the latest
+          LATEST=$(git tag -l "v*" | sort -V | tail -1)
+          if [ -z "$LATEST" ]; then
+            LATEST="v0.0.0"
+          fi
           echo "latest=$LATEST" >> $GITHUB_OUTPUT
           echo "semver=$LATEST" >> $GITHUB_OUTPUT
 
