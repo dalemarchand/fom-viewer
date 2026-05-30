@@ -9,10 +9,15 @@
     "test:debug": "node run.js --visible --timeout 30000",
     "lint": "eslint run.js config.js"
   },
-  "keywords": ["fom", "hla", "testing"],
+  "keywords": [
+    "fom",
+    "hla",
+    "testing"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "puppeteer-core": "^21.0.0"
+    "jsdom": "^29.1.1",
+    "puppeteer-core": "^21.11.0"
   }
 }
