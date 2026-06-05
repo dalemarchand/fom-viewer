@@ -57,8 +57,8 @@ async function test_IssuesCallOrderFix() {
     // Test 1: Verify that after loading files, issues are populated and visible in Issues tab
     console.log('Test 1: Loading FOM file and checking issues are populated...');
     
-    // Load a test FOM file (HLAstandardMIM.xml)
-    await loadTestFomFile(page, 'HLAstandardMIM.xml');
+    // Load RPR-Physical_v3.0.xml which produces cross-reference issues when loaded alone
+    await loadTestFomFile(page, 'RPR-Physical_v3.0.xml');
     
     // Wait for validation to run and issues to be populated
     await page.waitForFunction(() => {
@@ -66,11 +66,11 @@ async function test_IssuesCallOrderFix() {
     }, { timeout: config.test.timeout });
 
     const issueCountAfterLoad = await page.evaluate(() => state.issues.length);
-    console.log(`Issues found after loading HLAstandardMIM.xml: ${issueCountAfterLoad}`);
+    console.log(`Issues found after loading FOM file: ${issueCountAfterLoad}`);
 
     if (issueCountAfterLoad === 0) {
       await captureScreenshot(page, 'test_IssuesCallOrderFix_load_no_issues');
-      throw new Error('No issues found after loading HLAstandardMIM.xml - validate() may not have run');
+      throw new Error('No issues found after loading FOM file - validate() may not have run');
     }
 
     // Make sure Issues tab is visible (it might be hidden if no issues were found previously)
@@ -152,8 +152,8 @@ async function test_IssuesCallOrderFix() {
       throw new Error('Cannot test removeFile with zero initial issues');
     }
 
-    // Remove the first file
-    await waitAndClick(page, '#fileList .file-item:first-child .remove-file-btn');
+    // Remove the first file directly via removeFile() - tests that validate() runs after removal
+    await page.evaluate(() => removeFile(0));
     await sleep(500);
     
     // Wait for validation to run after file removal

@@ -114,6 +114,19 @@ async function openApp() {
   log(`Opening ${htmlPath}...`);
   await page.goto(`file://${htmlPath}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#app');
+  // Clear IndexedDB to prevent state leakage from previous tests
+  await page.evaluate(async () => {
+    try {
+      if (typeof clearStorage === 'function') {
+        await clearStorage();
+      }
+    } catch (e) {
+      console.warn('Failed to clear storage:', e);
+    }
+  });
+  // Reload with fresh state
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector('#app');
   log('App loaded successfully', 'success');
 }
 
