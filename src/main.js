@@ -4,7 +4,6 @@
 
 const DEBUG_BACK_BUTTON = false;
 
-const STORAGE_KEY = 'fomViewerFiles';
 const DB_NAME = 'FOMViewerDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'fomFiles';
@@ -16,8 +15,10 @@ const state = {
   currentSubTab: 'basic',
   selectedItem: null,
   sortEnabled: 'asc', // 'asc', 'desc', or false (off)
-  conflicts: [],
-  errors: [],
+  issues: [],
+  issuesFilter: 'all', // 'all', 'error', 'warning'
+  conflicts: [],   // @deprecated — use state.issues instead
+  errors: [],      // @deprecated — use state.issues instead
   history: [],
   // Appspace state
   // Structure: { fileName, entries: [{ className, apps: [] }], interactions: [{ className, apps: [], matchedClass }], unknown: [{ className, apps: [] }]
@@ -30,6 +31,21 @@ const state = {
     sortEnabled: 'asc'
   }
 };
+
+let issueCounter = 0;
+
+function makeIssue(severity, category, type, message, detail, sources, locations) {
+  return {
+    id: `iss-${String(++issueCounter).padStart(3, '0')}`,
+    severity,
+    category,
+    type,
+    message,
+    detail: detail || '',
+    sources: sources || [],
+    locations: locations || []
+  };
+}
 
 let db = null;
 
@@ -65,7 +81,7 @@ function initDB() {
 
 async function saveToStorage() {
   const fileData = state.files.map(f => ({ name: f.name, xml: f.xml }));
-  const uiState = { currentTab: state.currentTab, currentSubTab: state.currentSubTab, selectedItem: state.selectedItem, sortEnabled: state.sortEnabled };
+  const uiState = { currentTab: state.currentTab, currentSubTab: state.currentSubTab, selectedItem: state.selectedItem, sortEnabled: state.sortEnabled, issuesFilter: state.issuesFilter };
   try {
     if (!db) await initDB();
     const transaction = db.transaction([STORE_NAME], 'readwrite');
@@ -105,6 +121,7 @@ async function loadFromStorage() {
       state.currentSubTab = uiState.currentSubTab || 'basic';
       state.selectedItem = uiState.selectedItem || null;
       state.sortEnabled = uiState.sortEnabled !== undefined ? uiState.sortEnabled : 'asc';
+      state.issuesFilter = uiState.issuesFilter || 'all';
       updateSortButton();
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.querySelector(`.tab[data-tab="${state.currentTab}"]`).classList.add('active');
@@ -112,6 +129,8 @@ async function loadFromStorage() {
       dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
       const appspaceTabs = document.getElementById('appspaceTabs');
       appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
+      const issuesTabs = document.getElementById('issuesTabs');
+      issuesTabs.style.display = state.currentTab === 'issues' ? 'flex' : 'none';
       document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
       const subTabEl = document.querySelector(`.subtab[data-subtab="${state.currentSubTab}"]`);
       if (subTabEl) subTabEl.classList.add('active');
@@ -121,6 +140,12 @@ async function loadFromStorage() {
         const appspaceSubtabEl = document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`);
         if (appspaceSubtabEl) appspaceSubtabEl.classList.add('active');
         updateAppspaceTabCount();
+      }
+      // Restore issues subtab if on issues tab
+      if (state.currentTab === 'issues') {
+        document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+        const issuesSubtabEl = document.querySelector(`#issuesTabs .subtab[data-subtab="${state.issuesFilter}"]`);
+        if (issuesSubtabEl) issuesSubtabEl.classList.add('active');
       }
     }
     // Load appspace data
@@ -152,7 +177,7 @@ async function loadFromStorage() {
       if (state.files.length > 0) {
         const sorted = topologicalSort(state.files);
         state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: mergeDataTypes(sorted), transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
-        updateUI();
+        validate(); updateUI(); updateTabCounts(); updateIssuesTabVisibility();
         if (state.selectedItem) {
           const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
           setTimeout(() => {
@@ -161,6 +186,8 @@ async function loadFromStorage() {
             if (state.currentTab === 'modules') {
               const file = state.files.find(f => f.name === state.selectedItem.name);
               if (file) showModuleDetails(file, false);
+            } else if (state.currentTab === 'issues') {
+              showIssueDetail(state.selectedItem.name);
             } else {
               showDetail(state.selectedItem.name, state.selectedItem.type);
             }
@@ -171,6 +198,7 @@ async function loadFromStorage() {
             if (firstItem) {
               firstItem.classList.add('selected');
               const name = firstItem.dataset.name;
+              if (state.currentTab === 'issues') return;
               const type = firstItem.dataset.type || (state.currentTab === 'modules' ? null : state.currentTab === 'objects' ? 'object' : state.currentTab === 'dims' ? 'dims' : state.currentTab === 'trans' ? 'trans' : state.currentTab === 'notes' ? 'notes' : state.currentTab === 'switches' ? 'switches' : state.currentTab === 'tags' ? 'tags' : state.currentTab === 'time' ? 'time' : state.currentTab === 'interactions' ? 'interaction' : state.currentSubTab);
               if (name && type) {
                 if (state.currentTab === 'modules') {
@@ -683,7 +711,14 @@ function mergeClasses(files, type) {
   files.forEach(file => {
     const classes = type === 'object' ? file.objectClasses : file.interactionClasses;
     classes.forEach(c => {
-      if (!map[c.name]) { map[c.name] = { ...c, _sources: [file.name] }; }
+      if (!map[c.name]) {
+        map[c.name] = {
+          ...c,
+          attributes: c.attributes ? [...c.attributes] : undefined,
+          parameters: c.parameters ? [...c.parameters] : undefined,
+          _sources: [file.name]
+        };
+      }
       else { 
         map[c.name]._sources.push(file.name); 
         // Merge unique attributes from all sources
@@ -812,33 +847,11 @@ function checkConflicts(items, type) {
   });
 }
 
-function getSourceEnumValues(item, source) {
-  if (!item._sourceValues) {
-    item._sourceValues = {};
-    item._sources.forEach(s => {
-      const sourceFile = state.files.find(f => name === s);
-    });
-  }
-  const file = state.files.find(f => f.name === source);
-  if (!file) return item.values || [];
-  const enumType = file.dataTypes.enum?.find(e => e.name === item.name);
-  return enumType?.values || [];
-}
-
 function getSourceVariantAlternatives(item, source) {
   const file = state.files.find(f => f.name === source);
   if (!file) return item.alternatives || [];
   const variantType = file.dataTypes.variant?.find(v => v.name === item.name);
   return variantType?.alternatives || [];
-}
-
-function areEnumValuesEqual(values1, values2) {
-  if (!values1 && !values2) return true;
-  if (!values1 || !values2) return false;
-  if (values1.length !== values2.length) return false;
-  const sorted1 = [...values1].sort((a, b) => a.name.localeCompare(b.name));
-  const sorted2 = [...values2].sort((a, b) => a.name.localeCompare(b.name));
-  return sorted1.every((v1, i) => v1.name === sorted2[i].name && v1.value === sorted2[i].value);
 }
 
 function areVariantAlternativesEqual(alt1, alt2) {
@@ -848,6 +861,439 @@ function areVariantAlternativesEqual(alt1, alt2) {
   const sorted1 = [...alt1].sort((a, b) => a.label.localeCompare(b.label));
   const sorted2 = [...alt2].sort((a, b) => a.label.localeCompare(b.label));
   return sorted1.every((a1, i) => a1.label === sorted2[i].label && a1.dataType === sorted2[i].dataType);
+}
+
+function validate() {
+  state.issues = [];
+  issueCounter = 0;
+  _checkConflicts();
+  _checkCrossReferences(state.files, state.mergedFOM);
+  _detectCircularDependencies();
+}
+
+function updateIssuesTabVisibility() {
+  const tab = document.querySelector('.tab[data-tab="issues"]');
+  if (!tab) return;
+  tab.style.display = state.issues.length > 0 ? '' : 'none';
+}
+
+function _checkConflicts() {
+  const files = state.files;
+  if (!files || files.length < 2) return;
+  const merged = state.mergedFOM;
+  if (!merged) return;
+
+  // 1. Fixed-record field count mismatch
+  const fixedRecords = merged.dataTypes?.fixed || [];
+  fixedRecords.forEach(record => {
+    const sources = record._sources;
+    if (!sources || sources.length < 2) return;
+    const counts = sources.map(s => {
+      const file = files.find(f => f.name === s);
+      const src = file?.dataTypes?.fixed?.find(r => r.name === record.name);
+      return src?.fields?.length || 0;
+    });
+    if (new Set(counts).size > 1) {
+      state.issues.push(makeIssue('warning', 'load-conflict', 'fixed-record-fields',
+        `Fixed record "${record.name}" has different field counts across modules`,
+        counts.map((c, i) => `${sources[i]}: ${c} fields`).join('; '),
+        [...sources],
+        [{ tab: 'datatypes', subTab: 'fixed', itemName: record.name }]
+      ));
+    }
+  });
+
+  // 2. Enum value conflict (same numeric value → different names)
+  const enumTypes = merged.dataTypes?.enum || [];
+  enumTypes.forEach(enumType => {
+    const sources = enumType._sources;
+    if (!sources || sources.length < 2) return;
+    const valueMap = {};
+    (enumType.values || []).forEach(v => {
+      if (!valueMap[v.value]) valueMap[v.value] = [];
+      valueMap[v.value].push(v.name);
+    });
+    const hasConflict = Object.values(valueMap).some(names => new Set(names).size > 1);
+    if (hasConflict) {
+      state.issues.push(makeIssue('warning', 'load-conflict', 'enum-values',
+        `Enum "${enumType.name}" has same numeric value with different names across modules`,
+        '',
+        [...sources],
+        [{ tab: 'datatypes', subTab: 'enum', itemName: enumType.name }]
+      ));
+    }
+  });
+
+  // 3. Variant alternative structure mismatch
+  const variantTypes = merged.dataTypes?.variant || [];
+  variantTypes.forEach(variantType => {
+    const sources = variantType._sources;
+    if (!sources || sources.length < 2) return;
+    let hasConflict = false;
+    for (let i = 0; i < sources.length && !hasConflict; i++) {
+      for (let j = i + 1; j < sources.length && !hasConflict; j++) {
+        const alt1 = getSourceVariantAlternatives(variantType, sources[i]);
+        const alt2 = getSourceVariantAlternatives(variantType, sources[j]);
+        if (!areVariantAlternativesEqual(alt1, alt2)) hasConflict = true;
+      }
+    }
+    if (hasConflict) {
+      state.issues.push(makeIssue('warning', 'load-conflict', 'variant-alternatives',
+        `Variant record "${variantType.name}" has different alternatives across modules`,
+        '',
+        [...sources],
+        [{ tab: 'datatypes', subTab: 'variant', itemName: variantType.name }]
+      ));
+    }
+  });
+
+  // 4. Object class attribute count mismatch
+  const objectClasses = merged.objectClasses || [];
+  objectClasses.forEach(cls => {
+    const sources = cls._sources;
+    if (!sources || sources.length < 2) return;
+    const counts = sources.map(s => {
+      const file = files.find(f => f.name === s);
+      const src = file?.objectClasses?.find(c => c.name === cls.name);
+      return src?.attributes?.length || 0;
+    });
+    const nonZeroCounts = counts.filter(c => c > 0);
+    if (nonZeroCounts.length >= 2 && new Set(nonZeroCounts).size > 1) {
+      const perSourceDetails = sources.map((s, i) => {
+        const file = files.find(f => f.name === s);
+        const src = file?.objectClasses?.find(c => c.name === cls.name);
+        const attrNames = src?.attributes?.map(a => a.name) || [];
+        const visibleText = `${s}: ${counts[i]} attributes`;
+        const tooltipText = attrNames.length > 0 ? attrNames.join(', ') : '';
+        return tooltipText ? `${visibleText}||${tooltipText}` : visibleText;
+      }).join('; ');
+      state.issues.push(makeIssue('warning', 'load-conflict', 'object-attributes',
+        `Object class "${cls.name}" has different attribute counts across modules`,
+        perSourceDetails,
+        [...sources],
+        [{ tab: 'objects', subTab: '', itemName: cls.name }]
+      ));
+    }
+  });
+
+  // 5. Interaction class parameter count mismatch
+  const interactionClasses = merged.interactionClasses || [];
+  interactionClasses.forEach(cls => {
+    const sources = cls._sources;
+    if (!sources || sources.length < 2) return;
+    const counts = sources.map(s => {
+      const file = files.find(f => f.name === s);
+      const src = file?.interactionClasses?.find(c => c.name === cls.name);
+      return src?.parameters?.length || 0;
+    });
+    const nonZeroCounts = counts.filter(c => c > 0);
+    if (nonZeroCounts.length >= 2 && new Set(nonZeroCounts).size > 1) {
+      const perSourceDetails = sources.map((s, i) => {
+        const file = files.find(f => f.name === s);
+        const src = file?.interactionClasses?.find(c => c.name === cls.name);
+        const paramNames = src?.parameters?.map(p => p.name) || [];
+        const visibleText = `${s}: ${counts[i]} parameters`;
+        const tooltipText = paramNames.length > 0 ? paramNames.join(', ') : '';
+        return tooltipText ? `${visibleText}||${tooltipText}` : visibleText;
+      }).join('; ');
+      state.issues.push(makeIssue('warning', 'load-conflict', 'interaction-parameters',
+        `Interaction class "${cls.name}" has different parameter counts across modules`,
+        perSourceDetails,
+        [...sources],
+        [{ tab: 'interactions', subTab: '', itemName: cls.name }]
+      ));
+    }
+  });
+
+  // 6. Transportation semantics/reliable conflict
+  const transportations = merged.transportations || [];
+  transportations.forEach(t => {
+    const sources = t._sources;
+    if (!sources || sources.length < 2) return;
+    const seenSemantics = new Set();
+    const seenReliable = new Set();
+    sources.forEach(s => {
+      const file = files.find(f => f.name === s);
+      const src = file?.transportations?.find(tr => tr.name === t.name);
+      if (src?.semantics) seenSemantics.add(src.semantics);
+      if (src?.reliable) seenReliable.add(src.reliable);
+    });
+    if (seenSemantics.size > 1 || seenReliable.size > 1) {
+      state.issues.push(makeIssue('warning', 'load-conflict', 'transportation',
+        `Transportation "${t.name}" has conflicting semantics or reliable values across modules`,
+        sources.map(s => {
+          const file = files.find(f => f.name === s);
+          const src = file?.transportations?.find(tr => tr.name === t.name);
+          return `${s}: reliable=${src?.reliable || ''} semantics=${src?.semantics || ''}`;
+        }).join('; '),
+        [...sources],
+        [{ tab: 'trans', subTab: '', itemName: t.name }]
+      ));
+    }
+  });
+
+  // 7. Switch value conflict
+  const switches = merged.switches || [];
+  switches.forEach(sw => {
+    const sources = sw._sources;
+    if (!sources || sources.length < 2) return;
+    const seenValues = new Set();
+    sources.forEach(s => {
+      const file = files.find(f => f.name === s);
+      const src = file?.switches?.find(s2 => s2.name === sw.name);
+      if (src?.value) seenValues.add(src.value);
+    });
+    if (seenValues.size > 1) {
+      state.issues.push(makeIssue('warning', 'load-conflict', 'switch',
+        `Switch "${sw.name}" has different values across modules`,
+        sources.map(s => {
+          const file = files.find(f => f.name === s);
+          const src = file?.switches?.find(s2 => s2.name === sw.name);
+          return `${s}: ${src?.value || '(empty)'}`;
+        }).join('; '),
+        [...sources],
+        [{ tab: 'switches', subTab: '', itemName: sw.name }]
+      ));
+    }
+  });
+
+  // 8. Time configuration conflict
+  if (files.length >= 2) {
+    const uniqueTimestamps = new Set();
+    const uniqueLookaheads = new Set();
+    files.forEach(f => {
+      if (f.time?.timeStamp?.dataType) uniqueTimestamps.add(f.time.timeStamp.dataType);
+      if (f.time?.lookahead?.dataType) uniqueLookaheads.add(f.time.lookahead.dataType);
+    });
+    if (uniqueTimestamps.size > 1) {
+      state.issues.push(makeIssue('warning', 'load-conflict', 'time',
+        'Timestamp data type differs across modules',
+        files.map(f => `${f.name}: ${f.time?.timeStamp?.dataType || '(none)'}`).join('; '),
+        files.map(f => f.name),
+        [{ tab: 'time', subTab: '', itemName: '' }]
+      ));
+    }
+    if (uniqueLookaheads.size > 1) {
+      state.issues.push(makeIssue('warning', 'load-conflict', 'time',
+        'Lookahead data type differs across modules',
+        files.map(f => `${f.name}: ${f.time?.lookahead?.dataType || '(none)'}`).join('; '),
+        files.map(f => f.name),
+        [{ tab: 'time', subTab: '', itemName: '' }]
+      ));
+    }
+  }
+}
+
+function _checkCrossReferences(files, merged) {
+  if (!merged) return;
+  
+  // Collect known references
+  // Build dimNames from state.files directly (mergedFOM has no 'dimensions' key)
+  const dimNames = new Set();
+  (files || []).forEach(f => (f.dimensions || []).forEach(d => dimNames.add((d.name || d).trim())));
+  const transNames = new Set((merged.transportations || []).map(t => t.name.trim()));
+  const dataTypeNames = new Set();
+  ['basic', 'simple', 'array', 'fixed', 'enum', 'variant'].forEach(cat => {
+    (merged.dataTypes?.[cat] || []).forEach(dt => dataTypeNames.add(dt.name));
+  });
+  // IEEE 1516 standard built-in data types (always available per standard)
+  const hlaBuiltins = ['HLAinteger32BE','HLAinteger32LE','HLAinteger64BE','HLAinteger64LE',
+    'HLAinteger16BE','HLAinteger16LE','HLAoctet','HLAoctetPairBE','HLAoctetPairLE',
+    'HLAfloat32BE','HLAfloat32LE','HLAfloat64BE','HLAfloat64LE',
+    'HLAunicodeString','HLAASCIIstring','HLAboolean','HLAbyte',
+    'HLAvariableArrayData','HLAfixedArrayData','HLAfixedRecordData','HLAvariantRecordData',
+    'HLAopaqueData','HLAunicodeChar','HLAASCIIchar','HLAintegerSize','HLAinteger'];
+  hlaBuiltins.forEach(t => dataTypeNames.add(t));
+  // IEEE 1516 standard built-in transportations (always available per standard)
+  ['HLAreliable', 'HLAbestEffort'].forEach(t => transNames.add(t));
+  const loadedFileNames = new Set((files || []).map(f => f.name));
+  
+  // 1. Walk interactions — check dimensions, transportation, parameter dataTypes
+  (merged.interactionClasses || []).forEach(int => {
+    const intSources = int._sources || (int._source ? [int._source] : []);
+    // 1a. Interaction dimensions
+    (int.dimensions || []).forEach(dim => {
+      if (!dimNames.has(dim.trim())) {
+        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-dimension',
+          `Interaction "${int.name}" references unknown dimension "${dim}"`,
+          `The dimension "${dim}" is not defined in any loaded FOM module.`,
+          intSources,
+          [{ tab: 'interactions', itemName: int.name }]
+        ));
+      }
+    });
+    // 1b. Interaction transportation
+    if (int.transportation && !transNames.has(int.transportation.trim())) {
+      state.issues.push(makeIssue('warning', 'cross-reference', 'missing-transportation',
+        `Interaction "${int.name}" references unknown transportation "${int.transportation}"`,
+        `The transportation "${int.transportation}" is not defined in any loaded FOM module.`,
+        intSources,
+        [{ tab: 'interactions', itemName: int.name }]
+      ));
+    }
+    // 1c. Interaction parameter dataTypes
+    (int.parameters || []).forEach(param => {
+      if (param.dataType && !dataTypeNames.has(param.dataType)) {
+        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-data-type',
+          `Parameter "${param.name}" of interaction "${int.name}" references unknown data type "${param.dataType}"`,
+          `The data type "${param.dataType}" is not defined in any loaded FOM module.`,
+          intSources,
+          [{ tab: 'interactions', itemName: int.name }]
+        ));
+      }
+    });
+  });
+  
+  // 2. Walk object classes — check attribute dimensions, transportation, dataTypes
+  (merged.objectClasses || []).forEach(obj => {
+    const objSources = obj._sources || (obj._source ? [obj._source] : []);
+    (obj.attributes || []).forEach(attr => {
+      // 2a. Attribute dimensions
+      (attr.dimensions || []).forEach(dim => {
+        if (!dimNames.has(dim.trim())) {
+          state.issues.push(makeIssue('warning', 'cross-reference', 'missing-dimension',
+            `Attribute "${attr.name}" of object "${obj.name}" references unknown dimension "${dim}"`,
+            `The dimension "${dim}" is not defined in any loaded FOM module.`,
+            objSources,
+            [{ tab: 'objects', itemName: obj.name }]
+          ));
+        }
+      });
+      // 2b. Attribute transportation
+      if (attr.transportation && !transNames.has(attr.transportation.trim())) {
+        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-transportation',
+          `Attribute "${attr.name}" of object "${obj.name}" references unknown transportation "${attr.transportation}"`,
+          `The transportation "${attr.transportation}" is not defined in any loaded FOM module.`,
+          objSources,
+          [{ tab: 'objects', itemName: obj.name }]
+        ));
+      }
+      // 2c. Attribute dataType
+      if (attr.dataType && !dataTypeNames.has(attr.dataType)) {
+        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-data-type',
+          `Attribute "${attr.name}" of object "${obj.name}" references unknown data type "${attr.dataType}"`,
+          `The data type "${attr.dataType}" is not defined in any loaded FOM module.`,
+          objSources,
+          [{ tab: 'objects', itemName: obj.name }]
+        ));
+      }
+    });
+  });
+  
+  // 3. Walk complex dimensions — check dataType row references
+  (files || []).forEach(f => {
+    (f.dimensions || []).forEach(dim => {
+      const dimName = dim.name || dim;
+      if (dim.rows && dim.rows.length > 0) {
+        dim.rows.forEach(row => {
+          if (row.key === 'dataType' && row.value && !dataTypeNames.has(row.value)) {
+            state.issues.push(makeIssue('warning', 'cross-reference', 'missing-data-type',
+              `Dimension "${dimName}" references unknown data type "${row.value}"`,
+              `The data type "${row.value}" is not defined in any loaded FOM module.`,
+              [f.name],
+              [{ tab: 'dims', itemName: dimName }]
+            ));
+          }
+        });
+      }
+    });
+  });
+  
+  // 4. Check module dependencies
+  (files || []).forEach(file => {
+    (file.dependencies || []).forEach(dep => {
+      if (!loadedFileNames.has(dep)) {
+        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-dependency',
+          `Module "${file.name}" depends on missing module "${dep}"`,
+          `The module "${dep}" is required by "${file.name}" but is not loaded.`,
+          [file.name],
+          []
+        ));
+      }
+    });
+  });
+}
+
+function _detectCircularDependencies() {
+  const files = state.files;
+  if (!files || files.length < 2) return;
+
+  const fileNames = new Set(files.map(f => f.name));
+
+  // Build adjacency list: edge dep -> dependent (same direction as existing topologicalSort)
+  const graph = {};
+  files.forEach(f => { graph[f.name] = []; });
+  files.forEach(f => {
+    (f.dependencies || []).forEach(dep => {
+      if (fileNames.has(dep)) {
+        graph[dep].push(f.name);
+      }
+    });
+  });
+
+  // Tarjan's SCC
+  const index = {};
+  const lowlink = {};
+  const onStack = {};
+  const stack = [];
+  let nextIndex = 0;
+  const sccs = [];
+
+  function strongconnect(v) {
+    index[v] = nextIndex;
+    lowlink[v] = nextIndex;
+    nextIndex++;
+    stack.push(v);
+    onStack[v] = true;
+
+    (graph[v] || []).forEach(w => {
+      if (index[w] === undefined) {
+        strongconnect(w);
+        lowlink[v] = Math.min(lowlink[v], lowlink[w]);
+      } else if (onStack[w]) {
+        lowlink[v] = Math.min(lowlink[v], index[w]);
+      }
+    });
+
+    if (lowlink[v] === index[v]) {
+      const scc = [];
+      let w;
+      do {
+        w = stack.pop();
+        onStack[w] = false;
+        scc.push(w);
+      } while (w !== v);
+      sccs.push(scc);
+    }
+  }
+
+  files.forEach(f => {
+    if (index[f.name] === undefined) strongconnect(f.name);
+  });
+
+  // Report SCCs with size > 1 (true cycles)
+  // Or size === 1 if self-loop (node has edge to itself)
+  sccs.forEach(scc => {
+    if (scc.length > 1) {
+      state.issues.push(makeIssue('error', 'circular-dependency', 'cycle-detected',
+        'Circular dependency detected among modules',
+        `Modules involved in cycle: ${scc.sort().join(', ')}`,
+        [...scc],
+        []
+      ));
+    } else {
+      // Check for self-loop: does the single node have an edge to itself?
+      const node = scc[0];
+      if ((graph[node] || []).includes(node)) {
+        state.issues.push(makeIssue('error', 'circular-dependency', 'cycle-detected',
+          'Circular dependency detected among modules',
+          `Module has a self-referencing dependency: ${node}`,
+          [node],
+          []
+        ));
+      }
+    }
+  });
 }
 
 // ============================================================================
@@ -1244,6 +1690,24 @@ const sources = item._sources || (item._source ? [item._source] : []);
     }
     html += '</table></div>';
   }
+
+  // Related Issues section
+  if (item && item.name && state.issues && state.issues.length > 0) {
+    const relatedIssues = findIssuesForItem(item.name, type);
+    if (relatedIssues.length > 0) {
+      html += `<div class="detail-section">
+        <h4 style="margin-bottom:8px;color:var(--text-muted);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Related Issues (${relatedIssues.length})</h4>`;
+      relatedIssues.forEach(issue => {
+        const icon = issue.severity === 'error' ? '❗' : '⚠️';
+        html += `<div class="related-issue" data-tab="issues" data-issue-id="${issue.id}" style="cursor:pointer;padding:4px 8px;margin:2px 0;background:var(--bg-tertiary);border-radius:4px;font-size:13px;display:flex;align-items:center;gap:6px;">
+          <span>${icon}</span>
+          <span>${issue.message}</span>
+        </div>`;
+      });
+      html += '</div>';
+    }
+  }
+
   return html;
 }
 
@@ -1260,70 +1724,6 @@ function getPreferredType(name) {
   if (state.mergedFOM.dataTypes.enum?.find(d => d.name === name)) return 'enum';
   if (state.mergedFOM.dataTypes.variant?.find(d => d.name === name)) return 'variant';
   return 'basic';
-}
-
-function findBasicTypeUsages(basicTypeName) {
-  const usages = [];
-  if (!state.mergedFOM) return usages;
-  
-  // Check Simple data types
-  state.mergedFOM.dataTypes.simple?.forEach(s => {
-    if (s.representation === basicTypeName) {
-      usages.push({ name: s.name, type: 'simple', location: 'Simple Data Type' });
-    }
-  });
-  
-  // Check Array data types
-  state.mergedFOM.dataTypes.array?.forEach(a => {
-    if (a.dataType === basicTypeName) {
-      usages.push({ name: a.name, type: 'array', location: 'Array Data Type' });
-    }
-  });
-  
-  // Check Fixed record fields
-  state.mergedFOM.dataTypes.fixed?.forEach(f => {
-    f.fields?.forEach(field => {
-      if (field.dataType === basicTypeName) {
-        usages.push({ name: f.name, type: 'fixed', location: `Fixed Record: ${field.name}` });
-      }
-    });
-  });
-  
-  // Check Variant record alternatives
-  state.mergedFOM.dataTypes.variant?.forEach(v => {
-    v.alternatives?.forEach(alt => {
-      if (alt.dataType === basicTypeName) {
-        usages.push({ name: v.name, type: 'variant', location: `Variant Record: ${alt.label}` });
-      }
-    });
-  });
-  
-  // Check Enumeration representation
-  state.mergedFOM.dataTypes.enum?.forEach(e => {
-    if (e.representation === basicTypeName) {
-      usages.push({ name: e.name, type: 'enum', location: 'Enumerated Type' });
-    }
-  });
-  
-  // Check Object class attributes
-  state.mergedFOM.objectClasses?.forEach(obj => {
-    obj.attributes?.forEach(attr => {
-      if (attr.dataType === basicTypeName) {
-        usages.push({ name: obj.name, type: 'object', location: `Object: ${attr.name}` });
-      }
-    });
-  });
-  
-  // Check Interaction class parameters
-  state.mergedFOM.interactionClasses?.forEach(int => {
-    int.parameters?.forEach(param => {
-      if (param.dataType === basicTypeName) {
-        usages.push({ name: int.name, type: 'interaction', location: `Interaction: ${param.name}` });
-      }
-    });
-  });
-  
-  return usages;
 }
 
 function findDimensionByName(dimName) {
@@ -1573,6 +1973,128 @@ function renderDataTypeList(type) {
 // NAVIGATION (showDetail, showDataType, showModuleDetails)
 // ============================================================================
 
+function showIssueDetail(issueId) {
+  const issue = state.issues.find(i => i.id === issueId);
+  if (!issue) return;
+
+  state.selectedItem = { name: issue.id, type: 'issue' };
+
+  const header = document.getElementById('detailHeader');
+  const welcome = document.getElementById('welcomeScreen');
+  const title = document.getElementById('detailTitle');
+  const meta = document.getElementById('detailMeta');
+  const body = document.getElementById('detailBody');
+
+  welcome.style.display = 'none';
+  header.style.display = 'block';
+  title.textContent = issue.message;
+  meta.textContent = issue.severity.toUpperCase();
+
+  // Build locations HTML
+  let locationsHtml = '';
+  if (issue.locations && issue.locations.length > 0) {
+    const locationItems = issue.locations.map(loc => {
+      const targetTab = loc.subTab ? `${loc.tab}:${loc.subTab}` : loc.tab;
+      return `<div class="location-item" data-tab="${loc.tab}" data-subtab="${loc.subTab || ''}" data-item="${loc.itemName}" style="padding:6px 10px;margin:2px 0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px;">
+        <span style="color:var(--accent);font-size:12px;">📍</span>
+        <span style="flex:1;">${loc.itemName}</span>
+        <span style="color:var(--text-muted);font-size:11px;">${targetTab}</span>
+      </div>`;
+    }).join('');
+    locationsHtml = `<div style="margin-top:16px;">
+      <h4 style="margin-bottom:8px;color:var(--text-muted);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Navigation Targets</h4>
+      ${locationItems}
+    </div>`;
+  }
+
+  // Build detail items (non-bullet list)
+  let detailHtml = '';
+  if (issue.detail) {
+    const items = issue.detail.split('; ');
+    detailHtml = '<div class="detail-list">';
+    items.forEach(item => {
+      const parts = item.split('||');
+      const visibleText = parts[0];
+      const tooltipText = parts[1] || '';
+      detailHtml += tooltipText
+        ? `<div class="detail-list-item" title="${tooltipText.replace(/"/g, '&quot;')}">${visibleText}</div>`
+        : `<div class="detail-list-item">${visibleText}</div>`;
+    });
+    detailHtml += '</div>';
+  }
+
+  // Build source modules list (clickable, non-bullet)
+  let sourcesHtml = '';
+  if (issue.sources?.length) {
+    sourcesHtml = '<div class="source-module-list"><p class="source-module-heading"><strong>Source Modules:</strong></p>';
+    issue.sources.forEach(s => {
+      const escapedName = s.replace(/"/g, '&quot;');
+      sourcesHtml += `<div class="source-module-item" data-source="${escapedName}">${s}</div>`;
+    });
+    sourcesHtml += '</div>';
+  }
+
+  body.innerHTML = `
+    <div class="detail-section">
+      <h3 style="margin-bottom:8px;">${issue.severity === 'error' ? '❗ Error' : '⚠️ Warning'}: ${issue.message}</h3>
+      ${detailHtml}
+      ${sourcesHtml}
+      ${issue.type ? `<p style="margin-bottom:4px;color:var(--text-muted);font-size:12px;"><strong>Category:</strong> ${issue.category} / ${issue.type}</p>` : ''}
+      ${locationsHtml}
+      <p style="margin-top:16px;color:var(--text-muted);font-size:11px;border-top:1px solid var(--border);padding-top:8px;">Issue ID: ${issue.id}</p>
+    </div>`;
+
+  saveToStorage();
+}
+
+// Map type values to their corresponding tab names
+function typeToTab(type) {
+  const typeMap = {
+    'object': 'objects',
+    'interaction': 'interactions',
+  };
+  const dataTypes = ['basic', 'simple', 'array', 'fixed', 'enum', 'variant'];
+  if (dataTypes.includes(type)) return 'datatypes';
+  return typeMap[type] || type;
+}
+
+// Find issues that reference a specific item by name and type
+function findIssuesForItem(itemName, type) {
+  if (!state.issues || state.issues.length === 0) return [];
+
+  return state.issues.filter(issue => {
+    if (!issue || typeof issue !== 'object' || !issue.locations || issue.locations.length === 0) return false;
+    return issue.locations.some(loc => {
+      if (loc.itemName !== itemName) return false;
+      return loc.tab === typeToTab(type);
+    });
+  });
+}
+
+// Map tab names to showDetail()-compatible type values
+function tabToType(tab, subTab) {
+  const tabMap = {
+    'objects': 'object',
+    'interactions': 'interaction',
+    'dims': 'dims',
+    'trans': 'trans',
+    'notes': 'notes',
+    'switches': 'switches',
+    'tags': 'tags',
+    'time': 'time',
+    'modules': 'ident'
+  };
+  if (tab === 'datatypes' && subTab) return subTab;
+  return tabMap[tab] || tab;
+}
+
+// Navigate from issue detail to a specific location
+function navigateToLocation(loc) {
+  if (!loc || !loc.tab || !loc.itemName) return;
+  const type = tabToType(loc.tab, loc.subTab);
+  showDetail(loc.itemName, type, true);
+}
+
 function showDetail(name, type, isManualNav = false) {
   // Save current tab before any changes
   const prevTab = state.currentTab;
@@ -1773,6 +2295,7 @@ if (type === 'object') {
 // MODULE DETAILS
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 function switchToModule(moduleName, addToHistory = true) {
   const file = state.files.find(f => f.name === moduleName);
   if (file) {
@@ -1782,6 +2305,7 @@ function switchToModule(moduleName, addToHistory = true) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.tab[data-tab="modules"]').classList.add('active');
     document.getElementById('dataTypeTabs').style.display = 'none';
+    document.getElementById('issuesTabs').style.display = 'none';
     updateUI();
     showModuleDetails(file, addToHistory);
   }
@@ -1870,7 +2394,7 @@ function renderModuleBody(file) {
     </table>
     <h4 style="margin:16px 0 8px">Model Identification</h4>
     ${modelIdentHtml}
-    <button class="btn btn-danger" style="margin-top:12px" onclick="removeFile(${state.files.indexOf(file)}); document.getElementById('detailHeader').style.display='none'; document.getElementById('detailBody').innerHTML='';">Remove Module</button>
+    <button class="btn btn-danger" style="margin-top:12px" onclick="removeFile(${state.files.indexOf(file)});">Remove Module</button>
   </div>`;
 }
 
@@ -1985,6 +2509,17 @@ function updateUI() {
         showDetail('time', 'time');
       }
     }
+  } else if (state.currentTab === 'issues') {
+    treeView.innerHTML = '<div class="tree-wrapper">' + renderIssuesList() + '</div>';
+    if (!state.selectedItem && state.issues.length > 0) {
+      const firstItem = treeView.querySelector('.tree-item');
+      if (firstItem) {
+        firstItem.classList.add('selected');
+        firstItem.scrollIntoView({ block: 'nearest' });
+        const issueId = firstItem.dataset.issueId;
+        if (issueId) showIssueDetail(issueId);
+      }
+    }
   } else {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderDataTypeList(state.currentSubTab) + '</div>';
   }
@@ -2002,6 +2537,19 @@ function updateUI() {
       item.classList.add('selected');
       const name = item.dataset.name;
       if (state.currentTab === 'modules') { const file = state.files.find(f => f.name === name); if (file) showModuleDetails(file, true); return; }
+      if (state.currentTab === 'issues') {
+        if (state.selectedItem) {
+          state.history.push({
+            tab: state.currentTab,
+            subTab: state.issuesFilter || 'all',
+            selected: { ...state.selectedItem },
+            detail: document.getElementById('detailHeader').style.display
+          });
+          document.getElementById('backBtn').style.display = 'inline-block';
+        }
+        showIssueDetail(item.dataset.issueId);
+        return;
+      }
       const type = item.dataset.type || (state.currentTab === 'datatypes' ? state.currentSubTab : state.currentTab === 'objects' ? 'object' : state.currentTab === 'dims' ? 'dims' : state.currentTab === 'trans' ? 'trans' : state.currentTab === 'notes' ? 'notes' : state.currentTab === 'switches' ? 'switches' : state.currentTab === 'tags' ? 'tags' : state.currentTab === 'time' ? 'time' : 'interaction');
       showDetail(name, type, true);
     });
@@ -2022,6 +2570,53 @@ function renderTransList() {
   });
   return html;
 }
+function renderIssuesList() {
+  if (!state.issues || state.issues.length === 0) {
+    return '<div class="empty-state">No issues found.</div>';
+  }
+
+  // Filter by severity based on state.issuesFilter
+  let filtered = state.issues;
+  if (state.issuesFilter === 'error') {
+    filtered = state.issues.filter(i => i.severity === 'error');
+  } else if (state.issuesFilter === 'warning') {
+    filtered = state.issues.filter(i => i.severity === 'warning');
+  }
+
+  if (filtered.length === 0) {
+    return '<div class="empty-state">No issues match the current filter.</div>';
+  }
+
+  // Group by category
+  const groups = {};
+  filtered.forEach(issue => {
+    const cat = issue.category || 'other';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(issue);
+  });
+
+  let html = '';
+  for (const [category, issues] of Object.entries(groups)) {
+    const categoryLabel = category
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+    html += `<div class="issue-category-header">${categoryLabel} (${issues.length})</div>`;
+    issues.forEach(issue => {
+      const icon = issue.severity === 'error' ? '❗' : '⚠️';
+      const iconClass = issue.severity === 'error' ? 'issue-icon issue-error' : 'issue-icon issue-warning';
+      const sourceCount = issue.sources?.length || 0;
+      html += `<div class="tree-item" data-issue-id="${issue.id}" data-name="${issue.id}">
+        <span class="${iconClass}">${icon}</span>
+        <span class="name" title="${issue.message.replace(/"/g, '&quot;')}">${issue.message}</span>
+        ${sourceCount > 0 ? `<span class="issue-sources">${sourceCount} sources</span>` : ''}
+      </div>`;
+    });
+  }
+
+  return html;
+}
+
 function renderNotesList() {
   if (!state.files || state.files.length === 0) return '<div class="empty-state">No FOM files loaded. Use the "Load FOM" button in the header.</div>';
   let allNotes = [];
@@ -2155,7 +2750,8 @@ function updateTabCounts() {
     { id: 'switches', getCount: () => state.mergedFOM.switches?.length || 0 },
     { id: 'tags', getCount: () => state.mergedFOM.tags?.length || 0 },
     { id: 'time', getCount: () => state.mergedFOM.time ? 1 : 0 },
-    { id: 'notes', getCount: () => state.files.reduce((sum, f) => sum + (f.notes?.length || 0), 0) }
+    { id: 'notes', getCount: () => state.files.reduce((sum, f) => sum + (f.notes?.length || 0), 0) },
+    { id: 'issues', getCount: () => state.issues.length }
   ];
   tabs.forEach(tab => {
     const tabEl = document.querySelector(`.tab[data-tab="${tab.id}"]`);
@@ -2211,28 +2807,55 @@ function updateWelcomeStats() {
 }
 
 async function loadFiles(files) {
+  state.issues = [];
+  const totalFiles = files.length;
+  let failedFiles = 0;
+  const parseErrors = [];
   for (const file of files) {
-    try { const text = await file.text(); const parser = new FOMParser(text); const fom = parser.parse(); state.files.push(fom); }
-    catch (e) { console.error('Parse error:', e); state.errors.push(`Failed to parse ${file.name}: ${e.message}`); }
+    try {
+      const text = await file.text();
+      const parser = new FOMParser(text);
+      const fom = parser.parse();
+      state.files.push(fom);
+    } catch (e) {
+      failedFiles++;
+      parseErrors.push({ name: file.name, message: e.message });
+    }
   }
-  if (state.files.length > 0) { 
-    const sorted = topologicalSort(state.files); 
-    state.mergedFOM = { 
-      objectClasses: mergeClasses(sorted, 'object'), 
-      interactionClasses: mergeClasses(sorted, 'interaction'), 
+  if (state.files.length > 0) {
+    const sorted = topologicalSort(state.files);
+    state.mergedFOM = {
+      objectClasses: mergeClasses(sorted, 'object'),
+      interactionClasses: mergeClasses(sorted, 'interaction'),
       dataTypes: mergeDataTypes(sorted),
       transportations: mergeTransportations(sorted),
       switches: mergeSwitches(sorted),
       tags: mergeTags(sorted),
       time: mergeTime(sorted)
-    }; 
+    };
     state.history = [];
     state.currentTab = 'modules';
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.tab[data-tab="modules"]').classList.add('active');
     document.getElementById('dataTypeTabs').style.display = 'none';
-    saveToStorage(); 
+    document.getElementById('issuesTabs').style.display = 'none';
+    // Run validate() first (it resets state.issues), then append parse errors
+    validate();
+    parseErrors.forEach(pe => {
+      state.issues.push(makeIssue('error', 'validation', 'parse-error',
+        `Failed to parse ${pe.name}`,
+        pe.message,
+        [pe.name],
+      ));
+    });
+    updateIssuesTabVisibility();
+    saveToStorage();
     updateUI();
+    if (failedFiles > 0) {
+      showToast(`Loaded ${totalFiles - failedFiles} files (${failedFiles} failed)`);
+    } else {
+      showToast(`Loaded ${totalFiles} files`);
+    }
     setTimeout(() => {
       const firstItem = document.querySelector('.tree-item');
       if (firstItem) {
@@ -2242,7 +2865,20 @@ async function loadFiles(files) {
       }
     }, 50);
   } else {
-    saveToStorage(); updateUI();
+    validate();
+    parseErrors.forEach(pe => {
+      state.issues.push(makeIssue('error', 'validation', 'parse-error',
+        `Failed to parse ${pe.name}`,
+        pe.message,
+        [pe.name],
+      ));
+    });
+    updateIssuesTabVisibility();
+    saveToStorage();
+    updateUI();
+    if (failedFiles > 0) {
+      showToast(`0 files loaded (${failedFiles} failed)`);
+    }
   }
 }
 
@@ -2250,17 +2886,26 @@ async function loadFiles(files) {
 // FILE MANAGEMENT
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 function removeFile(index) {
+  document.getElementById('detailHeader').style.display = 'none';
+  document.getElementById('detailBody').innerHTML = '';
   state.files.splice(index, 1);
   if (state.files.length > 0) { 
     const sorted = topologicalSort(state.files); 
     state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: mergeDataTypes(sorted), transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) }; 
   }
   else { state.mergedFOM = null; }
-  saveToStorage(); updateUI();
+  saveToStorage(); validate(); updateUI(); updateIssuesTabVisibility();
 }
 
-document.getElementById('fileInput').addEventListener('change', e => { loadFiles(Array.from(e.target.files)); });
+document.getElementById('fileInput').addEventListener('change', e => {
+  const files = Array.from(e.target.files);
+  if (files.length > 0) {
+    loadFiles(files);
+    e.target.value = '';
+  }
+});
 
 function updateSortButton() {
   const btn = document.getElementById('sortBtn');
@@ -2296,15 +2941,18 @@ document.querySelectorAll('.tab').forEach(tab => {
     const prevSelected = state.selectedItem;
 
     if (state.currentTab !== tab.dataset.tab) { 
-      if (prevDetailShowing) {
-        debugBack('tab click: prevTab=%s, prevSelected=%s', prevTab, prevSelected ? prevSelected.name + '/' + prevSelected.type : 'null');
-        const historySubTab = prevTab === 'appspaces' ? state.appspaceSubTab : prevSubTab;
+      // Always preserve tab state when leaving a tab with subtabs (datatypes, issues, appspaces)
+      // so back-button restores the correct subtab even when detail panel is hidden
+      if (prevDetailShowing || ['issues', 'appspaces', 'datatypes'].includes(prevTab)) {
+        debugBack('tab click: prevTab=%s, prevSelected=%s, prevDetailShowing=%s', prevTab, prevSelected ? prevSelected.name + '/' + prevSelected.type : 'null', prevDetailShowing);
+        const historySubTab = prevTab === 'appspaces' ? state.appspaceSubTab : prevTab === 'issues' ? state.issuesFilter : prevSubTab;
         state.history.push({ tab: prevTab, subTab: historySubTab, selected: prevSelected, detail: 'block' });
       }
     }
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentTab = tab.dataset.tab; state.selectedItem = null;
     const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
     const appspaceTabs = document.getElementById('appspaceTabs'); appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
+    const issuesTabs = document.getElementById('issuesTabs'); issuesTabs.style.display = state.currentTab === 'issues' ? 'flex' : 'none';
     document.getElementById('detailHeader').style.display = 'none'; document.getElementById('detailBody').innerHTML = '';
     
     // Handle Data Types tab - ensure a subtab is selected BEFORE updateUI
@@ -2315,6 +2963,17 @@ document.querySelectorAll('.tab').forEach(tab => {
       }
       document.querySelectorAll('#dataTypeTabs .subtab').forEach(t => t.classList.remove('active'));
       const activeSubtab = document.querySelector(`#dataTypeTabs .subtab[data-subtab="${state.currentSubTab}"]`);
+      if (activeSubtab) activeSubtab.classList.add('active');
+    }
+    
+    // Handle Issues tab - ensure a subtab is selected BEFORE updateUI
+    if (state.currentTab === 'issues') {
+      const validFilters = ['all', 'error', 'warning'];
+      if (!state.issuesFilter || !validFilters.includes(state.issuesFilter)) {
+        state.issuesFilter = 'all';
+      }
+      document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+      const activeSubtab = document.querySelector(`#issuesTabs .subtab[data-subtab="${state.issuesFilter}"]`);
       if (activeSubtab) activeSubtab.classList.add('active');
     }
     
@@ -2387,6 +3046,8 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 document.querySelectorAll('.subtab').forEach(tab => {
   tab.addEventListener('click', () => {
+    // Skip if this subtab has its own dedicated handler
+    if (tab.closest('#issuesTabs, #appspaceTabs')) return;
     const prevDetailShowing = document.getElementById('detailHeader').style.display !== 'none';
     const prevTab = state.currentTab;
     const prevSubTab = state.currentSubTab;
@@ -2452,6 +3113,64 @@ document.querySelectorAll('#appspaceTabs .subtab').forEach(tab => {
     saveAppspaceToStorage();
     updateUI();
     renderAppspacesPanel();
+  });
+});
+
+// Issues subtab click handler
+document.querySelectorAll('#issuesTabs .subtab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    // Push to history when switching subtab
+    const prevSubTab = state.issuesFilter;
+    const prevSelected = state.selectedItem;
+
+    document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    state.issuesFilter = tab.dataset.subtab;
+
+    if (prevSubTab !== tab.dataset.subtab) {
+      state.history.push({ tab: 'issues', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+    }
+
+    state.selectedItem = null;
+    const header = document.getElementById('detailHeader');
+    const welcome = document.getElementById('welcomeScreen');
+    const body = document.getElementById('detailBody');
+    if (state.files && state.files.length > 0) {
+      // Files loaded: hide header and welcome screen
+      if (header) header.style.display = 'none';
+      if (welcome) welcome.style.display = 'none';
+
+      // Count issues matching the current filter
+      let filteredCount = 0;
+      if (state.issues && state.issues.length > 0) {
+        if (state.issuesFilter === 'error') {
+          filteredCount = state.issues.filter(i => i.severity === 'error').length;
+        } else if (state.issuesFilter === 'warning') {
+          filteredCount = state.issues.filter(i => i.severity === 'warning').length;
+        } else {
+          filteredCount = state.issues.length;
+        }
+      }
+
+      // Only show empty-state when zero issues match the filter;
+      // updateUI() will fill the detail body when there are matches.
+      if (body && filteredCount === 0) {
+        let msg = 'No issues found.';
+        if (state.issuesFilter === 'error') msg = 'No errors found.';
+        else if (state.issuesFilter === 'warning') msg = 'No warnings found.';
+        body.textContent = '';
+        const emptyState = document.createElement('div');
+        emptyState.className = 'empty-state';
+        emptyState.textContent = msg;
+        body.appendChild(emptyState);
+      }
+    } else {
+      // No files loaded: show welcome screen
+      if (header) header.style.display = 'none';
+      if (welcome) welcome.style.display = 'flex';
+    }
+    updateUI();
+    saveToStorage();
   });
 });
 
@@ -2617,6 +3336,7 @@ async function init() {
 // DATA TYPE NAVIGATION
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 function showDataType(name, preferredType) {
   // Save current state to history BEFORE switching
   if (state.selectedItem) {
@@ -2681,12 +3401,18 @@ function goBack() {
   // If we're in datatypes or appspaces tab, just pop the last entry
   if (currentTabNow === 'datatypes' || currentTabNow === 'appspaces') {
     prev = state.history.pop();
-    if (!prev || !prev.selected) { document.getElementById('backBtn').style.display = 'none'; saveToStorage(); return; }
+    if (!prev) { document.getElementById('backBtn').style.display = 'none'; saveToStorage(); return; }
     
     if (currentTabNow === 'datatypes') {
+      // Use prev.subTab for Issues tab (subtab = 'all'/'error'/'warning')
+      // Use prev.selected.type for DataTypes tab (subtab = 'basic'/'simple'/etc.)
+      let subTab = prev.selected?.type;
+      if (prev.tab === 'issues') {
+        subTab = prev.subTab || 'all';
+      }
       restoreState = {
         tab: prev.tab || 'datatypes',
-        subTab: prev.selected.type,
+        subTab: subTab || 'basic',
         selected: prev.selected
       };
     } else if (currentTabNow === 'appspaces') {
@@ -2699,7 +3425,7 @@ function goBack() {
   } else {
     // For other tabs, try to find an entry with the same tab first (for going back within same tab)
     // Otherwise find an entry with a different tab
-    const validTabs = ['modules', 'objects', 'interactions', 'dims', 'trans', 'notes', 'switches', 'tags', 'time', 'datatypes', 'appspaces'];
+    const validTabs = ['modules', 'objects', 'interactions', 'dims', 'trans', 'notes', 'switches', 'tags', 'time', 'datatypes', 'issues', 'appspaces'];
     let sameTabEntry = null;
     let diffTabEntry = null;
     
@@ -2708,7 +3434,7 @@ function goBack() {
     // First pass: look for same-tab entry
     for (let i = state.history.length - 1; i >= 0; i--) {
       const entry = state.history[i];
-      if (entry && entry.selected && entry.tab && validTabs.includes(entry.tab) && entry.tab === currentTabNow) {
+      if (entry && entry.tab && validTabs.includes(entry.tab) && entry.tab === currentTabNow) {
         sameTabEntry = entry;
         break;
       }
@@ -2718,7 +3444,7 @@ function goBack() {
     if (!sameTabEntry) {
       for (let i = state.history.length - 1; i >= 0; i--) {
         const entry = state.history[i];
-        if (entry && entry.selected && entry.tab && validTabs.includes(entry.tab) && entry.tab !== currentTabNow) {
+        if (entry && entry.tab && validTabs.includes(entry.tab) && entry.tab !== currentTabNow) {
           diffTabEntry = entry;
           break;
         }
@@ -2760,8 +3486,6 @@ function goBack() {
     };
   }
   
-  const prevTab = restoreState.tab;
-  
   // CRITICAL: Update state.currentTab to the restoreState tab
   state.currentTab = restoreState.tab;
   
@@ -2790,6 +3514,17 @@ function goBack() {
     updateAppspaceTabCount();
   } else {
     document.getElementById('appspaceTabs').style.display = 'none';
+  }
+  
+  // For issues tab, update the sub-tab UI
+  if (restoreState.tab === 'issues') {
+    const issuesTabs = document.getElementById('issuesTabs');
+    issuesTabs.style.display = 'flex';
+    state.issuesFilter = ['all','error','warning'].includes(restoreState.subTab) ? restoreState.subTab : 'all';
+    document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#issuesTabs .subtab[data-subtab="${state.issuesFilter}"]`)?.classList.add('active');
+  } else {
+    document.getElementById('issuesTabs').style.display = 'none';
   }
   
   debugBack('goBack: restoreState: tab=%s, subTab=%s, selected=%o', restoreState.tab, restoreState.subTab, restoreState.selected);
@@ -2834,6 +3569,8 @@ function goBack() {
     // Don't show tree for appspaces
     treeView.innerHTML = '';
     return;
+  } else if (restoreState.tab === 'issues') {
+    treeView.innerHTML = '<div class="tree-wrapper">' + renderIssuesList() + '</div>';
   } else {
     treeView.innerHTML = '<div class="tree-wrapper">' + renderDataTypeList(restoreState.subTab) + '</div>';
   }
@@ -2843,12 +3580,36 @@ function goBack() {
     item.addEventListener('click', () => {
       treeView.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
       item.classList.add('selected');
+      item.scrollIntoView({ block: 'nearest' });
+      // Handle issues tab specially — they use showIssueDetail, not showDetail
+      if (state.currentTab === 'issues') {
+        if (state.selectedItem) {
+          state.history.push({
+            tab: state.currentTab,
+            subTab: state.issuesFilter || 'all',
+            selected: { ...state.selectedItem },
+            detail: document.getElementById('detailHeader').style.display
+          });
+          document.getElementById('backBtn').style.display = 'inline-block';
+        }
+        showIssueDetail(item.dataset.issueId);
+        return;
+      }
       const name = item.dataset.name;
       const type = item.dataset.type || (state.currentTab === 'datatypes' ? state.currentSubTab : state.currentTab === 'objects' ? 'object' : state.currentTab === 'interactions' ? 'interaction' : state.currentTab);
       showDetail(name, type, true);
     });
   });
   
+  // If no item was selected (e.g., restoring to an empty Issues subtab), skip selection/detail
+  if (!restoreState.selected) {
+    document.getElementById('detailHeader').style.display = 'none';
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
+    saveToStorage();
+    return;
+  }
+
   // Select item in tree
   const escapedName = restoreState.selected.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const selectedItem = treeView.querySelector(`.tree-item[data-name="${escapedName}"]`);
@@ -2872,6 +3633,10 @@ state.selectedItem = restoreState.selected;
     const file = state.files.find(f => f.name === restoreState.selected.name);
     itemData = file;
     source = '';
+  } else if (restoreState.selected.type === 'issue') {
+    document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
+    showIssueDetail(restoreState.selected.name);
+    return;
   } else if (restoreState.selected.type === 'object') {
     itemData = state.mergedFOM.objectClasses?.find(c => c.name === restoreState.selected.name);
     source = itemData?._source || '';
@@ -2930,6 +3695,60 @@ state.selectedItem = restoreState.selected;
   saveToStorage();
 }
 
+// Issue location click delegation
+document.addEventListener('click', (e) => {
+  // Source module click → navigate to module detail
+  const sourceEl = e.target.closest('.source-module-item');
+  if (sourceEl) {
+    const moduleName = sourceEl.dataset.source;
+    const file = state.files.find(f => f.name === moduleName);
+    if (file) {
+      showModuleDetails(file, true);
+    }
+    return;
+  }
+
+  const loc = e.target.closest('.location-item');
+  if (loc) {
+    navigateToLocation({
+      tab: loc.dataset.tab,
+      subTab: loc.dataset.subtab || '',
+      itemName: loc.dataset.item
+    });
+    return;
+  }
+
+  const issueLink = e.target.closest('.related-issue');
+  if (issueLink) {
+    state.history.push({
+      tab: state.currentTab,
+      subTab: state.currentSubTab,
+      selected: state.selectedItem ? { ...state.selectedItem } : null,
+      detail: 'block'
+    });
+    state.currentTab = 'issues';
+    // Show issues subtab bar and hide DataTypes/Appspace subtab bars
+    document.getElementById('issuesTabs').style.display = 'flex';
+    document.getElementById('dataTypeTabs').style.display = 'none';
+    document.getElementById('appspaceTabs').style.display = 'none';
+    // Set subtab active state
+    const validFilters = ['all', 'error', 'warning'];
+    if (!state.issuesFilter || !validFilters.includes(state.issuesFilter)) {
+      state.issuesFilter = 'all';
+    }
+    document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+    const activeSubtab = document.querySelector(`#issuesTabs .subtab[data-subtab="${state.issuesFilter}"]`);
+    if (activeSubtab) activeSubtab.classList.add('active');
+    state.selectedItem = { name: issueLink.dataset.issueId, type: 'issue' };
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const issuesBtn = document.querySelector('.tab-btn[data-tab="issues"]');
+    if (issuesBtn) issuesBtn.classList.add('active');
+    updateUI();
+    showIssueDetail(issueLink.dataset.issueId);
+    document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
+  }
+});
+
 document.getElementById('backBtn').addEventListener('click', () => {
   goBack();
 });
@@ -2944,6 +3763,8 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     state.currentSubTab = 'basic';
     clearStorage();
     updateUI();
+    state.issues = [];
+    updateIssuesTabVisibility();
     document.getElementById('detailHeader').style.display = 'none';
     document.getElementById('detailBody').innerHTML = '';
     document.getElementById('welcomeScreen').style.display = 'flex';
@@ -2954,6 +3775,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
 // TAB SCROLLING
 // ============================================================================
 
+// eslint-disable-next-line no-unused-vars
 function scrollTabs(amount) {
   const container = document.getElementById('tabScrollContainer');
   if (container) container.scrollLeft += amount;
@@ -2989,13 +3811,10 @@ function setupTabScroll() {
 function parseAppspaceFile(content) {
   const lines = content.split('\n');
   const entries = [];
-  let lineCount = 0;
-  let parsedCount = 0;
   
   lines.forEach(line => {
     line = line.trim();
     if (!line || line.startsWith('#')) return;
-    lineCount++;
     
     const parts = line.split('|');
     if (parts.length !== 2) return;
@@ -3004,7 +3823,6 @@ function parseAppspaceFile(content) {
     const apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
     
     if (className && apps.length > 0) {
-      parsedCount++;
       entries.push({ className, apps });
     }
   });
@@ -3051,7 +3869,6 @@ function findAppspaceForClass(className, type) {
 function setupAppspaceButtons() {
   const loadBtn = document.getElementById('loadAppspaceBtn');
   const clearBtn = document.getElementById('clearAppspaceBtn');
-  const exportSep = document.getElementById('exportAppspaceSeparator');
   const appspaceSep = document.getElementById('appspaceSeparator');
   
   // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
@@ -3245,6 +4062,7 @@ HLAinteractionRoot.Warfare|SIM_APP`;
 }
 
 // Copy appspace example to clipboard
+// eslint-disable-next-line no-unused-vars
 async function copyAppspaceExample() {
   const example = document.getElementById('appspaceExample').textContent;
   await navigator.clipboard.writeText(example);
@@ -3281,6 +4099,7 @@ function showToast(message) {
 }
 
 // Download sample appspace file
+// eslint-disable-next-line no-unused-vars
 function downloadAppspaceSample() {
   const content = `# Application Space Mapping File
 # Format: ClassName|app1,app2,app3
@@ -3440,12 +4259,12 @@ try {
 }
 
 // Ensure DOM is ready before setting up appspace buttons
+function doSetup() {
+  setupAppspaceButtons();
+  loadAppspaceFromStorage();
+}
+
 try {
-  function doSetup() {
-    setupAppspaceButtons();
-    loadAppspaceFromStorage();
-  }
-  
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', doSetup);
   } else {

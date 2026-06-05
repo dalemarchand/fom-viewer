@@ -11,6 +11,8 @@ A single-page HTML viewer for IEEE 1516 compliant Federation Object Model (FOM) 
 - **Light/Dark theme**: Toggle between themes with CSS custom properties
 - **Multiple FOM support**: Load and merge multiple FOM files with dependency resolution
 - **Appspace support**: Load custom appspace definitions for object/interaction classification
+- **Validation Engine**: Automatic detection of cross-module conflicts, missing references, and consistency issues with categorized issue reporting
+- **Bidirectional Linking**: Clickable navigation from issues to affected items and from detail views to related issues
 - **Export functionality**: Export merged FOM data
 
 ## Quick Start
@@ -46,8 +48,8 @@ Open `fom-viewer.html` directly in a browser, or serve it from any web server.
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `src/main.js` | Main application logic, FOM parser, UI management | ~3508 |
-| `src/styles.css` | CSS styles with light/dark theme support | ~532 |
+| `src/main.js` | Main application logic, FOM parser, UI management, validation engine | ~4248 |
+| `src/styles.css` | CSS styles with light/dark theme support | ~540 |
 
 ### Core Components
 
@@ -64,8 +66,8 @@ Parses IEEE 1516 FOM XML files and extracts:
 - **Tags**: Data type tags
 - **Time**: Timestamp and lookahead settings
 
-#### State Management (`src/main.js:12-32`)
-Central `state` object manages application state including loaded files, merged FOM data, current tab/subtab, selection, sort order, navigation history, and appspace data.
+#### State Management (`src/main.js:12-34`)
+Central `state` object manages application state including loaded files, merged FOM data, current tab/subtab, selection, sort order, navigation history, issues/validation data, and appspace data.
 
 #### UI Tabs
 - **Modules**: FOM file modules
@@ -78,6 +80,7 @@ Central `state` object manages application state including loaded files, merged 
 - **Switches**: Switches
 - **Tags**: Tags
 - **Time**: Time management
+- **Issues**: Validation issues with All/Errors/Warnings filter (sub-tabs)
 - **Appspaces**: Appspace objects, interactions, unknown (sub-tabs)
 
 ## Testing
@@ -237,8 +240,8 @@ The HTML file can be:
 ```
 fom-viewer/
 ├── src/
-│   ├── main.js          # Main application logic (~3508 lines)
-│   └── styles.css       # CSS styles (~532 lines)
+│   ├── main.js          # Main application logic, validation engine (~4248 lines)
+│   └── styles.css       # CSS styles (~540 lines)
 ├── scripts/
 │   └── build.js        # Build script
 ├── test/
@@ -288,6 +291,53 @@ Appspaces allow loading custom FOM appspace definitions that classify objects an
 - **Objects**: Classified objects
 - **Interactions**: Classified interactions with matched classes
 - **Unknown**: Unclassified items
+
+## Validation Engine
+
+The application includes a built-in validation engine that automatically detects issues across loaded FOM modules. Issues are surfaced via the **Issues** tab and as **Related Issues** sections in detail views.
+
+### Issue Model
+
+Each issue has the following structure:
+
+```javascript
+{
+  id: 'iss-001',                          // Unique identifier
+  severity: 'error' | 'warning',          // Severity level
+  category: 'load-conflict' | 'consistency' | 'parse-error',
+  type: 'fixed-field-mismatch' | 'enum-value-conflict' | 'variant-mismatch'
+        | 'class-sharing' | 'interaction-sharing' | 'transport-semantics'
+        | 'switch-value' | 'time-config' | 'missing-dimension'
+        | 'missing-transport' | 'missing-dataType' | 'missing-dependency'
+        | 'circular-dependency' | 'parse-error',
+  message: string,                         // Short human-readable summary
+  detail: string,                         // Extended description
+  sources: string[],                      // Affected module names
+  locations: [{ tab, subTab, itemName }]  // Navigable references to related items
+}
+```
+
+### Issue Categories
+
+| Category | Description |
+|----------|-------------|
+| **Module Conflicts** | Structural mismatches between modules: fixed-record field counts, enum values, variant alternatives, class sharing conflicts, transportation semantics, switch values, time configuration |
+| **Cross-Reference Errors** | Missing references: dimensions, transportations, data types, module dependencies, circular dependencies |
+| **Parse Errors** | FOM files that failed to parse |
+
+### Issues Tab
+
+The **Issues** tab displays all validation issues organized by category. Filter subtabs allow viewing all issues, only errors, or only warnings. Each issue shows its severity icon, message, and source modules. Clicking an issue reveals full details with navigable links to related items.
+
+### Bidirectional Linking
+
+- **Issue → Item**: Click a location link in the issue detail view to navigate directly to the affected tab and item (supports data types, object classes, interaction classes, modules, dimensions, and transportations)
+- **Item → Issues**: Detail views for any item automatically show a **Related Issues** section listing all issues that reference that item
+- Selected issues are highlighted in the tree sidebar and scrolled into view
+
+### Red-Text Migration
+
+Inline `style="color:red"` spans for unresolved references (e.g., missing module dependencies, unresolved data type values) have been migrated to a CSS class `missing-item` using the `--danger` CSS custom property for consistent theming across light and dark modes.
 
 ## Theme Support
 

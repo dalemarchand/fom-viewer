@@ -1,0 +1,5 @@
+# Sample appspace for testing - All unknown entries
+# These should not match any known FOM classes
+CustomDomain.CustomObject|CustomApp
+Some.Other.Namespace.Class|OtherApp
+Unknown.System|SystemApp

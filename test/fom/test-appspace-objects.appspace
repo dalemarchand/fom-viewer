@@ -1,0 +1,8 @@
+# Sample appspace for testing - Object class matches
+# These use right-side matching against RPR FOM classes
+Aircraft|TestApp1,TestApp2
+Platform|PlatformViewer
+PhysicalEntity.Platform.AmphibiousVehicle|AmphibiousMonitor
+GroundVehicle|GroundTracker
+PhysicalEntity.Platform.Aircraft|AircraftMonitor
+BaseEntity.PhysicalEntity|EntityViewer

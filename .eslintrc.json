@@ -1,8 +1,10 @@
 {
   "env": {
     "node": true,
-    "es2021": true
+    "es2021": true,
+    "browser": true
   },
+  "ignorePatterns": ["*.css"],
   "extends": "eslint:recommended",
   "parserOptions": {
     "ecmaVersion": "latest"

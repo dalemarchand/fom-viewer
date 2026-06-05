@@ -1,0 +1,15 @@
+# Sample appspace for testing - Mixed object, interaction, and unknown entries
+# Object class matches (right-side match against RPR-Physical classes)
+Aircraft|RadarDisplay,WeaponSystem
+Platform|PlatformTracker
+PhysicalEntity.Platform.AmphibiousVehicle|AmphibiousControl
+
+# Interaction class matches (right-side match against loaded FOM files)
+# Collision from RPR-Physical, RadioSignal from RPR-Communication, IFFEmission from RPR-DER
+Collision|CollisionLogger
+RadioSignal|RadioMonitor
+IFFEmission|IFFTracker
+
+# Unknown entries (no match expected)
+CustomClass.SomeObject|UnknownApp1
+TotallyFake.ClassName|FakeApp
