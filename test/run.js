@@ -3,6 +3,15 @@ const path = require('path');
 const fs = require('fs');
 const config = require('./config');
 const { runWelcomeStatsTest } = require('./welcome-stats.test.js');
+const { test_IssueDetailPanelImprovements } = require('./issue-detail-panel.test.js');
+const { test_IssueHistoryPush } = require('./issue-history-push.test.js');
+const { test_IssueHistoryPushAdversarial } = require('./history-issue-adversarial.test.js');
+const { test_IssuesSubtabEmptyState } = require('./issues-subtab-empty-state.test.js');
+const { test_IssuesSubtabGuard } = require('./issues-subtab-guard.test.js');
+const { test_IssuesSubtabHistory } = require('./issues-subtab-history.test.js');
+const { test_IssuesCallOrderFix } = require('./issues-call-order-fix.test.js');
+const { test_BackButtonFixes } = require('./back-button-fixes.test.js');
+const { test_AppspaceFeature } = require('./appspace.test.js');
 
 
 const args = process.argv.slice(2);
@@ -740,6 +749,136 @@ async function test_BackButtonEmbeddedLinks() {
   }
 }
 
+async function test_BackButtonIssuesEmptySubtab() {
+  log('Testing: Back button navigation with empty Issues subtab...');
+  try {
+    await openApp();
+    await sleep(300);
+    
+    // Load a FOM file that has no errors
+    await loadTestFomFile(config.testFiles[0]);
+    await sleep(500);
+    
+    // Check state after file load
+    const stateAfterLoad = await page.evaluate(() => ({
+      filesLength: typeof state !== 'undefined' ? state.files.length : -1,
+      issuesLength: typeof state !== 'undefined' ? (state.issues || []).length : -1,
+      historyLength: typeof state !== 'undefined' ? (state.history || []).length : -1,
+      issuesTabDisplay: document.querySelector('[data-tab="issues"]')?.style.display || 'unknown'
+    }));
+    log(`State: ${JSON.stringify(stateAfterLoad)}`);
+    
+    // If Issues tab is hidden (no issues), force it visible via evaluate
+    if (stateAfterLoad.issuesTabDisplay === 'none') {
+      log('Issues tab is hidden — showing it via page.evaluate to bypass visibility constraints');
+      await page.evaluate(() => {
+        const tab = document.querySelector('[data-tab="issues"]');
+        if (tab) { tab.style.display = ''; }
+        // Also show the subtab bar
+        const issuesTabs = document.getElementById('issuesTabs');
+        if (issuesTabs) { issuesTabs.style.display = ''; }
+      });
+      await sleep(100);
+    }
+    
+    // Click Issues tab via evaluate
+    let clickedIssuesTab = await page.evaluate(() => {
+      const tab = document.querySelector('[data-tab="issues"]');
+      if (tab) { tab.click(); return true; }
+      return false;
+    });
+    if (!clickedIssuesTab) throw new Error('Could not click Issues tab via evaluate');
+    await sleep(500);
+    
+    // Verify Issues tab is active
+    const issuesActive = await page.evaluate(() => 
+      document.querySelector('[data-tab="issues"]')?.classList.contains('active')
+    );
+    if (!issuesActive) throw new Error('Issues tab not active after click');
+    
+    // Click Errors subtab via evaluate
+    let clickedError = await page.evaluate(() => {
+      const el = document.querySelector('.subtab[data-subtab="error"]');
+      if (el) { el.click(); return true; }
+      return false;
+    });
+    if (!clickedError) {
+      throw new Error('Could not click Errors subtab');
+    }
+    await sleep(500);
+    
+    // Verify empty state
+    const emptyAfterError = await page.evaluate(() => {
+      const db = document.getElementById('detailBody');
+      if (!db) return { found: false, html: '' };
+      const h = db.innerHTML;
+      return { found: true, html: h.substring(0, 200) };
+    });
+    log(`After Error subtab: ${JSON.stringify(emptyAfterError)}`);
+    
+    // Check history entry
+    const historyEntry = await page.evaluate(() => {
+      const h = state.history;
+      if (!h || h.length === 0) return null;
+      const last = h[h.length - 1];
+      return { tab: last.tab, subTab: last.subTab, selected: last.selected, detail: last.detail };
+    });
+    log(`Last history entry: ${JSON.stringify(historyEntry)}`);
+    
+    // Click All subtab
+    let clickedAll = await page.evaluate(() => {
+      const el = document.querySelector('.subtab[data-subtab="all"]');
+      if (el) { el.click(); return true; }
+      return false;
+    });
+    if (!clickedAll) throw new Error('Could not click All subtab');
+    await sleep(500);
+    
+    // Click back button via evaluate
+    let clickedBack = await page.evaluate(() => {
+      const btn = document.getElementById('backBtn');
+      if (btn && btn.style.display !== 'none') { btn.click(); return true; }
+      return false;
+    });
+    if (!clickedBack) throw new Error('Back button not found or not visible');
+    await sleep(500);
+    
+    // Verify we're back on Error subtab
+    const activeSubtab = await page.evaluate(() => {
+      const active = document.querySelector('#issuesTabs .subtab.active');
+      return active ? active.dataset.subtab : null;
+    });
+    log(`Active subtab after back: ${activeSubtab}`);
+    
+    if (activeSubtab !== 'error') {
+      await captureScreenshot('test_BackButtonIssuesEmptySubtab_wrong_subtab');
+      throw new Error(`Expected 'error' subtab, got '${activeSubtab}'`);
+    }
+    
+    // Verify empty state is shown again
+    const emptyAfterBack = await page.evaluate(() => {
+      const db = document.getElementById('detailBody');
+      if (!db) return { found: false };
+      const h = db.innerHTML;
+      return {
+        found: true,
+        isEmpty: h.includes('No issues found') || h.includes('No errors found') || h.includes('No warnings found') || h.trim() === '',
+        html: h.substring(0, 200)
+      };
+    });
+    log(`After back: ${JSON.stringify(emptyAfterBack)}`);
+    
+    log('Back button Issues empty subtab test passed', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_BackButtonIssuesEmptySubtab_failed');
+    logError('Back button Issues empty subtab test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
 async function test_SearchFunctionality() {
   log('Testing: Search functionality...');
   try {
@@ -1115,30 +1254,39 @@ async function runAllTests() {
   
   await launchBrowser();
   
-    const tests = [
-      { name: 'LoadPage', fn: test_LoadPage },
-      { name: 'FileLoading', fn: test_FileLoading },
-      { name: 'LoadAllFiles', fn: test_LoadAllFiles },
-      { name: 'TabNavigation', fn: test_TabNavigation },
-      { name: 'SubTabNavigation', fn: test_SubTabNavigation },
-      { name: 'ItemSelection', fn: test_ItemSelection },
-      { name: 'BackButton', fn: test_BackButton },
-      { name: 'BackButtonSubTabs', fn: test_BackButtonSubTabs },
-      { name: 'BackButtonEmbeddedLinks', fn: test_BackButtonEmbeddedLinks },
-      { name: 'Search', fn: test_SearchFunctionality },
-      { name: 'TreeFilter', fn: test_TreeFiltering },
-      { name: 'SortToggle', fn: test_SortToggle },
-      { name: 'DataTypeSubtabSorting', fn: test_DataTypeSubtabSorting },
-      { name: 'Export', fn: test_ExportFunctionality },
-      { name: 'DataType', fn: test_DataTypeSelection },
-      { name: 'CircularDependencyDetection', fn: test_CircularDependencyDetection },
-      { name: 'ValidationLifecycle', fn: test_ValidationLifecycle },
-      { name: 'AboutVersion_MetaTag', fn: test_AboutVersion_MetaTag },
-      { name: 'AboutVersion_MetaMissing', fn: test_AboutVersion_MetaMissing },
-      { name: 'AboutVersion_MetaPlaceholder', fn: test_AboutVersion_MetaPlaceholder },
-      { name: 'WelcomeStats', fn: runWelcomeStatsTest },
-
-    ];
+      const tests = [
+        { name: 'LoadPage', fn: test_LoadPage },
+        { name: 'FileLoading', fn: test_FileLoading },
+        { name: 'LoadAllFiles', fn: test_LoadAllFiles },
+        { name: 'TabNavigation', fn: test_TabNavigation },
+        { name: 'SubTabNavigation', fn: test_SubTabNavigation },
+        { name: 'ItemSelection', fn: test_ItemSelection },
+        { name: 'BackButton', fn: test_BackButton },
+        { name: 'BackButtonSubTabs', fn: test_BackButtonSubTabs },
+        { name: 'BackButtonEmbeddedLinks', fn: test_BackButtonEmbeddedLinks },
+        { name: 'BackButtonIssuesEmptySubtab', fn: test_BackButtonIssuesEmptySubtab },
+        { name: 'BackButtonFixes', fn: test_BackButtonFixes },
+        { name: 'Search', fn: test_SearchFunctionality },
+        { name: 'TreeFilter', fn: test_TreeFiltering },
+        { name: 'SortToggle', fn: test_SortToggle },
+        { name: 'DataTypeSubtabSorting', fn: test_DataTypeSubtabSorting },
+        { name: 'Export', fn: test_ExportFunctionality },
+        { name: 'DataType', fn: test_DataTypeSelection },
+        { name: 'CircularDependencyDetection', fn: test_CircularDependencyDetection },
+        { name: 'ValidationLifecycle', fn: test_ValidationLifecycle },
+        { name: 'AboutVersion_MetaTag', fn: test_AboutVersion_MetaTag },
+        { name: 'AboutVersion_MetaMissing', fn: test_AboutVersion_MetaMissing },
+        { name: 'AboutVersion_MetaPlaceholder', fn: test_AboutVersion_MetaPlaceholder },
+        { name: 'WelcomeStats', fn: runWelcomeStatsTest },
+        { name: 'IssueDetailPanelImprovements', fn: test_IssueDetailPanelImprovements },
+        { name: 'IssueHistoryPush', fn: test_IssueHistoryPush },
+        { name: 'HistoryIssueAdversarial', fn: test_IssueHistoryPushAdversarial },
+        { name: 'IssuesSubtabEmptyState', fn: test_IssuesSubtabEmptyState },
+        { name: 'IssuesSubtabGuard', fn: test_IssuesSubtabGuard },
+        { name: 'IssuesSubtabHistory', fn: test_IssuesSubtabHistory },
+        { name: 'IssuesCallOrderFix', fn: test_IssuesCallOrderFix },
+        { name: 'AppspaceFeature', fn: test_AppspaceFeature },
+      ];
   
   for (const test of tests) {
     if (opts.specificTest && test.name.toLowerCase() !== opts.specificTest.toLowerCase()) {

@@ -177,7 +177,7 @@ async function loadFromStorage() {
       if (state.files.length > 0) {
         const sorted = topologicalSort(state.files);
         state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: mergeDataTypes(sorted), transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
-        updateUI(); validate(); updateIssuesTabVisibility();
+        validate(); updateUI(); updateTabCounts(); updateIssuesTabVisibility();
         if (state.selectedItem) {
           const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
           setTimeout(() => {
@@ -950,10 +950,19 @@ function _checkConflicts() {
       const src = file?.objectClasses?.find(c => c.name === cls.name);
       return src?.attributes?.length || 0;
     });
-    if (new Set(counts).size > 1) {
+    const nonZeroCounts = counts.filter(c => c > 0);
+    if (nonZeroCounts.length >= 2 && new Set(nonZeroCounts).size > 1) {
+      const perSourceDetails = sources.map((s, i) => {
+        const file = files.find(f => f.name === s);
+        const src = file?.objectClasses?.find(c => c.name === cls.name);
+        const attrNames = src?.attributes?.map(a => a.name) || [];
+        const visibleText = `${s}: ${counts[i]} attributes`;
+        const tooltipText = attrNames.length > 0 ? attrNames.join(', ') : '';
+        return tooltipText ? `${visibleText}||${tooltipText}` : visibleText;
+      }).join('; ');
       state.issues.push(makeIssue('warning', 'load-conflict', 'object-attributes',
         `Object class "${cls.name}" has different attribute counts across modules`,
-        counts.map((c, i) => `${sources[i]}: ${c} attributes`).join('; '),
+        perSourceDetails,
         [...sources],
         [{ tab: 'objects', subTab: '', itemName: cls.name }]
       ));
@@ -970,10 +979,19 @@ function _checkConflicts() {
       const src = file?.interactionClasses?.find(c => c.name === cls.name);
       return src?.parameters?.length || 0;
     });
-    if (new Set(counts).size > 1) {
+    const nonZeroCounts = counts.filter(c => c > 0);
+    if (nonZeroCounts.length >= 2 && new Set(nonZeroCounts).size > 1) {
+      const perSourceDetails = sources.map((s, i) => {
+        const file = files.find(f => f.name === s);
+        const src = file?.interactionClasses?.find(c => c.name === cls.name);
+        const paramNames = src?.parameters?.map(p => p.name) || [];
+        const visibleText = `${s}: ${counts[i]} parameters`;
+        const tooltipText = paramNames.length > 0 ? paramNames.join(', ') : '';
+        return tooltipText ? `${visibleText}||${tooltipText}` : visibleText;
+      }).join('; ');
       state.issues.push(makeIssue('warning', 'load-conflict', 'interaction-parameters',
         `Interaction class "${cls.name}" has different parameter counts across modules`,
-        counts.map((c, i) => `${sources[i]}: ${c} parameters`).join('; '),
+        perSourceDetails,
         [...sources],
         [{ tab: 'interactions', subTab: '', itemName: cls.name }]
       ));
@@ -1982,11 +2000,38 @@ function showIssueDetail(issueId) {
     </div>`;
   }
 
+  // Build detail items (non-bullet list)
+  let detailHtml = '';
+  if (issue.detail) {
+    const items = issue.detail.split('; ');
+    detailHtml = '<div class="detail-list">';
+    items.forEach(item => {
+      const parts = item.split('||');
+      const visibleText = parts[0];
+      const tooltipText = parts[1] || '';
+      detailHtml += tooltipText
+        ? `<div class="detail-list-item" title="${tooltipText.replace(/"/g, '&quot;')}">${visibleText}</div>`
+        : `<div class="detail-list-item">${visibleText}</div>`;
+    });
+    detailHtml += '</div>';
+  }
+
+  // Build source modules list (clickable, non-bullet)
+  let sourcesHtml = '';
+  if (issue.sources?.length) {
+    sourcesHtml = '<div class="source-module-list"><p class="source-module-heading"><strong>Source Modules:</strong></p>';
+    issue.sources.forEach(s => {
+      const escapedName = s.replace(/"/g, '&quot;');
+      sourcesHtml += `<div class="source-module-item" data-source="${escapedName}">${s}</div>`;
+    });
+    sourcesHtml += '</div>';
+  }
+
   body.innerHTML = `
     <div class="detail-section">
       <h3 style="margin-bottom:8px;">${issue.severity === 'error' ? '❗ Error' : '⚠️ Warning'}: ${issue.message}</h3>
-      ${issue.detail ? `<p style="margin-bottom:12px;line-height:1.5;">${issue.detail}</p>` : ''}
-      ${issue.sources?.length ? `<p style="margin-bottom:6px;color:var(--text-muted);font-size:13px;"><strong>Source Modules:</strong></p><ul style="margin:0 0 12px 0;padding-left:20px;color:var(--text-muted);font-size:13px;">${issue.sources.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
+      ${detailHtml}
+      ${sourcesHtml}
       ${issue.type ? `<p style="margin-bottom:4px;color:var(--text-muted);font-size:12px;"><strong>Category:</strong> ${issue.category} / ${issue.type}</p>` : ''}
       ${locationsHtml}
       <p style="margin-top:16px;color:var(--text-muted);font-size:11px;border-top:1px solid var(--border);padding-top:8px;">Issue ID: ${issue.id}</p>
@@ -2485,7 +2530,19 @@ function updateUI() {
       item.classList.add('selected');
       const name = item.dataset.name;
       if (state.currentTab === 'modules') { const file = state.files.find(f => f.name === name); if (file) showModuleDetails(file, true); return; }
-      if (state.currentTab === 'issues') { showIssueDetail(item.dataset.issueId); return; }
+      if (state.currentTab === 'issues') {
+        if (state.selectedItem) {
+          state.history.push({
+            tab: state.currentTab,
+            subTab: state.issuesFilter || 'all',
+            selected: { ...state.selectedItem },
+            detail: document.getElementById('detailHeader').style.display
+          });
+          document.getElementById('backBtn').style.display = 'inline-block';
+        }
+        showIssueDetail(item.dataset.issueId);
+        return;
+      }
       const type = item.dataset.type || (state.currentTab === 'datatypes' ? state.currentSubTab : state.currentTab === 'objects' ? 'object' : state.currentTab === 'dims' ? 'dims' : state.currentTab === 'trans' ? 'trans' : state.currentTab === 'notes' ? 'notes' : state.currentTab === 'switches' ? 'switches' : state.currentTab === 'tags' ? 'tags' : state.currentTab === 'time' ? 'time' : 'interaction');
       showDetail(name, type, true);
     });
@@ -2832,7 +2889,7 @@ function removeFile(index) {
     state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: mergeDataTypes(sorted), transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) }; 
   }
   else { state.mergedFOM = null; }
-  saveToStorage(); updateUI(); validate(); updateIssuesTabVisibility();
+  saveToStorage(); validate(); updateUI(); updateIssuesTabVisibility();
 }
 
 document.getElementById('fileInput').addEventListener('change', e => {
@@ -2877,7 +2934,9 @@ document.querySelectorAll('.tab').forEach(tab => {
     const prevSelected = state.selectedItem;
 
     if (state.currentTab !== tab.dataset.tab) { 
-      if (prevDetailShowing) {
+      // Always preserve tab state when leaving a tab with subtabs (datatypes, issues, appspaces)
+      // so back-button restores the correct subtab even when detail panel is hidden
+      if (prevDetailShowing || ['issues', 'appspaces', 'datatypes'].includes(prevTab)) {
         debugBack('tab click: prevTab=%s, prevSelected=%s', prevTab, prevSelected ? prevSelected.name + '/' + prevSelected.type : 'null');
         const historySubTab = prevTab === 'appspaces' ? state.appspaceSubTab : prevTab === 'issues' ? state.issuesFilter : prevSubTab;
         state.history.push({ tab: prevTab, subTab: historySubTab, selected: prevSelected, detail: 'block' });
@@ -2897,6 +2956,17 @@ document.querySelectorAll('.tab').forEach(tab => {
       }
       document.querySelectorAll('#dataTypeTabs .subtab').forEach(t => t.classList.remove('active'));
       const activeSubtab = document.querySelector(`#dataTypeTabs .subtab[data-subtab="${state.currentSubTab}"]`);
+      if (activeSubtab) activeSubtab.classList.add('active');
+    }
+    
+    // Handle Issues tab - ensure a subtab is selected BEFORE updateUI
+    if (state.currentTab === 'issues') {
+      const validFilters = ['all', 'error', 'warning'];
+      if (!state.issuesFilter || !validFilters.includes(state.issuesFilter)) {
+        state.issuesFilter = 'all';
+      }
+      document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+      const activeSubtab = document.querySelector(`#issuesTabs .subtab[data-subtab="${state.issuesFilter}"]`);
       if (activeSubtab) activeSubtab.classList.add('active');
     }
     
@@ -2969,6 +3039,8 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 document.querySelectorAll('.subtab').forEach(tab => {
   tab.addEventListener('click', () => {
+    // Skip if this subtab has its own dedicated handler
+    if (tab.closest('#issuesTabs, #appspaceTabs')) return;
     const prevDetailShowing = document.getElementById('detailHeader').style.display !== 'none';
     const prevTab = state.currentTab;
     const prevSubTab = state.currentSubTab;
@@ -3040,15 +3112,55 @@ document.querySelectorAll('#appspaceTabs .subtab').forEach(tab => {
 // Issues subtab click handler
 document.querySelectorAll('#issuesTabs .subtab').forEach(tab => {
   tab.addEventListener('click', () => {
+    // Push to history when switching subtab
+    const prevSubTab = state.issuesFilter;
+    const prevSelected = state.selectedItem;
+
     document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
+
+    if (prevSubTab !== tab.dataset.subtab) {
+      state.history.push({ tab: 'issues', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+    }
+
     state.issuesFilter = tab.dataset.subtab;
     state.selectedItem = null;
     const header = document.getElementById('detailHeader');
     const welcome = document.getElementById('welcomeScreen');
-    if (header && welcome) {
-      header.style.display = 'none';
-      welcome.style.display = 'block';
+    const body = document.getElementById('detailBody');
+    if (state.files && state.files.length > 0) {
+      // Files loaded: hide header and welcome screen
+      if (header) header.style.display = 'none';
+      if (welcome) welcome.style.display = 'none';
+
+      // Count issues matching the current filter
+      let filteredCount = 0;
+      if (state.issues && state.issues.length > 0) {
+        if (state.issuesFilter === 'error') {
+          filteredCount = state.issues.filter(i => i.severity === 'error').length;
+        } else if (state.issuesFilter === 'warning') {
+          filteredCount = state.issues.filter(i => i.severity === 'warning').length;
+        } else {
+          filteredCount = state.issues.length;
+        }
+      }
+
+      // Only show empty-state when zero issues match the filter;
+      // updateUI() will fill the detail body when there are matches.
+      if (body && filteredCount === 0) {
+        let msg = 'No issues found.';
+        if (state.issuesFilter === 'error') msg = 'No errors found.';
+        else if (state.issuesFilter === 'warning') msg = 'No warnings found.';
+        body.textContent = '';
+        const emptyState = document.createElement('div');
+        emptyState.className = 'empty-state';
+        emptyState.textContent = msg;
+        body.appendChild(emptyState);
+      }
+    } else {
+      // No files loaded: show welcome screen
+      if (header) header.style.display = 'none';
+      if (welcome) welcome.style.display = 'flex';
     }
     updateUI();
     saveToStorage();
@@ -3282,12 +3394,18 @@ function goBack() {
   // If we're in datatypes or appspaces tab, just pop the last entry
   if (currentTabNow === 'datatypes' || currentTabNow === 'appspaces') {
     prev = state.history.pop();
-    if (!prev || !prev.selected) { document.getElementById('backBtn').style.display = 'none'; saveToStorage(); return; }
+    if (!prev) { document.getElementById('backBtn').style.display = 'none'; saveToStorage(); return; }
     
     if (currentTabNow === 'datatypes') {
+      // Use prev.subTab for Issues tab (subtab = 'all'/'error'/'warning')
+      // Use prev.selected.type for DataTypes tab (subtab = 'basic'/'simple'/etc.)
+      let subTab = prev.selected?.type;
+      if (prev.tab === 'issues') {
+        subTab = prev.subTab || 'all';
+      }
       restoreState = {
         tab: prev.tab || 'datatypes',
-        subTab: prev.selected.type,
+        subTab: subTab || 'basic',
         selected: prev.selected
       };
     } else if (currentTabNow === 'appspaces') {
@@ -3309,7 +3427,7 @@ function goBack() {
     // First pass: look for same-tab entry
     for (let i = state.history.length - 1; i >= 0; i--) {
       const entry = state.history[i];
-      if (entry && entry.selected && entry.tab && validTabs.includes(entry.tab) && entry.tab === currentTabNow) {
+      if (entry && entry.tab && validTabs.includes(entry.tab) && entry.tab === currentTabNow) {
         sameTabEntry = entry;
         break;
       }
@@ -3319,7 +3437,7 @@ function goBack() {
     if (!sameTabEntry) {
       for (let i = state.history.length - 1; i >= 0; i--) {
         const entry = state.history[i];
-        if (entry && entry.selected && entry.tab && validTabs.includes(entry.tab) && entry.tab !== currentTabNow) {
+        if (entry && entry.tab && validTabs.includes(entry.tab) && entry.tab !== currentTabNow) {
           diffTabEntry = entry;
           break;
         }
@@ -3458,6 +3576,15 @@ function goBack() {
       item.scrollIntoView({ block: 'nearest' });
       // Handle issues tab specially — they use showIssueDetail, not showDetail
       if (state.currentTab === 'issues') {
+        if (state.selectedItem) {
+          state.history.push({
+            tab: state.currentTab,
+            subTab: state.issuesFilter || 'all',
+            selected: { ...state.selectedItem },
+            detail: document.getElementById('detailHeader').style.display
+          });
+          document.getElementById('backBtn').style.display = 'inline-block';
+        }
         showIssueDetail(item.dataset.issueId);
         return;
       }
@@ -3467,6 +3594,15 @@ function goBack() {
     });
   });
   
+  // If no item was selected (e.g., restoring to an empty Issues subtab), skip selection/detail
+  if (!restoreState.selected) {
+    document.getElementById('detailHeader').style.display = 'none';
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
+    saveToStorage();
+    return;
+  }
+
   // Select item in tree
   const escapedName = restoreState.selected.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const selectedItem = treeView.querySelector(`.tree-item[data-name="${escapedName}"]`);
@@ -3491,6 +3627,7 @@ state.selectedItem = restoreState.selected;
     itemData = file;
     source = '';
   } else if (restoreState.selected.type === 'issue') {
+    document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
     showIssueDetail(restoreState.selected.name);
     return;
   } else if (restoreState.selected.type === 'object') {
@@ -3553,6 +3690,17 @@ state.selectedItem = restoreState.selected;
 
 // Issue location click delegation
 document.addEventListener('click', (e) => {
+  // Source module click → navigate to module detail
+  const sourceEl = e.target.closest('.source-module-item');
+  if (sourceEl) {
+    const moduleName = sourceEl.dataset.source;
+    const file = state.files.find(f => f.name === moduleName);
+    if (file) {
+      showModuleDetails(file, true);
+    }
+    return;
+  }
+
   const loc = e.target.closest('.location-item');
   if (loc) {
     navigateToLocation({
@@ -3572,6 +3720,18 @@ document.addEventListener('click', (e) => {
       detail: 'block'
     });
     state.currentTab = 'issues';
+    // Show issues subtab bar and hide DataTypes/Appspace subtab bars
+    document.getElementById('issuesTabs').style.display = 'flex';
+    document.getElementById('dataTypeTabs').style.display = 'none';
+    document.getElementById('appspaceTabs').style.display = 'none';
+    // Set subtab active state
+    const validFilters = ['all', 'error', 'warning'];
+    if (!state.issuesFilter || !validFilters.includes(state.issuesFilter)) {
+      state.issuesFilter = 'all';
+    }
+    document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+    const activeSubtab = document.querySelector(`#issuesTabs .subtab[data-subtab="${state.issuesFilter}"]`);
+    if (activeSubtab) activeSubtab.classList.add('active');
     state.selectedItem = { name: issueLink.dataset.issueId, type: 'issue' };
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     const issuesBtn = document.querySelector('.tab-btn[data-tab="issues"]');

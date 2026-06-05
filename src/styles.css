@@ -12,6 +12,7 @@
   --text-muted: #94a3b8;
   --accent: #667eea;
   --accent-hover: #5a67d8;
+  --accent-dim: #667eea33;
   --accent-light: #e0e7ff;
   --border: #e2e8f0;
   --border-hover: #cbd5e1;
@@ -37,6 +38,7 @@
   --text-muted: #64748b;
   --accent: #3b82f6;
   --accent-hover: #60a5fa;
+  --accent-dim: #3b82f633;
   --accent-light: #1e3a5f;
   --border: #334155;
   --border-hover: #475569;
@@ -539,4 +541,40 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 .missing-item {
   color: var(--danger);
   font-weight: 500;
+}
+
+/* Issue detail list styles */
+.detail-list {
+  margin-bottom: 12px;
+}
+.detail-list-item {
+  padding: 3px 8px;
+  margin: 2px 0;
+  line-height: 1.5;
+  color: var(--text-muted);
+  font-size: 13px;
+  border-left: 2px solid var(--border);
+}
+.detail-list-item:hover {
+  background: var(--bg-secondary);
+}
+
+/* Source module list styles (clickable links) */
+.source-module-heading {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.source-module-item {
+  padding: 4px 8px;
+  margin: 2px 0;
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 13px;
+  border-left: 2px solid var(--accent-dim);
+}
+.source-module-item:hover {
+  text-decoration: underline;
+  background: var(--bg-secondary);
+  color: var(--accent-hover);
 }
