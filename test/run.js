@@ -115,15 +115,18 @@ async function openApp() {
   await page.goto(`file://${htmlPath}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#app');
   // Clear IndexedDB to prevent state leakage from previous tests
-  await page.evaluate(async () => {
+  const clearResult = await page.evaluate(async () => {
     try {
       if (typeof clearStorage === 'function') {
         await clearStorage();
+        return { cleared: true };
       }
+      return { cleared: false, reason: 'clearStorage not available' };
     } catch (e) {
-      console.warn('Failed to clear storage:', e);
+      return { cleared: false, reason: e.message };
     }
   });
+  log(`IndexedDB clear result: ${JSON.stringify(clearResult)}`);
   // Reload with fresh state
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#app');
@@ -808,6 +811,23 @@ async function test_BackButtonIssuesEmptySubtab() {
       document.querySelector('[data-tab="issues"]')?.classList.contains('active')
     );
     if (!issuesActive) throw new Error('Issues tab not active after click');
+    
+    // Diagnostic: check state.issuesFilter after clicking Issues tab
+    const diagAfterIssues = await page.evaluate(() => ({
+      issuesFilter: state.issuesFilter,
+      currentTab: state.currentTab,
+      historyLength: state.history.length
+    }));
+    log(`After Issues tab click: ${JSON.stringify(diagAfterIssues)}`);
+    
+    // Diagnostic: check the state just before clicking Error subtab
+    const diagBeforeError = await page.evaluate(() => ({
+      issuesFilter: state.issuesFilter,
+      currentTab: state.currentTab,
+      historyLength: state.history.length,
+      activeSubtab: document.querySelector('#issuesTabs .subtab.active')?.dataset.subtab || 'none'
+    }));
+    log(`Before Error subtab click: ${JSON.stringify(diagBeforeError)}`);
     
     // Click Errors subtab via evaluate
     let clickedError = await page.evaluate(() => {
