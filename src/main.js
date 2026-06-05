@@ -102,7 +102,6 @@ async function clearStorage() {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
     store.clear();
-    console.log('DEBUG_CLEAR: clearStorage() called successfully');
   } catch (e) { console.warn('Failed to clear IndexedDB:', e); }
 }
 
@@ -2948,14 +2947,7 @@ document.querySelectorAll('.tab').forEach(tab => {
         debugBack('tab click: prevTab=%s, prevSelected=%s, prevDetailShowing=%s', prevTab, prevSelected ? prevSelected.name + '/' + prevSelected.type : 'null', prevDetailShowing);
         const historySubTab = prevTab === 'appspaces' ? state.appspaceSubTab : prevTab === 'issues' ? state.issuesFilter : prevSubTab;
         state.history.push({ tab: prevTab, subTab: historySubTab, selected: prevSelected, detail: 'block' });
-      } else {
-        console.log('DEBUG_TAB: skipping history push. prevTab=%s, prevDetailShowing=%s', prevTab, prevDetailShowing);
       }
-      console.log('DEBUG_TAB: tab click. prevTab=%s, newTab=%s, currentTabBefore=%s, issuesFilter=%s, historyLen=%d',
-        prevTab, tab.dataset.tab, state.currentTab, state.issuesFilter, state.history.length);
-    } else {
-      console.log('DEBUG_TAB: same tab click. tab=%s, issuesFilter=%s, historyLen=%d',
-        tab.dataset.tab, state.issuesFilter, state.history.length);
     }
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentTab = tab.dataset.tab; state.selectedItem = null;
     const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
@@ -3135,18 +3127,10 @@ document.querySelectorAll('#issuesTabs .subtab').forEach(tab => {
     tab.classList.add('active');
     state.issuesFilter = tab.dataset.subtab;
 
-    console.log('DEBUG_ISSUES_SUBTAB: clicked=%s, prevSubTab=%s, historyLength=%d, files=%d',
-      tab.dataset.subtab, prevSubTab, state.history.length, state.files ? state.files.length : -1);
-
     if (prevSubTab !== tab.dataset.subtab) {
-      const entry = { tab: 'issues', subTab: prevSubTab, selected: prevSelected, detail: 'block' };
-      state.history.push(entry);
-      console.log('DEBUG_ISSUES_SUBTAB: pushed history entry', JSON.stringify(entry));
-    } else {
-      console.log('DEBUG_ISSUES_SUBTAB: no push (same subtab)');
+      state.history.push({ tab: 'issues', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
     }
 
-    state.selectedItem = null;
     state.selectedItem = null;
     const header = document.getElementById('detailHeader');
     const welcome = document.getElementById('welcomeScreen');
