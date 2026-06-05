@@ -711,7 +711,14 @@ function mergeClasses(files, type) {
   files.forEach(file => {
     const classes = type === 'object' ? file.objectClasses : file.interactionClasses;
     classes.forEach(c => {
-      if (!map[c.name]) { map[c.name] = { ...c, _sources: [file.name] }; }
+      if (!map[c.name]) {
+        map[c.name] = {
+          ...c,
+          attributes: c.attributes ? [...c.attributes] : undefined,
+          parameters: c.parameters ? [...c.parameters] : undefined,
+          _sources: [file.name]
+        };
+      }
       else { 
         map[c.name]._sources.push(file.name); 
         // Merge unique attributes from all sources
