@@ -2145,6 +2145,33 @@ function navigateToLocation(loc) {
   showDetail(loc.itemName, type, true);
 }
 
+const TYPE_ICONS = {
+  object: '\u{1F4E6}', interaction: '\u{1F4AC}', basic: '\u{1F524}', simple: '\u{1F4DD}',
+  array: '\u{1F4CB}', fixed: '\u{1F4D1}', enum: '\u{1F522}', variant: '\u{1F500}',
+  trans: '\u{1F69A}', switches: '\u{1F518}', tags: '\u{1F3F7}\uFE0F', dims: '\u{1F4D0}',
+  notes: '\u{1F4DD}', time: '\u{23F1}\uFE0F',
+  appspace_object: '\u{1F4E6}', appspace_interaction: '\u{1F4AC}', appspace_unknown: '\u{2753}',
+  module: '\u{1F4C1}', attribute: '\u{1F4C4}', parameter: '\u{1F4C4}',
+  enumerator: '\u{1F522}', field: '\u{1F4CB}', alternative: '\u{1F500}',
+  appspace_app: '\u{1F4E6}'
+};
+
+const GROUP_LABELS = {
+  object: 'Object Classes', interaction: 'Interaction Classes',
+  basic: 'Basic Data Types', simple: 'Simple Data Types',
+  array: 'Array Data Types', fixed: 'Fixed Record Data Types',
+  enum: 'Enumerated Data Types', variant: 'Variant Record Data Types',
+  trans: 'Transportations', switches: 'Switches',
+  tags: 'Tags', dims: 'Dimensions',
+  notes: 'Notes', time: 'Time',
+  appspace_object: 'Appspace Objects', appspace_interaction: 'Appspace Interactions', appspace_unknown: 'Appspace Unknown',
+  module: 'FOM Modules', attribute: 'Object Attributes', parameter: 'Interaction Parameters',
+  enumerator: 'Enumerators', field: 'Fixed Record Fields', alternative: 'Variant Alternatives',
+  appspace_app: 'Appspace Applications'
+};
+
+const GROUP_ORDER = ['module', 'object', 'interaction', 'basic', 'simple', 'array', 'fixed', 'enum', 'variant', 'attribute', 'parameter', 'enumerator', 'field', 'alternative', 'trans', 'switches', 'tags', 'dims', 'notes', 'time', 'appspace_object', 'appspace_interaction', 'appspace_unknown', 'appspace_app'];
+
 function showDetail(name, type, isManualNav = false) {
   // Save current tab before any changes
   const prevTab = state.currentTab;
@@ -2160,7 +2187,8 @@ function showDetail(name, type, isManualNav = false) {
     'switches': 'switches',
     'tags': 'tags',
     'time': 'time',
-    'basic': 'datatypes', 'simple': 'datatypes', 'array': 'datatypes', 'fixed': 'datatypes', 'enum': 'datatypes', 'variant': 'datatypes'
+    'basic': 'datatypes', 'simple': 'datatypes', 'array': 'datatypes', 'fixed': 'datatypes', 'enum': 'datatypes', 'variant': 'datatypes',
+    'appspace_object': 'appspaces', 'appspace_interaction': 'appspaces', 'appspace_unknown': 'appspaces'
   };
   
   const targetTab = typeToTab[type] || type;
@@ -2277,6 +2305,11 @@ function showDetail(name, type, isManualNav = false) {
     item = tagItem || { name }; source = name;
   } else if (type === 'time') {
     item = state.mergedFOM?.time || {}; source = 'Time Configuration';
+  } else if (type === 'appspace_object' || type === 'appspace_interaction' || type === 'appspace_unknown') {
+    const key = type === 'appspace_object' ? 'entries' : type === 'appspace_interaction' ? 'interactions' : 'unknown';
+    const entry = state.appspace?.[key]?.find(e => e.className === name);
+    item = entry || { className: name, apps: [] };
+    source = state.appspace?.fileName || 'Appspace';
   }
   else { item = state.mergedFOM.dataTypes[type]?.find(d => d.name === name); }
   title.textContent = name;
@@ -2313,9 +2346,66 @@ if (type === 'object') {
     }
     parentChain.reverse();
     body.innerHTML = renderDetail(item, type, parentChain);
+  } else if (type === 'appspace_object' || type === 'appspace_interaction' || type === 'appspace_unknown') {
+    // Appspace search result - render the panel and scroll to entry
+    const subTab = type === 'appspace_object' ? 'objects' : type === 'appspace_interaction' ? 'interactions' : 'unknown';
+    state.appspaceSubTab = subTab;
+    document.getElementById('appspaceTabs').style.display = 'flex';
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`#appspaceTabs .subtab[data-subtab="${subTab}"]`)?.classList.add('active');
+    updateAppspaceTabCount();
+    renderAppspacesPanel();
+    setTimeout(() => {
+      const rows = document.querySelectorAll('.appspace-table tr');
+      for (const row of rows) {
+        if (row.textContent.includes(name)) {
+          row.scrollIntoView({ block: 'nearest' });
+          break;
+        }
+      }
+    }, 100);
   } else {
     body.innerHTML = renderDetail(item, type);
   }
+  
+  // Highlight search query text within detail body
+  (function highlightBody() {
+    const searchInput = document.getElementById('globalSearch');
+    const searchQuery = searchInput ? searchInput.value.trim() : '';
+    if (!searchQuery || !body.innerHTML) return;
+    const q = searchQuery.toLowerCase();
+    try {
+      const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+      const nodesToReplace = [];
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (!node.textContent || !node.parentElement) continue;
+        const lower = node.textContent.toLowerCase();
+        let idx = lower.indexOf(q);
+        if (idx === -1) continue;
+        nodesToReplace.push(node);
+        const fragment = document.createDocumentFragment();
+        let remaining = node.textContent;
+        while (idx !== -1) {
+          const before = remaining.substring(0, idx);
+          const match = remaining.substring(idx, idx + searchQuery.length);
+          remaining = remaining.substring(idx + searchQuery.length);
+          if (before) fragment.appendChild(document.createTextNode(before));
+          const mark = document.createElement('mark');
+          mark.className = 'search-highlight';
+          mark.textContent = match;
+          fragment.appendChild(mark);
+          idx = remaining.toLowerCase().indexOf(q);
+        }
+        if (remaining) fragment.appendChild(document.createTextNode(remaining));
+        node.parentNode.replaceChild(fragment, node);
+      }
+      const firstHighlight = body.querySelector('.search-highlight');
+      if (firstHighlight) {
+        firstHighlight.scrollIntoView({ block: 'center' });
+      }
+    } catch(e) { /* silently ignore highlight errors */ }
+  })();
   
   // Highlight selected item in tree after tree is rebuilt
   const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -2329,6 +2419,15 @@ if (type === 'object') {
       selectedItem = document.querySelector(selector);
     }
     if (selectedItem) {
+      let parent = selectedItem.parentElement;
+      while (parent && !parent.classList.contains('tree-wrapper')) {
+        if (parent.classList.contains('tree-children') && parent.classList.contains('collapsed')) {
+          parent.classList.remove('collapsed');
+          const toggle = parent.previousElementSibling?.querySelector('.tree-toggle');
+          if (toggle) { toggle.dataset.expanded = 'true'; toggle.textContent = '▼'; }
+        }
+        parent = parent.parentElement;
+      }
       selectedItem.classList.add('selected');
       selectedItem.scrollIntoView({ block: 'nearest' });
     }
@@ -2469,6 +2568,10 @@ function updateUI() {
     treeView.innerHTML = '';
     if (treeControls) treeControls.style.display = 'none';
     if (sidebar) sidebar.style.display = 'none';
+    document.getElementById('detailHeader').style.display = 'block';
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('detailTitle').textContent = 'Appspaces';
+    document.getElementById('detailMeta').textContent = 'Loaded from ' + (state.appspace?.fileName || 'file');
     renderAppspacesPanel();
     return;
   } else {
@@ -2885,6 +2988,8 @@ async function loadFiles(files) {
     };
     state.history = [];
     state.currentTab = 'modules';
+    document.getElementById('globalSearch').value = '';
+    hideSearchPanel();
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.tab[data-tab="modules"]').classList.add('active');
     document.getElementById('dataTypeTabs').style.display = 'none';
@@ -3239,8 +3344,6 @@ function renderAppspacesPanel() {
 
   welcome.style.display = 'none';
   header.style.display = 'block';
-  title.textContent = 'Appspaces';
-  meta.textContent = `Loaded from ${state.appspace.fileName || 'file'}`;
 
   const subTab = state.appspaceSubTab;
   let entries = [];
@@ -3254,6 +3357,25 @@ function renderAppspacesPanel() {
     clickType = 'interaction';
   } else if (subTab === 'unknown') {
     entries = state.appspace.unknown || [];
+  }
+
+  const searchInput = document.getElementById('globalSearch');
+  const searchQuery = searchInput ? searchInput.value.trim() : '';
+  const q = searchQuery ? searchQuery.toLowerCase() : '';
+
+  function markText(text) {
+    if (!q || !text) return escapeHtml(text);
+    const lower = text.toLowerCase();
+    let result = '';
+    let last = 0;
+    let idx = lower.indexOf(q);
+    while (idx !== -1) {
+      result += escapeHtml(text.slice(last, idx)) + '<mark class="search-highlight">' + escapeHtml(text.slice(idx, idx + q.length)) + '</mark>';
+      last = idx + q.length;
+      idx = lower.indexOf(q, last);
+    }
+    result += escapeHtml(text.slice(last));
+    return result;
   }
 
   let html = '';
@@ -3286,21 +3408,35 @@ function renderAppspacesPanel() {
         const isLeaf = idx === displayParts.length - 1;
         if (idx > 0) html += '<span class="tree-part">.</span>';
         if (isUnknown) {
-          html += `<span class="tree-part leaf">${part}</span>`;
+          html += `<span class="tree-part leaf">${markText(part)}</span>`;
         } else if (isLeaf) {
-          html += `<span class="tree-part leaf appspace-link" onclick="showDetail('${fullClassName}', '${clickType}', true)">${part}</span>`;
+          html += `<span class="tree-part leaf appspace-link" onclick="showDetail('${fullClassName}', '${clickType}', true)">${markText(part)}</span>`;
         } else {
-          html += `<span class="tree-part parent">${part}</span>`;
+          html += `<span class="tree-part parent">${markText(part)}</span>`;
         }
       });
       html += '</td><td><ul class="apps-list">';
-      entry.apps.forEach(app => { html += `<li>${app}</li>`; });
+      entry.apps.forEach(app => { html += `<li>${markText(app)}</li>`; });
       html += '</ul></td></tr>';
     });
     html += '</table>';
   }
 
   body.innerHTML = html;
+
+  // Scroll to selected appspace entry if navigated
+  if (state.selectedItem && state.selectedItem.type && state.selectedItem.type.startsWith('appspace_')) {
+    const selectedName = state.selectedItem.name;
+    setTimeout(() => {
+      const rows = document.querySelectorAll('.appspace-table tr');
+      for (const row of rows) {
+        if (row.textContent.includes(selectedName)) {
+          row.scrollIntoView({ block: 'nearest' });
+          break;
+        }
+      }
+    }, 100);
+  }
 }
 
 // Find a class in the list using right-side matching (like findAppspaceForClass does)
@@ -3332,42 +3468,254 @@ function findClassByRightSideMatch(entryName, classList) {
   return bestMatch;
 }
 
-
-document.getElementById('globalSearch').addEventListener('input', e => {
-  const query = e.target.value.toLowerCase().trim();
-  if (!query) {
-    updateUI();
-    return;
+function makeSnippet(item, type) {
+  if (!item) return '';
+  if (type === 'object') {
+    const parts = [];
+    if (item.parent) parts.push('Parent: ' + item.parent);
+    if (item.attributes && item.attributes.length) parts.push(item.attributes.length + ' attribute(s)');
+    return parts.join(' | ');
   }
+  if (type === 'interaction') {
+    const parts = [];
+    if (item.parent) parts.push('Parent: ' + item.parent);
+    if (item.parameters && item.parameters.length) parts.push(item.parameters.length + ' parameter(s)');
+    return parts.join(' | ');
+  }
+  if (type === 'basic') return 'Size: ' + (item.size || '?') + (item.encoding ? ' — ' + item.encoding.substring(0, 80) : '');
+  if (type === 'simple') return 'Representation: ' + (item.representation || '?') + (item.units ? ' | Units: ' + item.units : '');
+  if (type === 'array') return 'Type: ' + (item.type || '?') + (item.cardinality ? ' | Cardinality: ' + item.cardinality : '');
+  if (type === 'fixed') return (item.fields && item.fields.length ? item.fields.length + ' field(s)' : '');
+  if (type === 'enum') return (item.enumerators && item.enumerators.length ? item.enumerators.length + ' enumerator(s)' : '') + (item.representation ? ' | Repr: ' + item.representation : '');
+  if (type === 'variant') return (item.discriminant ? 'Discriminant: ' + item.discriminant : '') + (item.alternatives && item.alternatives.length ? ' | ' + item.alternatives.length + ' alternative(s)' : '');
+  if (type === 'trans') return 'Type: ' + (item.transportationType || item.kind || '?');
+  if (type === 'switches') return (item.values && item.values.length ? item.values.length + ' value(s)' : '');
+  if (type === 'tags') return 'Tag: ' + (item.tagValue || '');
+  if (type === 'dims') return 'Type: ' + (item.dataType || '?') + (item.units ? ' | Units: ' + item.units : '');
+  if (type === 'notes') {
+    const text = typeof item === 'string' ? item : item.text || '';
+    return text ? text.substring(0, 120) : '';
+  }
+  if (type === 'appspace_object' || type === 'appspace_interaction' || type === 'appspace_unknown') {
+    const parts = [];
+    if (item.matchedClass) parts.push('Class: ' + item.matchedClass);
+    if (item.apps && item.apps.length) parts.push(item.apps.length + ' app(s)');
+    return parts.join(' | ');
+  }
+  return '';
+}
+
+function performSearch(query) {
+  const q = query.toLowerCase().trim();
   const results = [];
   if (state.mergedFOM) {
-    state.mergedFOM.objectClasses?.forEach(c => { if (c.name.toLowerCase().includes(query)) results.push({ name: c.name, type: 'object' }); });
-    state.mergedFOM.interactionClasses?.forEach(c => { if (c.name.toLowerCase().includes(query)) results.push({ name: c.name, type: 'interaction' }); });
-    state.mergedFOM.dataTypes.basic?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'basic' }); });
-    state.mergedFOM.dataTypes.simple?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'simple' }); });
-    state.mergedFOM.dataTypes.array?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'array' }); });
-    state.mergedFOM.dataTypes.fixed?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'fixed' }); });
-    state.mergedFOM.dataTypes.enum?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'enum' }); });
-    state.mergedFOM.dataTypes.variant?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'variant' }); });
-    state.mergedFOM.transportations?.forEach(t => { if (t.name.toLowerCase().includes(query)) results.push({ name: t.name, type: 'trans' }); });
-    state.mergedFOM.switches?.forEach(s => { if (s.name.toLowerCase().includes(query)) results.push({ name: s.name, type: 'switches' }); });
-    state.mergedFOM.tags?.forEach(t => { if (t.name.toLowerCase().includes(query)) results.push({ name: t.name, type: 'tags' }); });
+    state.mergedFOM.objectClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'object', snippet: makeSnippet(c, 'object') }); });
+    state.mergedFOM.interactionClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'interaction', snippet: makeSnippet(c, 'interaction') }); });
+    state.mergedFOM.dataTypes.basic?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'basic', snippet: makeSnippet(d, 'basic') }); });
+    state.mergedFOM.dataTypes.simple?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'simple', snippet: makeSnippet(d, 'simple') }); });
+    state.mergedFOM.dataTypes.array?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'array', snippet: makeSnippet(d, 'array') }); });
+    state.mergedFOM.dataTypes.fixed?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'fixed', snippet: makeSnippet(d, 'fixed') }); });
+    state.mergedFOM.dataTypes.enum?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'enum', snippet: makeSnippet(d, 'enum') }); });
+    state.mergedFOM.dataTypes.variant?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'variant', snippet: makeSnippet(d, 'variant') }); });
+    state.mergedFOM.transportations?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'trans', snippet: makeSnippet(t, 'trans') }); });
+    state.mergedFOM.switches?.forEach(s => { if (s.name.toLowerCase().includes(q)) results.push({ name: s.name, type: 'switches', snippet: makeSnippet(s, 'switches') }); });
+    state.mergedFOM.tags?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'tags', snippet: makeSnippet(t, 'tags') }); });
   }
   state.files.forEach(f => {
-    f.dimensions?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'dims' }); });
-    f.notes?.forEach(n => { const nname = typeof n === 'string' ? n : n.name || ''; if (nname.toLowerCase().includes(query)) results.push({ name: nname, type: 'notes' }); });
+    f.dimensions?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'dims', snippet: makeSnippet(d, 'dims') }); });
+    f.notes?.forEach(n => { const nname = typeof n === 'string' ? n : n.name || ''; if (nname.toLowerCase().includes(q)) results.push({ name: nname, type: 'notes', snippet: makeSnippet(n, 'notes') }); });
+    if (f.name.toLowerCase().includes(q)) {
+      const ver = f.identification?.version ? ' | Version: ' + f.identification.version : '';
+      results.push({ name: f.name, type: 'module', snippet: (f.identification?.name || '') + ver });
+    }
   });
-  if (state.mergedFOM?.time && 'time'.includes(query)) results.push({ name: 'Time Configuration', type: 'time' });
-  const treeView = document.getElementById('treeView');
-  const typeIcons = { object: '📦', interaction: '💬', basic: '🔤', simple: '📝', array: '📋', fixed: '📑', enum: '🔢', variant: '🔀', trans: '🚚', switches: '🔘', tags: '🏷️', dims: '📐', notes: '📝', time: '⏱️' };
-  treeView.innerHTML = '<div class="tree-wrapper">' + (results.length > 0 ? results.map(r => `<div class="tree-item" data-name="${r.name}" data-type="${r.type}"><span class="icon">${typeIcons[r.type] || '📄'}</span><span class="name">${r.name}</span></div>`).join('') : '<div class="empty-state">No results found. Try a different search term.</div>') + '</div>';
-  treeView.querySelectorAll('.tree-item').forEach(item => {
+  if (state.mergedFOM?.time && 'time'.includes(q)) results.push({ name: 'Time Configuration', type: 'time', snippet: '' });
+  if (state.mergedFOM) {
+    state.mergedFOM.objectClasses?.forEach(c => {
+      c.attributes?.forEach(a => {
+        if (a.name.toLowerCase().includes(q)) results.push({ name: a.name, type: 'attribute', parentName: c.name, parentType: 'object', snippet: 'Class: ' + c.name + (a.dataType ? ' | Type: ' + a.dataType : '') });
+      });
+    });
+    state.mergedFOM.interactionClasses?.forEach(c => {
+      c.parameters?.forEach(p => {
+        if (p.name.toLowerCase().includes(q)) results.push({ name: p.name, type: 'parameter', parentName: c.name, parentType: 'interaction', snippet: 'Class: ' + c.name + (p.dataType ? ' | Type: ' + p.dataType : '') });
+      });
+    });
+    state.mergedFOM.dataTypes?.enum?.forEach(d => {
+      d.enumerators?.forEach(v => {
+        if (v.name.toLowerCase().includes(q)) results.push({ name: v.name, type: 'enumerator', parentName: d.name, parentType: 'enum', snippet: 'Enum: ' + d.name + (v.value !== undefined ? ' | Value: ' + v.value : '') });
+      });
+    });
+    state.mergedFOM.dataTypes?.fixed?.forEach(d => {
+      d.fields?.forEach(f => {
+        if (f.name.toLowerCase().includes(q)) results.push({ name: f.name, type: 'field', parentName: d.name, parentType: 'fixed', snippet: 'Record: ' + d.name + (f.dataType ? ' | Type: ' + f.dataType : '') });
+      });
+    });
+    state.mergedFOM.dataTypes?.variant?.forEach(d => {
+      d.alternatives?.forEach(a => {
+        const label = a.label || a.name || '';
+        if (label.toLowerCase().includes(q)) results.push({ name: label, type: 'alternative', parentName: d.name, parentType: 'variant', snippet: 'Variant: ' + d.name + (a.dataType ? ' | Type: ' + a.dataType : '') });
+      });
+    });
+  }
+  if (state.appspace) {
+    state.appspace.entries?.forEach(e => { if (e.className.toLowerCase().includes(q)) results.push({ name: e.className, type: 'appspace_object', snippet: makeSnippet(e, 'appspace_object') }); });
+    state.appspace.interactions?.forEach(e => { if (e.className.toLowerCase().includes(q)) results.push({ name: e.className, type: 'appspace_interaction', snippet: makeSnippet(e, 'appspace_interaction') }); });
+    state.appspace.unknown?.forEach(e => { if (e.className.toLowerCase().includes(q)) results.push({ name: e.className, type: 'appspace_unknown', snippet: makeSnippet(e, 'appspace_unknown') }); });
+    state.appspace.entries?.forEach(e => { e.apps?.forEach(a => { const appName = typeof a === 'string' ? a : a.name || ''; if (appName.toLowerCase().includes(q)) results.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_object', snippet: 'Entry: ' + e.className }); }); });
+    state.appspace.interactions?.forEach(e => { e.apps?.forEach(a => { const appName = typeof a === 'string' ? a : a.name || ''; if (appName.toLowerCase().includes(q)) results.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_interaction', snippet: 'Entry: ' + e.className }); }); });
+    state.appspace.unknown?.forEach(e => { e.apps?.forEach(a => { const appName = typeof a === 'string' ? a : a.name || ''; if (appName.toLowerCase().includes(q)) results.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_unknown', snippet: 'Entry: ' + e.className }); }); });
+  }
+  return results;
+}
+
+function hideSearchPanel() {
+  const panel = document.getElementById('searchPanel');
+  if (panel) panel.remove();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function showSearchPanel(results, query) {
+  hideSearchPanel();
+
+  const panel = document.createElement('div');
+  panel.id = 'searchPanel';
+  panel.className = 'search-panel';
+
+  let html = '<div class="search-panel-header">Results for "<strong>' + escapeHtml(query) + '</strong>" <span class="search-panel-count">' + results.length + ' match' + (results.length !== 1 ? 'es' : '') + '</span></div>';
+
+  const groups = {};
+  results.forEach(r => {
+    if (!groups[r.type]) groups[r.type] = [];
+    groups[r.type].push(r);
+  });
+
+  html += '<div class="search-panel-body">';
+  let hasContent = false;
+  GROUP_ORDER.forEach(type => {
+    if (!groups[type] || groups[type].length === 0) return;
+    hasContent = true;
+    const items = groups[type];
+    html += '<div class="search-panel-group"><div class="search-panel-group-header">' + (TYPE_ICONS[type] || '') + ' ' + (GROUP_LABELS[type] || type) + ' (' + items.length + ')</div>';
+    items.forEach(item => {
+      const snippet = item.snippet ? escapeHtml(item.snippet) : '';
+      const parentAttr = item.parentName ? ' data-parent="' + item.parentName.replace(/"/g, '&quot;') + '"' : '';
+      const parentTypeAttr = item.parentType ? ' data-parent-type="' + item.parentType + '"' : '';
+      html += '<div class="search-panel-item" data-name="' + item.name.replace(/"/g, '&quot;') + '" data-type="' + item.type + '" data-snippet="' + snippet.replace(/"/g, '&quot;') + '"' + parentAttr + parentTypeAttr + '>';
+      html += '<span class="search-panel-item-icon">' + (TYPE_ICONS[item.type] || '') + '</span>';
+      html += '<span class="search-panel-item-name">' + escapeHtml(item.name) + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  if (!hasContent) {
+    html += '<div class="search-panel-empty">No results found. Try a different search term.</div>';
+  }
+  html += '</div>';
+  panel.innerHTML = html;
+
+  const tabBar = document.querySelector('.tab-bar');
+  if (tabBar) {
+    const rect = tabBar.getBoundingClientRect();
+    panel.style.top = (rect.bottom + 4) + 'px';
+  } else {
+    panel.style.top = '80px';
+  }
+
+  document.body.appendChild(panel);
+
+  panel.querySelectorAll('.search-panel-item').forEach(item => {
+    item.addEventListener('mouseenter', (e) => {
+      const snippet = item.dataset.snippet;
+      if (!snippet) return;
+      showSearchTooltip(e, snippet);
+    });
+    item.addEventListener('mousemove', (e) => {
+      const tooltip = document.getElementById('searchTooltip');
+      if (tooltip) {
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top = (e.clientY + 14) + 'px';
+      }
+    });
+    item.addEventListener('mouseleave', hideSearchTooltip);
     item.addEventListener('click', () => {
-      treeView.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
-      item.classList.add('selected');
-      showDetail(item.dataset.name, item.dataset.type);
+      const name = item.dataset.name;
+      const type = item.dataset.type;
+      const parentName = item.dataset.parent;
+      const parentType = item.dataset.parentType;
+      const searchInput = document.getElementById('globalSearch');
+      const currentQuery = searchInput ? searchInput.value.trim() : query;
+      hideSearchPanel();
+      hideSearchTooltip();
+      state.history.push({ mode: 'search', query: currentQuery });
+      if (type === 'module') {
+        switchToModule(name, true);
+      } else if (type === 'attribute' || type === 'parameter' || type === 'enumerator' || type === 'field' || type === 'alternative') {
+        showDetail(parentName, parentType, true);
+      } else if (type === 'appspace_app') {
+        showDetail(parentName, parentType, true);
+      } else {
+        showDetail(name, type, true);
+      }
+      document.getElementById('backBtn').style.display = 'inline-block';
     });
   });
+}
+
+function showSearchTooltip(e, text) {
+  let tooltip = document.getElementById('searchTooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'searchTooltip';
+    tooltip.className = 'search-tooltip';
+    document.body.appendChild(tooltip);
+  }
+  tooltip.textContent = text;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top = (e.clientY + 14) + 'px';
+}
+
+function hideSearchTooltip() {
+  const tooltip = document.getElementById('searchTooltip');
+  if (tooltip) tooltip.style.display = 'none';
+}
+
+function checkForSearchMode() {
+  const lastEntry = state.history[state.history.length - 1];
+  if (lastEntry && lastEntry.mode === 'search') {
+    const results = performSearch(lastEntry.query);
+    if (results.length > 0) {
+      document.getElementById('globalSearch').value = lastEntry.query;
+      showSearchPanel(results, lastEntry.query);
+    } else {
+      state.history.pop();
+      document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
+    }
+  }
+}
+
+document.getElementById('globalSearch').addEventListener('input', e => {
+  const query = e.target.value.trim();
+  if (!query) {
+    hideSearchPanel();
+    return;
+  }
+  const results = performSearch(query);
+  showSearchPanel(results, query);
+});
+
+document.getElementById('globalSearch').addEventListener('focus', () => {
+  const query = document.getElementById('globalSearch').value.trim();
+  if (query && !document.getElementById('searchPanel')) {
+    const results = performSearch(query);
+    if (results.length > 0) {
+      showSearchPanel(results, query);
+    }
+  }
 });
 
 async function init() {
@@ -3612,6 +3960,7 @@ function goBack() {
     document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
     document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`)?.classList.add('active');
     updateAppspaceTabCount();
+    state.selectedItem = restoreState.selected || null;
     renderAppspacesPanel();
     document.getElementById('detailHeader').style.display = 'block';
     document.getElementById('detailTitle').textContent = 'Appspaces';
@@ -3665,12 +4014,21 @@ function goBack() {
   const selectedItem = treeView.querySelector(`.tree-item[data-name="${escapedName}"]`);
   
   if (selectedItem) {
+    let parent = selectedItem.parentElement;
+    while (parent && !parent.classList.contains('tree-wrapper')) {
+      if (parent.classList.contains('tree-children') && parent.classList.contains('collapsed')) {
+        parent.classList.remove('collapsed');
+        const toggle = parent.previousElementSibling?.querySelector('.tree-toggle');
+        if (toggle) { toggle.dataset.expanded = 'true'; toggle.textContent = '▼'; }
+      }
+      parent = parent.parentElement;
+    }
     selectedItem.classList.add('selected');
     selectedItem.scrollIntoView({ block: 'nearest' });
   }
   
   // Show detail
-state.selectedItem = restoreState.selected;
+  state.selectedItem = restoreState.selected;
   
   document.getElementById('detailHeader').style.display = 'block';
   
@@ -3797,10 +4155,51 @@ document.addEventListener('click', (e) => {
     showIssueDetail(issueLink.dataset.issueId);
     document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
   }
+
+  // Close search panel on outside click
+  const panel = document.getElementById('searchPanel');
+  if (panel) {
+    const searchInput = document.getElementById('globalSearch');
+    if (!panel.contains(e.target) && searchInput !== e.target && !e.target.closest('#backBtn')) {
+      hideSearchPanel();
+    }
+  }
 });
 
 document.getElementById('backBtn').addEventListener('click', () => {
   goBack();
+  checkForSearchMode();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const panel = document.getElementById('searchPanel');
+    if (panel) {
+      hideSearchPanel();
+      document.getElementById('globalSearch').blur();
+      return;
+    }
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+    const panel = document.getElementById('searchPanel');
+    if (!panel) return;
+    const items = panel.querySelectorAll('.search-panel-item');
+    if (items.length === 0) return;
+    e.preventDefault();
+    let idx = parseInt(panel.dataset.selectedIndex || '-1');
+    if (e.key === 'ArrowDown') {
+      idx = Math.min(idx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      idx = Math.max(idx - 1, 0);
+    } else if (e.key === 'Enter' && idx >= 0) {
+      items[idx].click();
+      return;
+    }
+    panel.dataset.selectedIndex = idx.toString();
+    items.forEach(i => i.classList.remove('selected'));
+    items[idx].classList.add('selected');
+    items[idx].scrollIntoView({ block: 'nearest' });
+  }
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -3818,6 +4217,8 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     document.getElementById('detailHeader').style.display = 'none';
     document.getElementById('detailBody').innerHTML = '';
     document.getElementById('welcomeScreen').style.display = 'flex';
+    document.getElementById('globalSearch').value = '';
+    hideSearchPanel();
   }
 });
 
@@ -4014,6 +4415,16 @@ function setupAppspaceButtons() {
         state.selectedItem = null;
         
         updateUI();
+
+        // Show appspace subtab bar and activate the correct subtab
+        const appspaceTabs = document.getElementById('appspaceTabs');
+        if (appspaceTabs) appspaceTabs.style.display = 'flex';
+        document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
+        const activeAppspaceSubtab = document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`);
+        if (activeAppspaceSubtab) activeAppspaceSubtab.classList.add('active');
+        updateAppspaceTabCount();
+        renderAppspacesPanel();
+
         const totalMatched = classified.objects.length + classified.interactions.length;
         showAppspaceSnackbar(file.name, totalMatched);
       };

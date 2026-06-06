@@ -894,34 +894,327 @@ async function test_BackButtonIssuesEmptySubtab() {
 }
 
 async function test_SearchFunctionality() {
-  log('Testing: Search functionality...');
+  log('Testing: Search panel shows on input and hides on Escape...');
   try {
     await openApp();
     await page.waitForSelector('#globalSearch');
-    await page.waitForSelector('#clearBtn');
-    
+
     await page.focus('#globalSearch');
     await page.keyboard.type('Test');
-    await sleep(300);
-    
+    await sleep(400);
+
+    const panel = await page.$('#searchPanel');
+    if (!panel) {
+      await captureScreenshot('test_SearchFunctionality_no_panel');
+      throw new Error('Search panel did not appear');
+    }
+
+    const panelVisible = await panel.boundingBox();
+    if (!panelVisible || panelVisible.height === 0) {
+      throw new Error('Search panel has zero height');
+    }
+
     await page.keyboard.press('Escape');
-    await page.evaluate(() => {
-      document.getElementById('globalSearch').value = '';
-      const event = new Event('input', { bubbles: true });
-      document.getElementById('globalSearch').dispatchEvent(event);
-    });
     await sleep(200);
-    
-    log('Search input works', 'success');
+
+    const panelAfter = await page.$('#searchPanel');
+    if (panelAfter) {
+      throw new Error('Search panel did not close on Escape');
+    }
+
+    log('Search panel shows and hides (Escape)', 'success');
     testsPassed++;
     return true;
   } catch (error) {
-    logError('Search test failed', error);
+    logError('Search panel show/hide test failed', error);
     testsFailed++;
     return false;
   }
 }
 
+async function test_SearchResultsDisplay() {
+  log('Testing: Search results display correctly with grouping...');
+  try {
+    await openApp();
+    await loadTestFomFile('RPR-Foundation_v3.0.xml');
+    await sleep(500);
+
+    await page.focus('#globalSearch');
+    await page.keyboard.type('Object');
+    await sleep(500);
+
+    const panel = await page.$('#searchPanel');
+    if (!panel) {
+      await captureScreenshot('test_SearchResultsDisplay_no_panel');
+      throw new Error('Search panel did not appear');
+    }
+
+    const groupHeaders = await page.$$('.search-panel-group-header');
+    if (groupHeaders.length === 0) {
+      await captureScreenshot('test_SearchResultsDisplay_no_groups');
+      throw new Error('No search result groups found');
+    }
+
+    const items = await page.$$('.search-panel-item');
+    if (items.length === 0) {
+      await captureScreenshot('test_SearchResultsDisplay_no_items');
+      throw new Error('No search result items found');
+    }
+
+    const headerText = await page.$eval('.search-panel-header', el => el.textContent);
+    if (!headerText.includes('Object')) {
+      throw new Error('Search panel header does not contain query');
+    }
+
+    log('Search results display with ' + items.length + ' items in ' + groupHeaders.length + ' groups', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_SearchResultsDisplay_failed');
+    logError('Search results display test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_SearchNavigateAndBack() {
+  log('Testing: Search result click navigates and back returns to panel...');
+  try {
+    await openApp();
+    await loadTestFomFile('HLAstandardMIM.xml');
+    await sleep(500);
+
+    await page.focus('#globalSearch');
+    await page.keyboard.type('HLAobjectRoot');
+    await sleep(500);
+
+    let items = await page.$$('.search-panel-item');
+    if (items.length === 0) {
+      await page.evaluate(() => {
+        document.getElementById('globalSearch').value = '';
+        const ev = new Event('input', { bubbles: true });
+        document.getElementById('globalSearch').dispatchEvent(ev);
+      });
+      await sleep(200);
+      await page.keyboard.type('HLA');
+      await sleep(500);
+      items = await page.$$('.search-panel-item');
+    }
+
+    const firstItemName = await items[0].$eval('.search-panel-item-name', el => el.textContent);
+    await items[0].click();
+    await sleep(400);
+
+    const panelAfterClick = await page.$('#searchPanel');
+    if (panelAfterClick) {
+      throw new Error('Search panel did not close after clicking result');
+    }
+
+    const detailTitle = await page.$eval('#detailTitle', el => el.textContent);
+    if (!detailTitle) {
+      throw new Error('No detail title shown after clicking search result');
+    }
+
+    const backBtn = await page.$('#backBtn');
+    if (!backBtn) {
+      throw new Error('Back button not visible after search navigation');
+    }
+    const backVisible = await backBtn.boundingBox();
+    if (!backVisible || backVisible.width === 0) {
+      throw new Error('Back button display is none after search navigation');
+    }
+
+    await backBtn.click();
+    await sleep(400);
+
+    const restoredPanel = await page.$('#searchPanel');
+    if (!restoredPanel) {
+      await captureScreenshot('test_SearchNavigateAndBack_no_restored_panel');
+      throw new Error('Search panel did not reappear after back button');
+    }
+
+    log('Search result "' + firstItemName + '" navigated and back restored panel', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_SearchNavigateAndBack_failed');
+    logError('Search navigate and back test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_SearchOutsideClick() {
+  log('Testing: Search panel closes on outside click...');
+  try {
+    await openApp();
+    await loadTestFomFile('RPR-Foundation_v3.0.xml');
+    await sleep(500);
+
+    await page.focus('#globalSearch');
+    await page.keyboard.type('Object');
+    await sleep(400);
+
+    const panel = await page.$('#searchPanel');
+    if (!panel) throw new Error('Search panel did not appear');
+
+    await page.click('h1');
+    await sleep(300);
+
+    const panelAfter = await page.$('#searchPanel');
+    if (panelAfter) {
+      await captureScreenshot('test_SearchOutsideClick_failed');
+      throw new Error('Search panel did not close on outside click');
+    }
+
+    log('Search panel closes on outside click', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_SearchOutsideClick_failed');
+    logError('Search outside click test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_SearchEmptyState() {
+  log('Testing: Search empty state message...');
+  try {
+    await openApp();
+    await loadTestFomFile('RPR-Foundation_v3.0.xml');
+    await sleep(500);
+
+    await page.focus('#globalSearch');
+    await page.keyboard.type('ZZZZNONEXISTENTZZZZ');
+    await sleep(400);
+
+    const panel = await page.$('#searchPanel');
+    if (!panel) {
+      await captureScreenshot('test_SearchEmptyState_no_panel');
+      throw new Error('Search panel did not appear');
+    }
+
+    const emptyMsg = await page.$('.search-panel-empty');
+    if (!emptyMsg) {
+      await captureScreenshot('test_SearchEmptyState_no_empty_msg');
+      throw new Error('No empty state message shown for no results');
+    }
+
+    const emptyText = await emptyMsg.evaluate(el => el.textContent);
+    if (!emptyText || !emptyText.toLowerCase().includes('no results')) {
+      throw new Error('Empty state message does not mention no results: "' + emptyText + '"');
+    }
+
+    log('Search empty state shows correct message', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_SearchEmptyState_failed');
+    logError('Search empty state test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_SearchKeyboardNavigation() {
+  log('Testing: Search keyboard navigation (ArrowDown/ArrowUp/Enter)...');
+  try {
+    await openApp();
+    await loadTestFomFile('RPR-Foundation_v3.0.xml');
+    await sleep(500);
+
+    await page.focus('#globalSearch');
+    await page.keyboard.type('Object');
+    await sleep(400);
+
+    const items = await page.$$('.search-panel-item');
+    if (items.length < 2) {
+      log('Not enough search results for keyboard test (' + items.length + ')', 'warn');
+      testsPassed++;
+      return true;
+    }
+
+    await page.keyboard.press('ArrowDown');
+    await sleep(100);
+    let selectedCount = await page.evaluate(() => document.querySelectorAll('.search-panel-item.selected').length);
+    if (selectedCount !== 1) {
+      await captureScreenshot('test_SearchKeyboardNav_arrowdown');
+      throw new Error('Expected 1 selected item after ArrowDown, got ' + selectedCount);
+    }
+
+    await page.keyboard.press('ArrowDown');
+    await sleep(100);
+    selectedCount = await page.evaluate(() => document.querySelectorAll('.search-panel-item.selected').length);
+    if (selectedCount !== 1) {
+      throw new Error('Expected 1 selected item after second ArrowDown, got ' + selectedCount);
+    }
+
+    await page.keyboard.press('ArrowUp');
+    await sleep(100);
+    selectedCount = await page.evaluate(() => document.querySelectorAll('.search-panel-item.selected').length);
+    if (selectedCount !== 1) {
+      throw new Error('Expected 1 selected item after ArrowUp, got ' + selectedCount);
+    }
+
+    await page.keyboard.press('Enter');
+    await sleep(400);
+
+    const panelAfter = await page.$('#searchPanel');
+    if (panelAfter) {
+      throw new Error('Search panel did not close after Enter on selected item');
+    }
+
+    log('Keyboard navigation works correctly', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_SearchKeyboardNavigation_failed');
+    logError('Search keyboard navigation test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
+async function test_SearchClearedOnFileLoad() {
+  log('Testing: Search is cleared when files are loaded...');
+  try {
+    await openApp();
+    await sleep(200);
+
+    await page.focus('#globalSearch');
+    await page.keyboard.type('TestQuery');
+    await sleep(300);
+
+    const searchValue = await page.$eval('#globalSearch', el => el.value);
+    if (searchValue !== 'TestQuery') {
+      throw new Error('Search input value not set');
+    }
+
+    await loadTestFomFile('HLAstandardMIM.xml');
+    await sleep(500);
+
+    const searchValueAfter = await page.$eval('#globalSearch', el => el.value);
+    if (searchValueAfter !== '') {
+      await captureScreenshot('test_SearchClearedOnFileLoad_failed');
+      throw new Error('Search input was not cleared after file load. Value: "' + searchValueAfter + '"');
+    }
+
+    const panelAfter = await page.$('#searchPanel');
+    if (panelAfter) {
+      throw new Error('Search panel still visible after file load');
+    }
+
+    log('Search clears on file load', 'success');
+    testsPassed++;
+    return true;
+  } catch (error) {
+    await captureScreenshot('test_SearchClearedOnFileLoad_failed');
+    logError('Search clear on file load test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
 async function test_TreeFiltering() {
   log('Testing: Tree filtering...');
   try {
@@ -1301,6 +1594,12 @@ async function runAllTests() {
         { name: 'BackButtonIssuesEmptySubtab', fn: test_BackButtonIssuesEmptySubtab },
         { name: 'BackButtonFixes', fn: test_BackButtonFixes },
         { name: 'Search', fn: test_SearchFunctionality },
+        { name: 'SearchResultsDisplay', fn: test_SearchResultsDisplay },
+        { name: 'SearchNavigateAndBack', fn: test_SearchNavigateAndBack },
+        { name: 'SearchOutsideClick', fn: test_SearchOutsideClick },
+        { name: 'SearchEmptyState', fn: test_SearchEmptyState },
+        { name: 'SearchKeyboardNavigation', fn: test_SearchKeyboardNavigation },
+        { name: 'SearchClearedOnFileLoad', fn: test_SearchClearedOnFileLoad },
         { name: 'TreeFilter', fn: test_TreeFiltering },
         { name: 'SortToggle', fn: test_SortToggle },
         { name: 'DataTypeSubtabSorting', fn: test_DataTypeSubtabSorting },
