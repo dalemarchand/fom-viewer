@@ -2336,6 +2336,45 @@ if (type === 'object') {
     body.innerHTML = renderDetail(item, type);
   }
   
+  // Highlight search query text within detail body
+  (function highlightBody() {
+    const searchInput = document.getElementById('globalSearch');
+    const searchQuery = searchInput ? searchInput.value.trim() : '';
+    if (!searchQuery || !body.innerHTML) return;
+    const q = searchQuery.toLowerCase();
+    try {
+      const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
+      const nodesToReplace = [];
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (!node.textContent || !node.parentElement) continue;
+        const lower = node.textContent.toLowerCase();
+        let idx = lower.indexOf(q);
+        if (idx === -1) continue;
+        nodesToReplace.push(node);
+        const fragment = document.createDocumentFragment();
+        let remaining = node.textContent;
+        while (idx !== -1) {
+          const before = remaining.substring(0, idx);
+          const match = remaining.substring(idx, idx + searchQuery.length);
+          remaining = remaining.substring(idx + searchQuery.length);
+          if (before) fragment.appendChild(document.createTextNode(before));
+          const mark = document.createElement('mark');
+          mark.className = 'search-highlight';
+          mark.textContent = match;
+          fragment.appendChild(mark);
+          idx = remaining.toLowerCase().indexOf(q);
+        }
+        if (remaining) fragment.appendChild(document.createTextNode(remaining));
+        node.parentNode.replaceChild(fragment, node);
+      }
+      const firstHighlight = body.querySelector('.search-highlight');
+      if (firstHighlight) {
+        firstHighlight.scrollIntoView({ block: 'center' });
+      }
+    } catch(e) { /* silently ignore highlight errors */ }
+  })();
+  
   // Highlight selected item in tree after tree is rebuilt
   const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
   const highlightItem = () => {
@@ -3353,27 +3392,58 @@ function findClassByRightSideMatch(entryName, classList) {
   return bestMatch;
 }
 
+function makeSnippet(item, type) {
+  if (!item) return '';
+  if (type === 'object') {
+    const parts = [];
+    if (item.parent) parts.push('Parent: ' + item.parent);
+    if (item.attributes && item.attributes.length) parts.push(item.attributes.length + ' attribute(s)');
+    return parts.join(' | ');
+  }
+  if (type === 'interaction') {
+    const parts = [];
+    if (item.parent) parts.push('Parent: ' + item.parent);
+    if (item.parameters && item.parameters.length) parts.push(item.parameters.length + ' parameter(s)');
+    return parts.join(' | ');
+  }
+  if (type === 'basic') return 'Size: ' + (item.size || '?') + (item.encoding ? ' — ' + item.encoding.substring(0, 80) : '');
+  if (type === 'simple') return 'Representation: ' + (item.representation || '?') + (item.units ? ' | Units: ' + item.units : '');
+  if (type === 'array') return 'Type: ' + (item.type || '?') + (item.cardinality ? ' | Cardinality: ' + item.cardinality : '');
+  if (type === 'fixed') return (item.fields && item.fields.length ? item.fields.length + ' field(s)' : '');
+  if (type === 'enum') return (item.enumerators && item.enumerators.length ? item.enumerators.length + ' enumerator(s)' : '') + (item.representation ? ' | Repr: ' + item.representation : '');
+  if (type === 'variant') return (item.discriminant ? 'Discriminant: ' + item.discriminant : '') + (item.alternatives && item.alternatives.length ? ' | ' + item.alternatives.length + ' alternative(s)' : '');
+  if (type === 'trans') return 'Type: ' + (item.transportationType || item.kind || '?');
+  if (type === 'switches') return (item.values && item.values.length ? item.values.length + ' value(s)' : '');
+  if (type === 'tags') return 'Tag: ' + (item.tagValue || '');
+  if (type === 'dims') return 'Type: ' + (item.dataType || '?') + (item.units ? ' | Units: ' + item.units : '');
+  if (type === 'notes') {
+    const text = typeof item === 'string' ? item : item.text || '';
+    return text ? text.substring(0, 120) : '';
+  }
+  return '';
+}
+
 function performSearch(query) {
   const q = query.toLowerCase().trim();
   const results = [];
   if (state.mergedFOM) {
-    state.mergedFOM.objectClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'object' }); });
-    state.mergedFOM.interactionClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'interaction' }); });
-    state.mergedFOM.dataTypes.basic?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'basic' }); });
-    state.mergedFOM.dataTypes.simple?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'simple' }); });
-    state.mergedFOM.dataTypes.array?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'array' }); });
-    state.mergedFOM.dataTypes.fixed?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'fixed' }); });
-    state.mergedFOM.dataTypes.enum?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'enum' }); });
-    state.mergedFOM.dataTypes.variant?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'variant' }); });
-    state.mergedFOM.transportations?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'trans' }); });
-    state.mergedFOM.switches?.forEach(s => { if (s.name.toLowerCase().includes(q)) results.push({ name: s.name, type: 'switches' }); });
-    state.mergedFOM.tags?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'tags' }); });
+    state.mergedFOM.objectClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'object', snippet: makeSnippet(c, 'object') }); });
+    state.mergedFOM.interactionClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'interaction', snippet: makeSnippet(c, 'interaction') }); });
+    state.mergedFOM.dataTypes.basic?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'basic', snippet: makeSnippet(d, 'basic') }); });
+    state.mergedFOM.dataTypes.simple?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'simple', snippet: makeSnippet(d, 'simple') }); });
+    state.mergedFOM.dataTypes.array?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'array', snippet: makeSnippet(d, 'array') }); });
+    state.mergedFOM.dataTypes.fixed?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'fixed', snippet: makeSnippet(d, 'fixed') }); });
+    state.mergedFOM.dataTypes.enum?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'enum', snippet: makeSnippet(d, 'enum') }); });
+    state.mergedFOM.dataTypes.variant?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'variant', snippet: makeSnippet(d, 'variant') }); });
+    state.mergedFOM.transportations?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'trans', snippet: makeSnippet(t, 'trans') }); });
+    state.mergedFOM.switches?.forEach(s => { if (s.name.toLowerCase().includes(q)) results.push({ name: s.name, type: 'switches', snippet: makeSnippet(s, 'switches') }); });
+    state.mergedFOM.tags?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'tags', snippet: makeSnippet(t, 'tags') }); });
   }
   state.files.forEach(f => {
-    f.dimensions?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'dims' }); });
-    f.notes?.forEach(n => { const nname = typeof n === 'string' ? n : n.name || ''; if (nname.toLowerCase().includes(q)) results.push({ name: nname, type: 'notes' }); });
+    f.dimensions?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'dims', snippet: makeSnippet(d, 'dims') }); });
+    f.notes?.forEach(n => { const nname = typeof n === 'string' ? n : n.name || ''; if (nname.toLowerCase().includes(q)) results.push({ name: nname, type: 'notes', snippet: makeSnippet(n, 'notes') }); });
   });
-  if (state.mergedFOM?.time && 'time'.includes(q)) results.push({ name: 'Time Configuration', type: 'time' });
+  if (state.mergedFOM?.time && 'time'.includes(q)) results.push({ name: 'Time Configuration', type: 'time', snippet: '' });
   return results;
 }
 
@@ -3409,7 +3479,8 @@ function showSearchPanel(results, query) {
     const items = groups[type];
     html += '<div class="search-panel-group"><div class="search-panel-group-header">' + (TYPE_ICONS[type] || '') + ' ' + (GROUP_LABELS[type] || type) + ' (' + items.length + ')</div>';
     items.forEach(item => {
-      html += '<div class="search-panel-item" data-name="' + item.name.replace(/"/g, '&quot;') + '" data-type="' + item.type + '">';
+      const snippet = item.snippet ? escapeHtml(item.snippet) : '';
+      html += '<div class="search-panel-item" data-name="' + item.name.replace(/"/g, '&quot;') + '" data-type="' + item.type + '" data-snippet="' + snippet.replace(/"/g, '&quot;') + '">';
       html += '<span class="search-panel-item-icon">' + (TYPE_ICONS[item.type] || '') + '</span>';
       html += '<span class="search-panel-item-name">' + escapeHtml(item.name) + '</span>';
       html += '</div>';
@@ -3433,17 +3504,50 @@ function showSearchPanel(results, query) {
   document.body.appendChild(panel);
 
   panel.querySelectorAll('.search-panel-item').forEach(item => {
+    item.addEventListener('mouseenter', (e) => {
+      const snippet = item.dataset.snippet;
+      if (!snippet) return;
+      showSearchTooltip(e, snippet);
+    });
+    item.addEventListener('mousemove', (e) => {
+      const tooltip = document.getElementById('searchTooltip');
+      if (tooltip) {
+        tooltip.style.left = (e.clientX + 14) + 'px';
+        tooltip.style.top = (e.clientY + 14) + 'px';
+      }
+    });
+    item.addEventListener('mouseleave', hideSearchTooltip);
     item.addEventListener('click', () => {
       const name = item.dataset.name;
       const type = item.dataset.type;
       const searchInput = document.getElementById('globalSearch');
       const currentQuery = searchInput ? searchInput.value.trim() : query;
       hideSearchPanel();
+      hideSearchTooltip();
       state.history.push({ mode: 'search', query: currentQuery });
       showDetail(name, type, true);
       document.getElementById('backBtn').style.display = 'inline-block';
     });
   });
+}
+
+function showSearchTooltip(e, text) {
+  let tooltip = document.getElementById('searchTooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'searchTooltip';
+    tooltip.className = 'search-tooltip';
+    document.body.appendChild(tooltip);
+  }
+  tooltip.textContent = text;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (e.clientX + 14) + 'px';
+  tooltip.style.top = (e.clientY + 14) + 'px';
+}
+
+function hideSearchTooltip() {
+  const tooltip = document.getElementById('searchTooltip');
+  if (tooltip) tooltip.style.display = 'none';
 }
 
 function checkForSearchMode() {

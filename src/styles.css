@@ -733,6 +733,39 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   font-size: 14px;
 }
 
+.search-tooltip {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-primary);
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  display: none;
+}
+
+[data-theme="dark"] .search-tooltip {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+
+.search-highlight {
+  background: #fff176;
+  padding: 1px 2px;
+  border-radius: 2px;
+}
+
+[data-theme="dark"] .search-highlight {
+  background: #5c5200;
+  color: #fff;
+}
+
 .count-badge.same {
   background: var(--accent-dim);
   color: var(--accent);
