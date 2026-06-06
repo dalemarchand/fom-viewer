@@ -712,10 +712,12 @@ function mergeClasses(files, type) {
     const classes = type === 'object' ? file.objectClasses : file.interactionClasses;
     classes.forEach(c => {
       if (!map[c.name]) {
+        const mergedAttrs = c.attributes ? c.attributes.map(a => ({ ...a, _source: file.name })) : undefined;
+        const mergedParams = c.parameters ? c.parameters.map(p => ({ ...p, _source: file.name })) : undefined;
         map[c.name] = {
           ...c,
-          attributes: c.attributes ? [...c.attributes] : undefined,
-          parameters: c.parameters ? [...c.parameters] : undefined,
+          attributes: mergedAttrs,
+          parameters: mergedParams,
           _sources: [file.name]
         };
       }
@@ -727,7 +729,7 @@ function mergeClasses(files, type) {
           const existingNames = new Set(existingAttrs.map(a => a.name));
           c.attributes.forEach(attr => {
             if (!existingNames.has(attr.name)) {
-              existingAttrs.push(attr);
+              existingAttrs.push({ ...attr, _source: file.name });
               existingNames.add(attr.name);
             }
           });
@@ -739,7 +741,7 @@ function mergeClasses(files, type) {
           const existingNames = new Set(existingParams.map(p => p.name));
           c.parameters.forEach(param => {
             if (!existingNames.has(param.name)) {
-              existingParams.push(param);
+              existingParams.push({ ...param, _source: file.name });
               existingNames.add(param.name);
             }
           });
@@ -1368,10 +1370,12 @@ const sources = item._sources || (item._source ? [item._source] : []);
     
       if (props && props.length > 0) {
       html += '<h4 style="margin:12px 0 8px">' + (isObject ? 'Attributes' : 'Parameters') + '</h4>';
-      html += '<table class="property-table"><tr><th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th>' + (isObject ? '<th>Update Type</th><th>Update Condition</th><th>Ownership</th><th>Transportation</th><th>Dimensions</th><th>Order</th>' : '<th>Order</th>') + '</tr>';
+      html += '<table class="property-table"><tr><th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th><th>Module</th>' + (isObject ? '<th>Update Type</th><th>Update Condition</th><th>Ownership</th><th>Transportation</th><th>Dimensions</th><th>Order</th>' : '<th>Order</th>') + '</tr>';
       props.forEach(p => {
         const dataTypeLink = p.dataType ? `<span class="clickable-item" onclick="showDataType('${p.dataType.replace(/'/g, "\\'")}', getPreferredType('${p.dataType.replace(/'/g, "\\'")}'))">${p.dataType}</span>` : '';
-        html += `<tr><td>${p.name}${p.notes ? ' ' + renderNoteIcon(p.notes) : ''}</td><td>${dataTypeLink}</td><td>${p.sharing || ''}</td><td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">${p.semantics || ''}</td>`;
+        const srcModule = p._source || (item._sources && item._sources[0]) || '';
+        const moduleHtml = srcModule ? `<span class="clickable-item" onclick="switchToModule('${srcModule.replace(/'/g, "\\'")}')">${srcModule}</span>` : '';
+        html += `<tr><td>${p.name}${p.notes ? ' ' + renderNoteIcon(p.notes) : ''}</td><td>${dataTypeLink}</td><td>${p.sharing || ''}</td><td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">${p.semantics || ''}</td><td>${moduleHtml}</td>`;
         if (isObject) {
           let transportHtml = p.transportation || '';
           if (p.transportation) {
@@ -1887,8 +1891,11 @@ function findDataTypeUsages(typeName) {
     });
   });
   
-  // Check Variant record alternatives
+  // Check Variant record discriminants and alternatives
   state.mergedFOM.dataTypes.variant?.forEach(v => {
+    if (v.dataType === typeName) {
+      usages.push({ name: v.name, type: 'variant', location: 'Discriminant' });
+    }
     v.alternatives?.forEach(alt => {
       if (alt.dataType === typeName) {
         usages.push({ name: v.name, type: 'variant', location: `Alternative: ${alt.label}` });
@@ -1973,6 +1980,45 @@ function renderDataTypeList(type) {
 // NAVIGATION (showDetail, showDataType, showModuleDetails)
 // ============================================================================
 
+function buildConflictDetailTable(issue) {
+  const items = issue.detail ? issue.detail.split('; ') : [];
+  const isAttrs = issue.type === 'object-attributes';
+  let html = '<table class="conflict-table"><tr><th>Module</th><th>Count</th><th></th></tr>';
+  items.forEach(item => {
+    const parts = item.split('||');
+    const visibleText = parts[0];
+    const tooltipText = parts[1] || '';
+    const match = visibleText.match(/^(.+?):\s*(\d+)\s*(?:attribute|parameter)s?/);
+    if (!match) {
+      html += `<tr><td colspan="3">${visibleText}</td></tr>`;
+      return;
+    }
+    const moduleName = match[1];
+    const count = match[2];
+    const hasDetail = tooltipText.length > 0;
+    html += `<tr class="conflict-row" onclick="${hasDetail ? 'toggleConflictRow(this)' : ''}">`;
+    html += `<td>${moduleName}</td>`;
+    html += `<td><span class="count-badge ${count === '0' ? 'same' : 'different'}">${count}</span></td>`;
+    html += `<td>${hasDetail ? '<span class="arrow">▶</span>' : ''}</td></tr>`;
+    if (hasDetail) {
+      html += `<tr class="conflict-detail-row" style="display:none"><td colspan="3">${tooltipText}</td></tr>`;
+    }
+  });
+  html += '</table>';
+  return html;
+}
+
+// eslint-disable-next-line no-unused-vars
+function toggleConflictRow(row) {
+  const detailRow = row.nextElementSibling;
+  if (detailRow && detailRow.classList.contains('conflict-detail-row')) {
+    const isHidden = detailRow.style.display === 'none';
+    detailRow.style.display = isHidden ? '' : 'none';
+    const arrow = row.querySelector('.arrow');
+    if (arrow) arrow.classList.toggle('expanded', isHidden);
+  }
+}
+
 function showIssueDetail(issueId) {
   const issue = state.issues.find(i => i.id === issueId);
   if (!issue) return;
@@ -2007,20 +2053,24 @@ function showIssueDetail(issueId) {
     </div>`;
   }
 
-  // Build detail items (non-bullet list)
+  // Build detail items — use comparison table for count mismatches
   let detailHtml = '';
   if (issue.detail) {
-    const items = issue.detail.split('; ');
-    detailHtml = '<div class="detail-list">';
-    items.forEach(item => {
-      const parts = item.split('||');
-      const visibleText = parts[0];
-      const tooltipText = parts[1] || '';
-      detailHtml += tooltipText
-        ? `<div class="detail-list-item" title="${tooltipText.replace(/"/g, '&quot;')}">${visibleText}</div>`
-        : `<div class="detail-list-item">${visibleText}</div>`;
-    });
-    detailHtml += '</div>';
+    if (issue.type === 'object-attributes' || issue.type === 'interaction-parameters') {
+      detailHtml = buildConflictDetailTable(issue);
+    } else {
+      const items = issue.detail.split('; ');
+      detailHtml = '<div class="detail-list">';
+      items.forEach(item => {
+        const parts = item.split('||');
+        const visibleText = parts[0];
+        const tooltipText = parts[1] || '';
+        detailHtml += tooltipText
+          ? `<div class="detail-list-item" title="${tooltipText.replace(/"/g, '&quot;')}">${visibleText}</div>`
+          : `<div class="detail-list-item">${visibleText}</div>`;
+      });
+      detailHtml += '</div>';
+    }
   }
 
   // Build source modules list (clickable, non-bullet)
