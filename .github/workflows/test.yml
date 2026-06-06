@@ -17,7 +17,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: cd .. && npm install
-      - run: cd .. && npm run build
-      - run: cd test && npm install
-      - run: cd test && npm test
+      - run: npm install && npm run build
+      - run: cd test && npm install && npm test
