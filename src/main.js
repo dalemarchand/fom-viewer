@@ -2145,6 +2145,25 @@ function navigateToLocation(loc) {
   showDetail(loc.itemName, type, true);
 }
 
+const TYPE_ICONS = {
+  object: '\u{1F4E6}', interaction: '\u{1F4AC}', basic: '\u{1F524}', simple: '\u{1F4DD}',
+  array: '\u{1F4CB}', fixed: '\u{1F4D1}', enum: '\u{1F522}', variant: '\u{1F500}',
+  trans: '\u{1F69A}', switches: '\u{1F518}', tags: '\u{1F3F7}\uFE0F', dims: '\u{1F4D0}',
+  notes: '\u{1F4DD}', time: '\u{23F1}\uFE0F'
+};
+
+const GROUP_LABELS = {
+  object: 'Object Classes', interaction: 'Interaction Classes',
+  basic: 'Basic Data Types', simple: 'Simple Data Types',
+  array: 'Array Data Types', fixed: 'Fixed Record Data Types',
+  enum: 'Enumerated Data Types', variant: 'Variant Record Data Types',
+  trans: 'Transportations', switches: 'Switches',
+  tags: 'Tags', dims: 'Dimensions',
+  notes: 'Notes', time: 'Time'
+};
+
+const GROUP_ORDER = ['object', 'interaction', 'basic', 'simple', 'array', 'fixed', 'enum', 'variant', 'trans', 'switches', 'tags', 'dims', 'notes', 'time'];
+
 function showDetail(name, type, isManualNav = false) {
   // Save current tab before any changes
   const prevTab = state.currentTab;
@@ -2885,6 +2904,8 @@ async function loadFiles(files) {
     };
     state.history = [];
     state.currentTab = 'modules';
+    document.getElementById('globalSearch').value = '';
+    hideSearchPanel();
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.tab[data-tab="modules"]').classList.add('active');
     document.getElementById('dataTypeTabs').style.display = 'none';
@@ -3332,42 +3353,131 @@ function findClassByRightSideMatch(entryName, classList) {
   return bestMatch;
 }
 
-
-document.getElementById('globalSearch').addEventListener('input', e => {
-  const query = e.target.value.toLowerCase().trim();
-  if (!query) {
-    updateUI();
-    return;
-  }
+function performSearch(query) {
+  const q = query.toLowerCase().trim();
   const results = [];
   if (state.mergedFOM) {
-    state.mergedFOM.objectClasses?.forEach(c => { if (c.name.toLowerCase().includes(query)) results.push({ name: c.name, type: 'object' }); });
-    state.mergedFOM.interactionClasses?.forEach(c => { if (c.name.toLowerCase().includes(query)) results.push({ name: c.name, type: 'interaction' }); });
-    state.mergedFOM.dataTypes.basic?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'basic' }); });
-    state.mergedFOM.dataTypes.simple?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'simple' }); });
-    state.mergedFOM.dataTypes.array?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'array' }); });
-    state.mergedFOM.dataTypes.fixed?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'fixed' }); });
-    state.mergedFOM.dataTypes.enum?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'enum' }); });
-    state.mergedFOM.dataTypes.variant?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'variant' }); });
-    state.mergedFOM.transportations?.forEach(t => { if (t.name.toLowerCase().includes(query)) results.push({ name: t.name, type: 'trans' }); });
-    state.mergedFOM.switches?.forEach(s => { if (s.name.toLowerCase().includes(query)) results.push({ name: s.name, type: 'switches' }); });
-    state.mergedFOM.tags?.forEach(t => { if (t.name.toLowerCase().includes(query)) results.push({ name: t.name, type: 'tags' }); });
+    state.mergedFOM.objectClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'object' }); });
+    state.mergedFOM.interactionClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'interaction' }); });
+    state.mergedFOM.dataTypes.basic?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'basic' }); });
+    state.mergedFOM.dataTypes.simple?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'simple' }); });
+    state.mergedFOM.dataTypes.array?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'array' }); });
+    state.mergedFOM.dataTypes.fixed?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'fixed' }); });
+    state.mergedFOM.dataTypes.enum?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'enum' }); });
+    state.mergedFOM.dataTypes.variant?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'variant' }); });
+    state.mergedFOM.transportations?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'trans' }); });
+    state.mergedFOM.switches?.forEach(s => { if (s.name.toLowerCase().includes(q)) results.push({ name: s.name, type: 'switches' }); });
+    state.mergedFOM.tags?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'tags' }); });
   }
   state.files.forEach(f => {
-    f.dimensions?.forEach(d => { if (d.name.toLowerCase().includes(query)) results.push({ name: d.name, type: 'dims' }); });
-    f.notes?.forEach(n => { const nname = typeof n === 'string' ? n : n.name || ''; if (nname.toLowerCase().includes(query)) results.push({ name: nname, type: 'notes' }); });
+    f.dimensions?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'dims' }); });
+    f.notes?.forEach(n => { const nname = typeof n === 'string' ? n : n.name || ''; if (nname.toLowerCase().includes(q)) results.push({ name: nname, type: 'notes' }); });
   });
-  if (state.mergedFOM?.time && 'time'.includes(query)) results.push({ name: 'Time Configuration', type: 'time' });
-  const treeView = document.getElementById('treeView');
-  const typeIcons = { object: '📦', interaction: '💬', basic: '🔤', simple: '📝', array: '📋', fixed: '📑', enum: '🔢', variant: '🔀', trans: '🚚', switches: '🔘', tags: '🏷️', dims: '📐', notes: '📝', time: '⏱️' };
-  treeView.innerHTML = '<div class="tree-wrapper">' + (results.length > 0 ? results.map(r => `<div class="tree-item" data-name="${r.name}" data-type="${r.type}"><span class="icon">${typeIcons[r.type] || '📄'}</span><span class="name">${r.name}</span></div>`).join('') : '<div class="empty-state">No results found. Try a different search term.</div>') + '</div>';
-  treeView.querySelectorAll('.tree-item').forEach(item => {
+  if (state.mergedFOM?.time && 'time'.includes(q)) results.push({ name: 'Time Configuration', type: 'time' });
+  return results;
+}
+
+function hideSearchPanel() {
+  const panel = document.getElementById('searchPanel');
+  if (panel) panel.remove();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function showSearchPanel(results, query) {
+  hideSearchPanel();
+
+  const panel = document.createElement('div');
+  panel.id = 'searchPanel';
+  panel.className = 'search-panel';
+
+  let html = '<div class="search-panel-header">Results for "<strong>' + escapeHtml(query) + '</strong>" <span class="search-panel-count">' + results.length + ' match' + (results.length !== 1 ? 'es' : '') + '</span></div>';
+
+  const groups = {};
+  results.forEach(r => {
+    if (!groups[r.type]) groups[r.type] = [];
+    groups[r.type].push(r);
+  });
+
+  html += '<div class="search-panel-body">';
+  let hasContent = false;
+  GROUP_ORDER.forEach(type => {
+    if (!groups[type] || groups[type].length === 0) return;
+    hasContent = true;
+    const items = groups[type];
+    html += '<div class="search-panel-group"><div class="search-panel-group-header">' + (TYPE_ICONS[type] || '') + ' ' + (GROUP_LABELS[type] || type) + ' (' + items.length + ')</div>';
+    items.forEach(item => {
+      html += '<div class="search-panel-item" data-name="' + item.name.replace(/"/g, '&quot;') + '" data-type="' + item.type + '">';
+      html += '<span class="search-panel-item-icon">' + (TYPE_ICONS[item.type] || '') + '</span>';
+      html += '<span class="search-panel-item-name">' + escapeHtml(item.name) + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  if (!hasContent) {
+    html += '<div class="search-panel-empty">No results found. Try a different search term.</div>';
+  }
+  html += '</div>';
+  panel.innerHTML = html;
+
+  const tabBar = document.querySelector('.tab-bar');
+  if (tabBar) {
+    const rect = tabBar.getBoundingClientRect();
+    panel.style.top = (rect.bottom + 4) + 'px';
+  } else {
+    panel.style.top = '80px';
+  }
+
+  document.body.appendChild(panel);
+
+  panel.querySelectorAll('.search-panel-item').forEach(item => {
     item.addEventListener('click', () => {
-      treeView.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
-      item.classList.add('selected');
-      showDetail(item.dataset.name, item.dataset.type);
+      const name = item.dataset.name;
+      const type = item.dataset.type;
+      const searchInput = document.getElementById('globalSearch');
+      const currentQuery = searchInput ? searchInput.value.trim() : query;
+      hideSearchPanel();
+      state.history.push({ mode: 'search', query: currentQuery });
+      showDetail(name, type, true);
+      document.getElementById('backBtn').style.display = 'inline-block';
     });
   });
+}
+
+function checkForSearchMode() {
+  const lastEntry = state.history[state.history.length - 1];
+  if (lastEntry && lastEntry.mode === 'search') {
+    const results = performSearch(lastEntry.query);
+    if (results.length > 0) {
+      document.getElementById('globalSearch').value = lastEntry.query;
+      showSearchPanel(results, lastEntry.query);
+    } else {
+      state.history.pop();
+      document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
+    }
+  }
+}
+
+document.getElementById('globalSearch').addEventListener('input', e => {
+  const query = e.target.value.trim();
+  if (!query) {
+    hideSearchPanel();
+    return;
+  }
+  const results = performSearch(query);
+  showSearchPanel(results, query);
+});
+
+document.getElementById('globalSearch').addEventListener('focus', () => {
+  const query = document.getElementById('globalSearch').value.trim();
+  if (query && !document.getElementById('searchPanel')) {
+    const results = performSearch(query);
+    if (results.length > 0) {
+      showSearchPanel(results, query);
+    }
+  }
 });
 
 async function init() {
@@ -3797,10 +3907,51 @@ document.addEventListener('click', (e) => {
     showIssueDetail(issueLink.dataset.issueId);
     document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
   }
+
+  // Close search panel on outside click
+  const panel = document.getElementById('searchPanel');
+  if (panel) {
+    const searchInput = document.getElementById('globalSearch');
+    if (!panel.contains(e.target) && searchInput !== e.target && !e.target.closest('#backBtn')) {
+      hideSearchPanel();
+    }
+  }
 });
 
 document.getElementById('backBtn').addEventListener('click', () => {
   goBack();
+  checkForSearchMode();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const panel = document.getElementById('searchPanel');
+    if (panel) {
+      hideSearchPanel();
+      document.getElementById('globalSearch').blur();
+      return;
+    }
+  }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
+    const panel = document.getElementById('searchPanel');
+    if (!panel) return;
+    const items = panel.querySelectorAll('.search-panel-item');
+    if (items.length === 0) return;
+    e.preventDefault();
+    let idx = parseInt(panel.dataset.selectedIndex || '-1');
+    if (e.key === 'ArrowDown') {
+      idx = Math.min(idx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      idx = Math.max(idx - 1, 0);
+    } else if (e.key === 'Enter' && idx >= 0) {
+      items[idx].click();
+      return;
+    }
+    panel.dataset.selectedIndex = idx.toString();
+    items.forEach(i => i.classList.remove('selected'));
+    items[idx].classList.add('selected');
+    items[idx].scrollIntoView({ block: 'nearest' });
+  }
 });
 
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -3818,6 +3969,8 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     document.getElementById('detailHeader').style.display = 'none';
     document.getElementById('detailBody').innerHTML = '';
     document.getElementById('welcomeScreen').style.display = 'flex';
+    document.getElementById('globalSearch').value = '';
+    hideSearchPanel();
   }
 });
 
