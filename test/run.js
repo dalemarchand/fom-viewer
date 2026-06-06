@@ -12,6 +12,7 @@ const { test_IssuesSubtabHistory } = require('./issues-subtab-history.test.js');
 const { test_IssuesCallOrderFix } = require('./issues-call-order-fix.test.js');
 const { test_BackButtonFixes } = require('./back-button-fixes.test.js');
 const { test_AppspaceFeature } = require('./appspace.test.js');
+const { run: test_MergeClassesRun } = require('./merge-classes.test.js');
 
 
 const args = process.argv.slice(2);
@@ -1260,6 +1261,26 @@ async function test_ValidationLifecycle() {
   }
 }
 
+async function test_MergeClasses() {
+  log('Testing: MergeClasses attribute/parameter source tracking...');
+  try {
+    const exitCode = await test_MergeClassesRun();
+    if (exitCode === 0) {
+      log('MergeClasses test passed', 'success');
+      testsPassed++;
+      return true;
+    } else {
+      log('MergeClasses test failed (exit code ' + exitCode + ')', 'fail');
+      testsFailed++;
+      return false;
+    }
+  } catch (error) {
+    logError('MergeClasses test failed', error);
+    testsFailed++;
+    return false;
+  }
+}
+
 async function runAllTests() {
   log('='.repeat(50));
   log('Starting FOM Viewer Tests');
@@ -1299,6 +1320,7 @@ async function runAllTests() {
         { name: 'IssuesSubtabHistory', fn: test_IssuesSubtabHistory },
         { name: 'IssuesCallOrderFix', fn: test_IssuesCallOrderFix },
         { name: 'AppspaceFeature', fn: test_AppspaceFeature },
+        { name: 'MergeClasses', fn: test_MergeClasses },
       ];
   
   for (const test of tests) {

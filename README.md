@@ -48,8 +48,8 @@ Open `fom-viewer.html` directly in a browser, or serve it from any web server.
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `src/main.js` | Main application logic, FOM parser, UI management, validation engine | ~4248 |
-| `src/styles.css` | CSS styles with light/dark theme support | ~540 |
+| `src/main.js` | Main application logic, FOM parser, UI management, validation engine | ~4379 |
+| `src/styles.css` | CSS styles with light/dark theme support | ~640 |
 
 ### Core Components
 
@@ -124,21 +124,38 @@ npm run test:combined
 
 | Test | Description | File |
 |------|-------------|------|
-| LoadPage | Page loads without JavaScript errors | `test/run.js:109` |
-| FileLoading | FOM files load and parse correctly | `test/run.js:166` |
-| LoadAllFiles | All FOM files load successfully | `test/run.js:200` |
-| TabNavigation | Main tabs switch correctly | `test/run.js:133` |
-| SubTabNavigation | Sub-tabs (data types) switch correctly | `test/run.js:746` |
-| ItemSelection | Clicking sidebar items shows details | `test/run.js:232` |
-| DataTypeSelection | Data type items display correctly | `test/run.js:277` |
-| BackButton | Back navigation restores state | `test/run.js:373` |
-| BackButtonSubTabs | Back button works with sub-tabs | `test/run.js:412` |
-| BackButtonEmbeddedLinks | Back button with embedded links | `test/run.js:456` |
-| Search | Global search filters results | `test/run.js:502` |
-| TreeFilter | Tree filtering functionality | `test/run.js:531` |
-| SortToggle | Sort toggle on multiple tabs | `test/run.js:576` |
-| DataTypeSubtabSorting | Data type subtab sorting | `test/run.js:649` |
-| Export | Export functionality | `test/run.js:710` |
+| LoadPage | Page loads without JavaScript errors | `test/run.js:134` |
+| TabNavigation | Main tabs switch correctly | `test/run.js:158` |
+| AboutVersion_MetaTag | About dialog uses meta tag version | `test/run.js:192` |
+| AboutVersion_MetaMissing | About dialog fallback when meta tag missing | `test/run.js:225` |
+| AboutVersion_MetaPlaceholder | About dialog fallback when meta is placeholder | `test/run.js:252` |
+| FileLoading | FOM files load and parse correctly | `test/run.js:284` |
+| LoadAllFiles | All FOM files load successfully | `test/run.js:318` |
+| ItemSelection | Clicking sidebar items shows details | `test/run.js:350` |
+| DataTypeSelection | Data type items display correctly | `test/run.js:395` |
+| CircularDependencyDetection | Circular dependency detection | `test/run.js:491` |
+| BackButton | Back navigation restores state | `test/run.js:637` |
+| BackButtonSubTabs | Back button works with sub-tabs | `test/run.js:676` |
+| BackButtonEmbeddedLinks | Back button with embedded links | `test/run.js:720` |
+| BackButtonIssuesEmptySubtab | Back button with empty Issues subtab | `test/run.js:766` |
+| BackButtonFixes | Back button behavior with Issues subtabs | `test/back-button-fixes.test.js:19` |
+| Search | Global search filters results | `test/run.js:896` |
+| TreeFilter | Tree filtering functionality | `test/run.js:925` |
+| SortToggle | Sort toggle on multiple tabs | `test/run.js:970` |
+| DataTypeSubtabSorting | Data type subtab sorting | `test/run.js:1043` |
+| Export | Export functionality | `test/run.js:1104` |
+| SubTabNavigation | Sub-tabs (data types) switch correctly | `test/run.js:1140` |
+| ValidationLifecycle | Validation lifecycle on load/remove/clear | `test/run.js:1175` |
+| MergeClasses | MergeClasses attribute/parameter source tracking | `test/run.js:1264` |
+| WelcomeStats | Welcome screen stats display | `test/welcome-stats.test.js:12` |
+| IssueDetailPanelImprovements | Issue detail panel display improvements | `test/issue-detail-panel.test.js:9` |
+| IssueHistoryPush | Issue history push on selection | `test/issue-history-push.test.js:9` |
+| HistoryIssueAdversarial | Issue history adversarial tests | `test/history-issue-adversarial.test.js:9` |
+| IssuesSubtabEmptyState | Issues subtab empty state messages | `test/issues-subtab-empty-state.test.js:10` |
+| IssuesSubtabGuard | Issues subtab click guard | `test/issues-subtab-guard.test.js:10` |
+| IssuesSubtabHistory | Issues subtab history recording | `test/issues-subtab-history.test.js:11` |
+| IssuesCallOrderFix | Issues call order after file load | `test/issues-call-order-fix.test.js:10` |
+| AppspaceFeature | Appspace load, display, persistence | `test/appspace.test.js:9` |
 
 ### Test Configuration (`test/config.js`)
 
@@ -240,14 +257,15 @@ The HTML file can be:
 ```
 fom-viewer/
 ├── src/
-│   ├── main.js          # Main application logic, validation engine (~4248 lines)
-│   └── styles.css       # CSS styles (~540 lines)
+│   ├── main.js          # Main application logic, validation engine (~4379 lines)
+│   └── styles.css       # CSS styles (~640 lines)
 ├── scripts/
 │   └── build.js        # Build script
 ├── test/
-│   ├── run.js          # Test runner (~838 lines)
+│   ├── run.js          # Test runner (~1358 lines)
 │   ├── config.js       # Test configuration
 │   ├── README.md       # Test documentation
+│   ├── *.test.js       # Test modules (welcome-stats, appspace, issue-*, back-button-fixes, merge-classes, etc.)
 │   ├── fom/           # Test FOM files
 │   └── screenshots/   # Test failure screenshots
 ├── dist/               # Build output directory
