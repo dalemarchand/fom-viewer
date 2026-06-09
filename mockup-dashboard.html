@@ -3,136 +3,361 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mockup: Data Dashboard</title>
+<title>Mockup: Overview Dashboard</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-:root { --primary: #2563eb; --bg: #0f172a; --card: #1e293b; --card-hover: #334155; --text: #f1f5f9; --text-muted: #94a3b8; --accent: #06b6d4; --success: #10b981; --warning: #f59e0b; }
-body { font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-.header { background: var(--card); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
-.header h1 { font-size: 20px; font-weight: 600; }
-.controls { display: flex; gap: 12px; align-items: center; }
-.search { background: var(--bg); border: 1px solid #334155; padding: 10px 14px; border-radius: 8px; color: var(--text); width: 260px; font-size: 13px; }
-.btn { background: var(--primary); color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: 500; font-size: 13px; }
-.btn:hover { background: #1d4ed8; }
-.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid #334155; }
-.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px 24px; background: var(--bg); }
-.stat-card { background: var(--card); padding: 20px; border-radius: 12px; border: 1px solid #334155; }
-.stat-value { font-size: 32px; font-weight: 700; color: var(--accent); }
-.stat-label { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
-.stat-badge { display: inline-block; background: #10b98120; color: var(--success); padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 8px; }
-.nav-bar { background: var(--card); padding: 0 24px; display: flex; gap: 4px; border-bottom: 1px solid #334155; }
-.nav-item { padding: 14px 18px; cursor: pointer; color: var(--text-muted); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; }
-.nav-item:hover { color: var(--text); }
-.nav-item.active { color: var(--accent); border-bottom-color: var(--accent); }
-.nav-item .count { background: #334155; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 6px; }
-.main { display: flex; padding: 20px 24px; gap: 20px; flex: 1; }
-.sidebar { width: 280px; background: var(--card); border-radius: 12px; border: 1px solid #334155; overflow: hidden; }
-.sidebar-header { padding: 16px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
-.sidebar-title { font-size: 14px; font-weight: 600; }
-.sidebar-filter { padding: 12px; border-bottom: 1px solid #334155; }
-.filter-input { width: 100%; padding: 10px 12px; background: var(--bg); border: 1px solid #334155; border-radius: 6px; color: var(--text); font-size: 13px; }
-.tree { padding: 8px; max-height: 400px; overflow-y: auto; }
-.tree-item { padding: 10px 12px; cursor: pointer; border-radius: 6px; display: flex; align-items: center; gap: 10px; margin-bottom: 2px; }
-.tree-item:hover { background: var(--card-hover); }
-.tree-item.selected { background: var(--primary); }
-.icon { font-size: 16px; }
-.name { font-size: 13px; }
-.content { flex: 1; background: var(--card); border-radius: 12px; border: 1px solid #334155; overflow: hidden; }
-.content-header { padding: 20px 24px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
-.content-title { font-size: 20px; font-weight: 600; }
-.content-meta { color: var(--text-muted); font-size: 13px; }
-.content-body { padding: 24px; }
-.section { margin-bottom: 24px; }
-.section h3 { font-size: 14px; font-weight: 600; color: var(--accent); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
-.data-grid { display: grid; grid-template-columns: 140px 1fr; gap: 2px; }
-.data-row { display: contents; }
-.data-key { background: var(--bg); padding: 12px 16px; color: var(--text-muted); font-size: 13px; }
-.data-val { background: var(--bg); padding: 12px 16px; font-size: 13px; }
-.usage-list { display: flex; gap: 8px; flex-wrap: wrap; }
-.usage-tag { background: #334155; padding: 6px 12px; border-radius: 6px; font-size: 12px; }
-.usage-tag .type { color: var(--accent); }
-.empty { text-align: center; padding: 60px; color: var(--text-muted); }
-.empty h2 { font-size: 20px; color: var(--text); margin-bottom: 12px; }
+:root {
+  --bg: #0f172a; --bg2: #1e293b; --bg3: #334155;
+  --hover: #334155; --active: #1e3a5f;
+  --text: #f1f5f9; --text2: #94a3b8; --text3: #64748b;
+  --border: #334155;
+  --accent: #06b6d4; --accent2: #0891b2;
+  --green: #10b981; --orange: #f59e0b; --red: #ef4444; --purple: #8b5cf6;
+  --gradient: linear-gradient(135deg, #06b6d4 0%, #8b5cf6 100%);
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* HEADER */
+.header { background: var(--bg2); padding: 8px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.header .hamburger { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 6px; cursor: default; color: var(--text2); font-size: 20px; }
+.header .hamburger:hover { background: var(--hover); color: var(--text); }
+.header h1 { font-size: 16px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+.ver { font-size: 11px; color: var(--text3); margin-left: 6px; font-weight: 400; }
+.search-box { display: flex; align-items: center; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; width: 320px; margin-left: 16px; }
+.search-box:focus-within { border-color: var(--accent); }
+.search-box input { background: none; border: none; color: var(--text); padding: 7px 6px; font-size: 13px; width: 100%; outline: none; font-family: var(--font); }
+.search-box input::placeholder { color: var(--text3); }
+.search-box .kbd { color: var(--text3); font-size: 10px; font-family: var(--mono); padding: 1px 5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 3px; }
+.header .spacer { flex: 1; }
+.header-btn { background: none; border: 1px solid transparent; color: var(--text2); padding: 6px 12px; border-radius: 6px; cursor: default; font-size: 13px; font-family: var(--font); }
+.header-btn:hover { background: var(--hover); color: var(--text); border-color: var(--border); }
+.header-btn.primary { background: var(--gradient); color: white; border: none; }
+.header-btn.primary:hover { opacity: 0.9; }
+.overflow-btn { font-size: 20px; }
+
+/* MAIN */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* LEFT RAIL */
+.left-rail { width: 48px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 4px 0; flex-shrink: 0; }
+.rail-item { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: default; color: var(--text2); font-size: 18px; position: relative; margin-bottom: 1px; }
+.rail-item:hover { background: var(--hover); color: var(--text); }
+.rail-item.active { background: var(--accent2); color: white; }
+.rail-item .badge { position: absolute; top: 2px; right: 2px; background: var(--red); color: white; font-size: 9px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+.rail-sep { width: 32px; height: 1px; background: var(--border); margin: 6px 0; }
+
+/* DASHBOARD */
+.dashboard { flex: 1; overflow-y: auto; padding: 28px 32px; }
+.dashboard h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.3px; }
+.dashboard .welcome-sub { color: var(--text2); font-size: 14px; margin-bottom: 24px; }
+.dashboard .welcome-sub .highlight { color: var(--accent); font-weight: 500; }
+
+/* STATS GRID */
+.stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 28px; }
+.stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.stat-card .value { font-size: 28px; font-weight: 700; }
+.stat-card .label { font-size: 12px; color: var(--text2); margin-top: 2px; }
+.stat-card .sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+.stat-card .icon { font-size: 16px; margin-bottom: 8px; }
+.stat-card.cyan .value { color: var(--accent); }
+.stat-card.green .value { color: var(--green); }
+.stat-card.purple .value { color: var(--purple); }
+.stat-card.orange .value { color: var(--orange); }
+.stat-card.red .value { color: var(--red); }
+
+/* TWO-COLUMN LAYOUT */
+.dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+
+/* PANEL */
+.panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.panel-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.panel-header h3 { font-size: 14px; font-weight: 600; }
+.panel-header .action { font-size: 12px; color: var(--accent); cursor: default; }
+.panel-body { padding: 4px 0; }
+
+/* RECENT FILES */
+.recent-item { display: flex; align-items: center; gap: 12px; padding: 10px 16px; cursor: default; }
+.recent-item:hover { background: var(--hover); }
+.recent-item .file-icon { font-size: 20px; }
+.recent-item .file-info { flex: 1; }
+.recent-item .file-name { font-size: 13px; font-weight: 500; }
+.recent-item .file-meta { font-size: 11px; color: var(--text3); margin-top: 1px; display: flex; gap: 12px; }
+.recent-item .file-meta span { display: flex; align-items: center; gap: 4px; }
+.recent-item .recent-badge { font-size: 11px; background: var(--bg3); padding: 2px 8px; border-radius: 4px; color: var(--text2); }
+
+/* ISSUE BREAKDOWN */
+.issue-row { display: flex; align-items: center; gap: 12px; padding: 8px 16px; }
+.issue-row .dot { width: 8px; height: 8px; border-radius: 50%; }
+.issue-row .dot.error { background: var(--red); }
+.issue-row .dot.warning { background: var(--orange); }
+.issue-row .dot.info { background: var(--accent); }
+.issue-row .cat { font-size: 13px; flex: 1; }
+.issue-row .count { font-size: 13px; font-weight: 600; }
+.issue-row .pct { font-size: 12px; color: var(--text3); }
+.issue-bar-bg { height: 6px; background: var(--bg3); border-radius: 3px; margin: 0 16px 8px; overflow: hidden; }
+.issue-bar { height: 100%; border-radius: 3px; }
+.issue-bar.error { background: var(--red); }
+.issue-bar.warning { background: var(--orange); }
+.issue-bar.info { background: var(--accent); }
+
+/* QUICK ACTIONS */
+.quick-actions { display: flex; gap: 10px; margin-top: 8px; }
+.quick-action { flex: 1; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; cursor: default; text-align: center; transition: border-color 0.15s; }
+.quick-action:hover { border-color: var(--accent); }
+.quick-action .qa-icon { font-size: 28px; margin-bottom: 8px; }
+.quick-action .qa-label { font-size: 13px; font-weight: 500; }
+.quick-action .qa-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.quick-action.primary { background: linear-gradient(135deg, #06b6d420, #8b5cf620); border-color: var(--accent); }
+
+/* DROP ZONE */
+.drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 24px; text-align: center; color: var(--text3); font-size: 13px; margin-top: 8px; cursor: default; }
+.drop-zone:hover { border-color: var(--accent); color: var(--accent); background: #06b6d408; }
+.drop-zone .dz-icon { font-size: 32px; margin-bottom: 8px; }
+
+/* MODULE DEP */
+.dep-item { padding: 8px 16px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.dep-item .dep-name { font-weight: 500; color: var(--text); }
+.dep-item .dep-arrow { color: var(--text3); }
+.dep-item .dep-deps { color: var(--text2); }
+.dep-item .dep-count { margin-left: auto; background: var(--bg3); padding: 1px 7px; border-radius: 4px; font-size: 11px; color: var(--text2); }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ANNOTATION */
+.annotation { position: fixed; bottom: 12px; right: 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--text2); max-width: 320px; line-height: 1.5; z-index: 100; }
+.annotation strong { color: var(--text); }
 </style>
 </head>
 <body>
+
+<!-- HEADER -->
 <div class="header">
-<h1>FOM Viewer</h1>
-<div class="controls">
-<button class="btn btn-ghost">← Back</button>
-<input type="text" class="search" placeholder="Search all items...">
-<button class="btn btn-ghost">Sort</button>
-<button class="btn btn-ghost">Clear</button>
-<button class="btn">Load FOM</button>
+  <div class="hamburger">&#9776;</div>
+  <h1>FOM Viewer <span class="ver">v2.0</span></h1>
+  <div class="search-box">
+    <input type="text" placeholder="Search classes, types, attributes...">
+    <span class="kbd">/</span>
+  </div>
+  <div class="spacer"></div>
+  <button class="header-btn">&#8592; Back</button>
+  <button class="header-btn primary">+ Load FOM</button>
+  <button class="header-btn overflow-btn">&#8942;</button>
 </div>
-</div>
-<div class="stats">
-<div class="stat-card">
-<div class="stat-value">24 <span class="stat-badge">+3</span></div>
-<div class="stat-label">Basic Types</div>
-</div>
-<div class="stat-card">
-<div class="stat-value">156</div>
-<div class="stat-label">Object Classes</div>
-</div>
-<div class="stat-card">
-<div class="stat-value">42</div>
-<div class="stat-label">Interactions</div>
-</div>
-<div class="stat-card">
-<div class="stat-value">8</div>
-<div class="stat-label">Modules</div>
-</div>
-</div>
-<div class="nav-bar">
-<div class="nav-item active">Data Types <span class="count">412</span></div>
-<div class="nav-item">Object Classes <span class="count">156</span></div>
-<div class="nav-item">Interactions <span class="count">42</span></div>
-<div class="nav-item">Modules <span class="count">8</span></div>
-</div>
+
+<!-- MAIN -->
 <div class="main">
-<div class="sidebar">
-<div class="sidebar-header">
-<span class="sidebar-title">Basic Types</span>
+
+  <!-- LEFT RAIL -->
+  <nav class="left-rail">
+    <div class="rail-item active" title="Overview">&#127968;</div>
+    <div class="rail-sep"></div>
+    <div class="rail-item" title="Modules">&#128230;</div>
+    <div class="rail-item" title="Object Classes">&#128100;</div>
+    <div class="rail-item" title="Interaction Classes">&#128172;</div>
+    <div class="rail-item" title="Data Types">&#128202;</div>
+    <div class="rail-sep"></div>
+    <div class="rail-item" title="Dimensions">&#128209;</div>
+    <div class="rail-item" title="Transportations">&#128666;</div>
+    <div class="rail-item" title="Switches">&#128295;</div>
+    <div class="rail-item" title="Tags">&#127991;</div>
+    <div class="rail-item" title="Time">&#9201;</div>
+    <div class="rail-item" title="Notes">&#128221;</div>
+    <div class="rail-sep"></div>
+    <div class="rail-item" title="Issues">&#9888;<span class="badge">12</span></div>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <div class="dashboard">
+    <h2>Welcome back</h2>
+    <div class="welcome-sub">
+      <span class="highlight">8 modules</span> loaded &middot; Last session: <span class="highlight">RPR-Foundation v3.0</span>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-grid">
+      <div class="stat-card cyan">
+        <div class="icon">&#128100;</div>
+        <div class="value">156</div>
+        <div class="label">Object Classes</div>
+        <div class="sub">12 root, 144 derived</div>
+      </div>
+      <div class="stat-card green">
+        <div class="icon">&#128172;</div>
+        <div class="value">42</div>
+        <div class="label">Interactions</div>
+        <div class="sub">6 root, 36 derived</div>
+      </div>
+      <div class="stat-card purple">
+        <div class="icon">&#128202;</div>
+        <div class="value">412</div>
+        <div class="label">Data Types</div>
+        <div class="sub">24 basic, 142 fixed, 98 enum</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="icon">&#128230;</div>
+        <div class="value">8</div>
+        <div class="label">Modules</div>
+        <div class="sub">4.2 MB total XML</div>
+      </div>
+      <div class="stat-card red">
+        <div class="icon">&#9888;</div>
+        <div class="value">12</div>
+        <div class="label">Issues</div>
+        <div class="sub">3 errors, 9 warnings</div>
+      </div>
+    </div>
+
+    <!-- TWO COLUMN -->
+    <div class="dashboard-grid">
+
+      <!-- RECENT FILES -->
+      <div class="panel">
+        <div class="panel-header">
+          <h3>&#9201; Recent Files</h3>
+          <span class="action">Clear history</span>
+        </div>
+        <div class="panel-body">
+          <div class="recent-item">
+            <span class="file-icon">&#128196;</span>
+            <div class="file-info">
+              <div class="file-name">RPR-Foundation_v3.0.xml</div>
+              <div class="file-meta">
+                <span>&#128197; Today 2:30 PM</span>
+                <span>&#128100; 42 classes</span>
+                <span>&#128202; 86 types</span>
+              </div>
+            </div>
+            <span class="recent-badge">Active</span>
+          </div>
+          <div class="recent-item">
+            <span class="file-icon">&#128196;</span>
+            <div class="file-info">
+              <div class="file-name">RPR-Physical_v3.0.xml</div>
+              <div class="file-meta">
+                <span>&#128197; Today 2:28 PM</span>
+                <span>&#128100; 68 classes</span>
+                <span>&#128202; 12 types</span>
+              </div>
+            </div>
+            <span class="recent-badge">Active</span>
+          </div>
+          <div class="recent-item">
+            <span class="file-icon">&#128196;</span>
+            <div class="file-info">
+              <div class="file-name">RPR-Enumerations_v3.0.xml</div>
+              <div class="file-meta">
+                <span>&#128197; Yesterday 4:15 PM</span>
+                <span>&#128202; 98 enum types</span>
+              </div>
+            </div>
+          </div>
+          <div class="recent-item">
+            <span class="file-icon">&#128196;</span>
+            <div class="file-info">
+              <div class="file-name">HLAstandardMIM.xml</div>
+              <div class="file-meta">
+                <span>&#128197; Yesterday 3:00 PM</span>
+                <span>&#128100; 6 classes</span>
+              </div>
+            </div>
+          </div>
+          <div class="recent-item">
+            <span class="file-icon">&#128196;</span>
+            <div class="file-info">
+              <div class="file-name">RPR-Aggregate_v3.0.xml</div>
+              <div class="file-meta">
+                <span>&#128197; Jan 15</span>
+                <span>&#128100; 18 classes</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ISSUES BREAKDOWN -->
+      <div class="panel">
+        <div class="panel-header">
+          <h3>&#9888; Issue Summary</h3>
+          <span class="action">View all</span>
+        </div>
+        <div class="panel-body">
+          <div class="issue-row">
+            <span class="dot error"></span>
+            <span class="cat">Circular Dependencies</span>
+            <span class="count" style="color:var(--red);">1</span>
+            <span class="pct">8%</span>
+          </div>
+          <div class="issue-bar-bg"><div class="issue-bar error" style="width:8%;"></div></div>
+          <div class="issue-row">
+            <span class="dot error"></span>
+            <span class="cat">Validation Issues</span>
+            <span class="count" style="color:var(--red);">2</span>
+            <span class="pct">17%</span>
+          </div>
+          <div class="issue-bar-bg"><div class="issue-bar error" style="width:17%;"></div></div>
+          <div class="issue-row">
+            <span class="dot warning"></span>
+            <span class="cat">Cross-Reference Issues</span>
+            <span class="count" style="color:var(--orange);">5</span>
+            <span class="pct">42%</span>
+          </div>
+          <div class="issue-bar-bg"><div class="issue-bar warning" style="width:42%;"></div></div>
+          <div class="issue-row">
+            <span class="dot warning"></span>
+            <span class="cat">Load Conflicts</span>
+            <span class="count" style="color:var(--orange);">4</span>
+            <span class="pct">33%</span>
+          </div>
+          <div class="issue-bar-bg"><div class="issue-bar warning" style="width:33%;"></div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- QUICK ACTIONS -->
+    <div class="quick-actions">
+      <div class="quick-action primary">
+        <div class="qa-icon">&#128196;</div>
+        <div class="qa-label">Open FOM File</div>
+        <div class="qa-sub">Load XML files to get started</div>
+      </div>
+      <div class="quick-action">
+        <div class="qa-icon">&#128259;</div>
+        <div class="qa-label">Load Last Session</div>
+        <div class="qa-sub">Restore previously loaded modules</div>
+      </div>
+      <div class="quick-action">
+        <div class="qa-icon">&#128214;</div>
+        <div class="qa-label">Documentation</div>
+        <div class="qa-sub">Learn about FOM Viewer features</div>
+      </div>
+      <div class="quick-action">
+        <div class="qa-icon">&#128230;</div>
+        <div class="qa-label">Load Appspace</div>
+        <div class="qa-sub">Load appspace classification data</div>
+      </div>
+    </div>
+
+    <!-- DROP ZONE -->
+    <div class="drop-zone">
+      <div class="dz-icon">&#128229;</div>
+      Drop FOM XML files here or click "Load FOM" to browse
+    </div>
+
+  </div>
 </div>
-<div class="sidebar-filter">
-<input type="text" class="filter-input" placeholder="Filter...">
+
+<div class="annotation">
+  <strong>Option C: Overview Dashboard</strong><br>
+  Default landing page with stats cards, recent files<br>
+  from IndexedDB, issue breakdown with bars, quick<br>
+  action cards, and a drag-and-drop zone.
 </div>
-<div class="tree">
-<div class="tree-item selected"><span class="icon">🔵</span><span class="name">HLAfloat32BE</span></div>
-<div class="tree-item"><span class="icon">🔵</span><span class="name">HLAfloat32LE</span></div>
-<div class="tree-item"><span class="icon">🔵</span><span class="name">HLAfloat64BE</span></div>
-<div class="tree-item"><span class="icon">🔵</span><span class="name">HLAinteger16BE</span></div>
-<div class="tree-item"><span class="icon">🔵</span><span class="name">HLAunicodeString</span></div>
-</div>
-</div>
-<div class="content">
-<div class="content-header">
-<div>
-<div class="content-title">HLAfloat32BE</div>
-<div class="content-meta">Basic Data Type</div>
-</div>
-</div>
-<div class="content-body">
-<div class="section">
-<h3>Properties</h3>
-<div class="data-grid">
-<div class="data-row"><div class="data-key">Name</div><div class="data-val">HLAfloat32BE</div></div>
-<div class="data-row"><div class="data-key">Size</div><div class="data-val">32</div></div>
-<div class="data-row"><div class="data-key">Encoding</div><div class="data-val">IEEE-754 binary32</div></div>
-<div class="data-row"><div class="data-key">Interpretation</div><div class="data-val">Float [-3.4E38, 3.4E38]</div></div>
-</div>
-</div>
-<div class="section">
-<h3>Used By</h3>
-<div class="usage-list">
-<div class="usage-tag">EntityState <span class="type">Attribute</span></div>
-<div class="usage-tag">VelocityVector <span class="type">Attribute</span></div>
-<div class="usage-tag">AngularVelocityVector <span class="type">Attribute</span></div>
-</div>
-</div>
-</div>
-</div>
-<style>
+
 </body>
 </html>

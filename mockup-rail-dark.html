@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup: Left Rail (Dark)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #1e1e1e; --bg2: #252526; --bg3: #2d2d2d;
+  --hover: #2a2d2e; --active: #37373d; --selection: #264f78;
+  --text: #cccccc; --text2: #858585; --text3: #6e6e6e;
+  --border: #3c3c3c; --accent: #0078d4; --accent2: #094771;
+  --green: #1fc11a; --orange: #d7ba7d; --red: #f44747;
+  --yellow: #dcdcaa; --blue: #569cd6; --cyan: #4ec9b0;
+  --font: 'Segoe UI', -apple-system, sans-serif;
+  --mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+}
+body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* HEADER */
+.header { background: var(--bg2); padding: 6px 10px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.header .hamburger { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: default; color: var(--text2); font-size: 18px; }
+.header .hamburger:hover { background: var(--hover); color: var(--text); }
+.header h1 { font-size: 13px; font-weight: 500; color: var(--text); margin-right: 12px; }
+.search-box { display: flex; align-items: center; background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 0 8px; width: 280px; }
+.search-box input { background: none; border: none; color: var(--text); padding: 5px 6px; font-size: 12px; width: 100%; outline: none; font-family: var(--font); }
+.search-box input::placeholder { color: var(--text3); }
+.search-box .kbd { color: var(--text3); font-size: 11px; font-family: var(--mono); padding: 1px 5px; background: var(--bg2); border-radius: 3px; }
+.header .spacer { flex: 1; }
+.header-btn { background: none; border: none; color: var(--text2); padding: 4px 10px; border-radius: 4px; cursor: default; font-size: 12px; font-family: var(--font); }
+.header-btn:hover { background: var(--hover); color: var(--text); }
+.header-btn.primary { background: var(--accent); color: white; }
+.header-btn.primary:hover { background: #1a8ae8; }
+.back-btn { color: var(--text2); margin-right: 4px; }
+.overflow-btn { font-size: 18px; padding: 4px 6px; line-height: 1; }
+.sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+
+/* MAIN LAYOUT */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* LEFT RAIL */
+.left-rail { width: 48px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 4px 0; flex-shrink: 0; overflow-y: auto; }
+.rail-item { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 4px; cursor: default; color: var(--text2); font-size: 18px; position: relative; margin-bottom: 1px; }
+.rail-item:hover { background: var(--hover); color: var(--text); }
+.rail-item.active { background: var(--accent2); color: white; }
+.rail-item.active::before { content: ''; position: absolute; left: -4px; top: 8px; bottom: 8px; width: 3px; background: var(--accent); border-radius: 0 2px 2px 0; }
+.rail-item .badge { position: absolute; top: 2px; right: 2px; background: var(--red); color: white; font-size: 9px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+.rail-sep { width: 32px; height: 1px; background: var(--border); margin: 6px 0; }
+
+/* CONTENT AREA */
+.content { flex: 1; display: flex; overflow: hidden; }
+
+/* SIDEBAR */
+.sidebar { width: 280px; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-header { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.sidebar-header .title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text2); font-weight: 600; }
+.sidebar-header .count { font-size: 11px; color: var(--text3); margin-left: auto; }
+.filter-chips { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.chip { padding: 3px 10px; border-radius: 3px; font-size: 12px; cursor: default; color: var(--text2); background: var(--bg3); }
+.chip:hover { background: var(--hover); color: var(--text); }
+.chip.active { background: var(--accent); color: white; }
+.sidebar-filter { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.sidebar-filter input { width: 100%; padding: 5px 8px; background: var(--bg3); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font-size: 12px; outline: none; font-family: var(--font); }
+.sidebar-filter input::placeholder { color: var(--text3); }
+.sidebar-items { flex: 1; overflow-y: auto; padding: 4px; }
+.sidebar-group-label { padding: 8px 12px 4px; font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+.tree-item { padding: 4px 8px; cursor: default; border-radius: 3px; display: flex; align-items: center; gap: 6px; margin-bottom: 1px; }
+.tree-item:hover { background: var(--hover); }
+.tree-item.selected { background: var(--selection); }
+.tree-item .icon { flex-shrink: 0; font-size: 14px; }
+.tree-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-size: 13px; }
+.tree-item .usages { flex-shrink: 0; font-size: 10px; color: var(--text3); background: var(--bg3); padding: 1px 6px; border-radius: 8px; }
+.tree-item .indent { width: 16px; flex-shrink: 0; }
+.tree-item .expand { width: 16px; flex-shrink: 0; text-align: center; color: var(--text3); font-size: 10px; }
+
+/* DETAIL PANEL */
+.detail { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.detail-tabs { background: var(--bg2); padding: 0 12px; display: flex; gap: 2px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.detail-tab { padding: 8px 14px; font-size: 12px; color: var(--text2); cursor: default; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.detail-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.detail-tab .close { margin-left: 8px; color: var(--text3); font-size: 14px; }
+
+.detail-body { padding: 16px 20px; flex: 1; }
+.detail-breadcrumb { font-size: 12px; color: var(--text2); margin-bottom: 12px; }
+.detail-breadcrumb span { color: var(--text2); }
+.detail-breadcrumb .current { color: var(--text); font-weight: 500; }
+.detail-breadcrumb .sep { margin: 0 4px; color: var(--text3); }
+.detail-title { font-size: 20px; font-weight: 600; color: white; margin-bottom: 4px; }
+.detail-subtitle { font-size: 12px; color: var(--text2); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.module-badge { background: var(--accent2); color: var(--accent); padding: 2px 8px; border-radius: 3px; font-size: 11px; }
+
+/* COLLAPSIBLE SECTION */
+.collapsible { margin-bottom: 16px; }
+.collapsible-header { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); cursor: default; }
+.collapsible-header .chevron { font-size: 10px; color: var(--text2); width: 16px; flex-shrink: 0; transition: transform 0.15s; }
+.collapsible-header .chevron.open { transform: rotate(90deg); }
+.collapsible-header .label { font-size: 14px; font-weight: 500; color: white; }
+.collapsible-header .count { font-size: 11px; color: var(--text3); background: var(--bg3); padding: 1px 7px; border-radius: 8px; }
+.collapsible-content { padding: 8px 0 4px 16px; }
+
+.prop-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.prop-table th, .prop-table td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+.prop-table th { color: var(--text2); width: 140px; font-weight: 400; }
+.prop-table td { color: var(--text); }
+.prop-table td .clickable { color: var(--cyan); cursor: default; }
+.prop-table td .missing { color: var(--red); }
+.prop-table tr:last-child th, .prop-table tr:last-child td { border-bottom: none; }
+
+.attr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.attr-table th { padding: 8px 10px; text-align: left; border-bottom: 2px solid var(--border); color: var(--text2); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.attr-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+
+/* LABEL ANNOTATIONS */
+.annotation { position: fixed; bottom: 12px; right: 12px; background: var(--bg3); border: 1px solid var(--border); padding: 10px 14px; border-radius: 6px; font-size: 12px; color: var(--text2); max-width: 300px; line-height: 1.5; z-index: 100; }
+.annotation strong { color: var(--text); }
+.annotation code { font-family: var(--mono); background: var(--bg); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="hamburger">&#9776;</div>
+  <h1>FOM Viewer</h1>
+  <div class="search-box">
+    <input type="text" placeholder="Search all items...">
+    <span class="kbd">/</span>
+  </div>
+  <button class="header-btn back-btn">&#8592; Back</button>
+  <div class="spacer"></div>
+  <button class="header-btn">Export</button>
+  <button class="header-btn primary">Load FOM</button>
+  <div class="sep"></div>
+  <button class="header-btn overflow-btn">&#8942;</button>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="main">
+
+  <!-- LEFT RAIL (collapsed) -->
+  <nav class="left-rail">
+    <div class="rail-item active" title="Modules">&#128230;</div>
+    <div class="rail-item" title="Object Classes">&#128100;</div>
+    <div class="rail-item" title="Interaction Classes">&#128172;</div>
+    <div class="rail-item" title="Data Types">&#128202;</div>
+    <div class="rail-sep"></div>
+    <div class="rail-item" title="Dimensions">&#128209;</div>
+    <div class="rail-item" title="Transportations">&#128666;</div>
+    <div class="rail-item" title="Switches">&#128295;</div>
+    <div class="rail-item" title="Tags">&#127991;</div>
+    <div class="rail-item" title="Time">&#9201;</div>
+    <div class="rail-item" title="Notes">&#128221;</div>
+    <div class="rail-sep"></div>
+    <div class="rail-item" title="Issues">
+      &#9888;
+      <span class="badge">12</span>
+    </div>
+  </nav>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <span class="title">Data Types</span>
+        <span class="count">412</span>
+      </div>
+      <div class="filter-chips">
+        <span class="chip active">Basic (24)</span>
+        <span class="chip">Simple (16)</span>
+        <span class="chip">Array (8)</span>
+        <span class="chip">Fixed Record (142)</span>
+        <span class="chip">Enumerated (98)</span>
+        <span class="chip">Variant (36)</span>
+      </div>
+      <div class="sidebar-filter">
+        <input type="text" placeholder="Filter data types...">
+      </div>
+      <div class="sidebar-items">
+        <div class="sidebar-group-label">IEEE Standard</div>
+        <div class="tree-item selected">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAfloat32BE</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAfloat64BE</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAinteger16BE</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAinteger32BE</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAinteger64BE</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAoctet</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAoctetPairBE</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">HLAunicodeString</span>
+        </div>
+        <div class="sidebar-group-label">RPR FOM</div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">RPRunsignedInteger32</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">RPRfloat32</span>
+          <span class="usages">24 refs</span>
+        </div>
+        <div class="tree-item">
+          <span class="icon">&#128308;</span>
+          <span class="name">RPRboolean</span>
+          <span class="usages">8 refs</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- DETAIL PANEL -->
+    <div class="detail">
+      <div class="detail-tabs">
+        <div class="detail-tab active">HLAfloat32BE <span class="close">&#10005;</span></div>
+      </div>
+      <div class="detail-body">
+        <div class="detail-breadcrumb">
+          <span>Data Types</span><span class="sep">/</span><span class="current">HLAfloat32BE</span>
+        </div>
+        <div class="detail-title">HLAfloat32BE</div>
+        <div class="detail-subtitle">
+          <span style="color:var(--text2);">Basic Data Type &middot; 32-bit</span>
+          <span class="module-badge">HLAstandardMIM</span>
+          <span style="color:var(--text3);font-size:11px;">Used by 14 types, 3 classes</span>
+        </div>
+
+        <!-- PROPERTIES (always visible) -->
+        <div class="collapsible">
+          <div class="collapsible-header">
+            <span class="chevron open">&#9654;</span>
+            <span class="label">Properties</span>
+          </div>
+          <div class="collapsible-content">
+            <table class="prop-table">
+              <tr><th>Name</th><td>HLAfloat32BE</td></tr>
+              <tr><th>Size</th><td>32</td></tr>
+              <tr><th>Encoding</th><td>IEEE-754 binary32</td></tr>
+              <tr><th>Endian</th><td>Big</td></tr>
+              <tr><th>Semantics</th><td>32-bit floating point number in big-endian byte order, conforming to the IEEE-754 single precision format.</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- USAGES (collapsed by default) -->
+        <div class="collapsible">
+          <div class="collapsible-header">
+            <span class="chevron">&#9654;</span>
+            <span class="label">Used By</span>
+            <span class="count">17</span>
+          </div>
+        </div>
+
+        <!-- RELATED ISSUES (collapsed, with count) -->
+        <div class="collapsible">
+          <div class="collapsible-header">
+            <span class="chevron">&#9654;</span>
+            <span class="label" style="color:var(--orange);">Related Issues</span>
+            <span class="count" style="background:var(--orange);color:var(--bg);">2</span>
+          </div>
+          <div class="collapsible-content">
+            <table class="prop-table">
+              <tr><th style="width:auto;padding:4px 8px;color:var(--orange);">&#9888; Warning</th><td>Type referenced by RadarConfig but size mismatch (32 vs 64)</td></tr>
+              <tr><th style="width:auto;padding:4px 8px;color:var(--orange);">&#9888; Warning</th><td>Cross-module: defined differently in RPR-Foundation and RPR-Physical</td></tr>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="annotation">
+  <strong>Option A: Dark (VS Code inspired)</strong><br>
+  Left rail with icon navigation, data type filter chips<br>
+  in sidebar, collapsible detail sections, consolidated<br>
+  header with overflow menu.
+</div>
+
+</body>
+</html>
