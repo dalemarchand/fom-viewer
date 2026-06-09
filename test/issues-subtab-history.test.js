@@ -250,7 +250,9 @@ async function loadTestFomFile(page, filename) {
   
   await page.waitForFunction(() => {
     const welcome = document.getElementById('welcomeScreen');
-    return welcome && welcome.style.display === 'none';
+    if (welcome) return welcome.style.display === 'none';
+    const header = document.getElementById('detailHeader');
+    return header && header.style.display !== 'none';
   }, { timeout: config.test.timeout });
 }
 

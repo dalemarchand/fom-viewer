@@ -86,7 +86,7 @@ async function test_IssueHistoryPushAdversarial() {
     }
 
     // Get the first and second issues in the list
-    const issueItems = await page.$$('.tree-item');
+    const issueItems = await page.$$('.issue-item');
     if (issueItems.length < 2) {
       await captureScreenshot(page, 'test_IssueHistoryPushAdversarial_not_enough_issues');
       throw new Error('Need at least 2 issue items to test history push');
@@ -192,7 +192,7 @@ async function test_IssueHistoryPushAdversarial() {
       await sleep(300);
       
       // Select an object to set state.selectedItem
-      const objectItems = await page.$$('.tree-item');
+      const objectItems = await page.$$('#treeViewTree .tree-item');
       if (objectItems.length > 0) {
         await objectItems[0].click();
         await sleep(300);
@@ -203,7 +203,7 @@ async function test_IssueHistoryPushAdversarial() {
       await sleep(300);
       
       // Re-query issue items (previous handles are stale after tab switch)
-      const issuesAfterNav = await page.$$('.tree-item');
+      const issuesAfterNav = await page.$$('.issue-item');
       if (issuesAfterNav.length < 2) {
         throw new Error('Need at least 2 issue items after tab switch');
       }
@@ -234,7 +234,7 @@ async function test_IssueHistoryPushAdversarial() {
       });
       
       // Re-query issue items (state change might have re-rendered)
-      const issuesAfterNull = await page.$$('.tree-item');
+      const issuesAfterNull = await page.$$('.issue-item');
       if (issuesAfterNull.length < 2) {
         throw new Error('Need at least 2 issue items after null test');
       }
@@ -265,7 +265,7 @@ async function test_IssueHistoryPushAdversarial() {
       await waitAndClick(page, '[data-tab="objects"]');
       await sleep(300);
       
-      const objectItems = await page.$$('.tree-item');
+      const objectItems = await page.$$('#treeViewTree .tree-item');
       if (objectItems.length > 0) {
         await objectItems[0].click();
         await sleep(300);
@@ -276,7 +276,7 @@ async function test_IssueHistoryPushAdversarial() {
       await sleep(300);
       
       // Re-query issue items (previous handles are stale after tab switch)
-      const issuesAfterNav4 = await page.$$('.tree-item');
+      const issuesAfterNav4 = await page.$$('.issue-item');
       if (issuesAfterNav4.length < 1) {
         throw new Error('Need at least 1 issue item after tab switch');
       }
@@ -324,7 +324,7 @@ async function test_IssueHistoryPushAdversarial() {
       await sleep(300);
       
       // Re-query issue items
-      const issuesTest5 = await page.$$('.tree-item');
+      const issuesTest5 = await page.$$('.issue-item');
       if (issuesTest5.length < 3) {
         throw new Error('Need at least 3 issue items for sequential back test');
       }
@@ -341,12 +341,12 @@ async function test_IssueHistoryPushAdversarial() {
       
       // Click issue 2 → should push issue 1 to history
       // Re-query because tree was re-rendered
-      const issuesTest5b = await page.$$('.tree-item');
+      const issuesTest5b = await page.$$('.issue-item');
       await issuesTest5b[1].click();
       await sleep(300);
       
       // Click issue 3 → should push issue 2 to history
-      const issuesTest5c = await page.$$('.tree-item');
+      const issuesTest5c = await page.$$('.issue-item');
       await issuesTest5c[2].click();
       await sleep(300);
       
@@ -392,7 +392,7 @@ async function test_IssueHistoryPushAdversarial() {
       await sleep(300);
       
       // Re-query issue items (previous handles are stale after tab switches)
-      const issuesAfterNav6 = await page.$$('.tree-item');
+      const issuesAfterNav6 = await page.$$('.issue-item');
       if (issuesAfterNav6.length > 0) {
         await issuesAfterNav6[0].click();
         await sleep(300);
@@ -464,7 +464,9 @@ async function test_IssueHistoryPushAdversarial() {
     
     await page.waitForFunction(() => {
       const welcome = document.getElementById('welcomeScreen');
-      return welcome && welcome.style.display === 'none';
+      if (welcome) return welcome.style.display === 'none';
+      const header = document.getElementById('detailHeader');
+      return header && header.style.display !== 'none';
     }, { timeout: config.test.timeout });
   }
 

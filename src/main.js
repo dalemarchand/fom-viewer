@@ -1,29 +1,99 @@
 // ============================================================================
+// SVELTE APP ENTRY
+// ============================================================================
+
+import { mount } from 'svelte';
+import App from './App.svelte';
+import './styles.css';
+import { wrap } from 'comlink';
+import Fuse from 'fuse.js';
+
+mount(App, { target: document.getElementById('svelte-root') });
+
+let workerInstance = null;
+let workerProxy = null;
+let workerFailed = false;
+
+async function parseInWorker(xml) {
+  if (!workerProxy && !workerFailed) {
+    try {
+      workerInstance = new Worker(new URL('./lib/fom-worker.js', import.meta.url), { type: 'module' });
+      workerProxy = wrap(workerInstance);
+    } catch (e) {
+      workerFailed = true;
+    }
+  }
+  if (workerProxy) {
+    try { return await workerProxy.parse(xml); }
+    catch (e) { workerFailed = true; }
+  }
+  return parseSync(xml);
+}
+
+function parseSync(xml) {
+  const parser = new FOMParser(xml);
+  return parser.parse();
+}
+
+// Track style changes on detailHeader
+function trackDetailHeader() {
+  const dh = document.getElementById('detailHeader');
+  if (!dh) { setTimeout(trackDetailHeader, 50); return; }
+  const obs = new MutationObserver(records => {
+    for (const r of records) {
+      if (r.type === 'attributes' && r.attributeName === 'style') {
+        const title = document.getElementById('detailTitle');
+        console.log('[DH-MUTATION] style.display=' + dh.style.display + ' title=' + (title ? title.innerHTML : 'null'));
+      }
+    }
+  });
+  obs.observe(dh, { attributes: true, attributeFilter: ['style'] });
+  console.log('[DH-MUTATION] observer attached');
+}
+setTimeout(trackDetailHeader, 50);
+
+import { parseObjectClasses, parseInteractionClasses, parseDataTypes, parseModelIdentificationFull, parseDependencies, parseListElements, parseDimensions, parseTransportations, parseSwitches, parseTags, parseTime, parseNotes, buildFullName, getSource } from './lib/FOM-Parser/index.js';
+import { topologicalSort, mergeClasses, mergeTransportations, mergeDataTypes, mergeSwitches, mergeTags, mergeTime } from './lib/merge.js';
+import { validate, updateIssuesTabVisibility, detectCircularDependencies } from './lib/validation.js';
+import { exportJSON, exportFullJSON, exportCSV, exportPrint } from './lib/export.js';
+import * as fomStore from './lib/stores/fomStore.svelte.js';
+import * as uiStore from './lib/stores/uiStore.svelte.js';
+import * as historyStore from './lib/stores/historyStore.svelte.js';
+import * as issueStore from './lib/stores/issueStore.svelte.js';
+import * as storage from './lib/storage.js';
+import * as searchStore from './lib/stores/searchStore.svelte.js';
+
+// ============================================================================
 // CONSTANTS & STATE
 // ============================================================================
 
 const DEBUG_BACK_BUTTON = false;
 
-const DB_NAME = 'FOMViewerDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'fomFiles';
-
 const state = {
-  files: [],
-  mergedFOM: null,
-  currentTab: 'modules',
-  currentSubTab: 'basic',
-  selectedItem: null,
-  sortEnabled: 'asc', // 'asc', 'desc', or false (off)
-  issues: [],
-  issuesFilter: 'all', // 'all', 'error', 'warning'
-  conflicts: [],   // @deprecated — use state.issues instead
-  errors: [],      // @deprecated — use state.issues instead
+  // Delegated to stores
+  get files() { return fomStore.getFiles(); },
+  set files(v) { fomStore.setFiles(v); },
+  get mergedFOM() { return fomStore.getMergedFOM(); },
+  set mergedFOM(v) { fomStore.setMergedFOM(v); },
+  get currentTab() { return uiStore.getCurrentTab(); },
+  set currentTab(v) { uiStore.setCurrentTab(v); },
+  get currentSubTab() { return uiStore.getCurrentSubTab(); },
+  set currentSubTab(v) { uiStore.setCurrentSubTab(v); },
+  get selectedItem() { return uiStore.getSelectedItem(); },
+  set selectedItem(v) { uiStore.setSelectedItem(v); },
+  get sortEnabled() { return uiStore.getSortEnabled(); },
+  set sortEnabled(v) { uiStore.setSortEnabled(v); },
+  get issues() { return issueStore.getIssues(); },
+  set issues(v) { issueStore.setIssues(v); },
+  get issuesFilter() { return issueStore.getIssuesFilter(); },
+  set issuesFilter(v) { issueStore.setIssuesFilter(v); },
+  get appspaceSubTab() { return uiStore.getAppspaceSubTab(); },
+  set appspaceSubTab(v) { uiStore.setAppspaceSubTab(v); },
+  // Data properties (not yet store-delegated)
   history: [],
-  // Appspace state
-  // Structure: { fileName, entries: [{ className, apps: [] }], interactions: [{ className, apps: [], matchedClass }], unknown: [{ className, apps: [] }]
-  appspace: null, // { fileName, entries, interactions, unknown }
-  appspaceSubTab: 'objects', // 'objects', 'interactions', or 'unknown'
+  conflicts: [],
+  errors: [],
+  appspace: null,
   uiState: {
     currentTab: 'modules',
     currentSubTab: 'basic',
@@ -47,8 +117,6 @@ function makeIssue(severity, category, type, message, detail, sources, locations
   };
 }
 
-let db = null;
-
 // ============================================================================
 // DEBUG UTILITIES
 // ============================================================================
@@ -61,47 +129,22 @@ function debugBack(msg, ...args) {
 // DATABASE (IndexedDB for file caching)
 // ============================================================================
 
-function initDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => { db = request.result; resolve(db); };
-    request.onupgradeneeded = (event) => {
-      const database = event.target.result;
-      if (!database.objectStoreNames.contains(STORE_NAME)) {
-        database.createObjectStore(STORE_NAME, { keyPath: 'name' });
-      }
-    };
-  });
-}
-
 // ============================================================================
 // STORAGE (IndexedDB persistence)
 // ============================================================================
 
 async function saveToStorage() {
   const fileData = state.files.map(f => ({ name: f.name, xml: f.xml }));
-  const uiState = { currentTab: state.currentTab, currentSubTab: state.currentSubTab, selectedItem: state.selectedItem, sortEnabled: state.sortEnabled, issuesFilter: state.issuesFilter };
+  const sel = state.selectedItem;
+  const uiState = { currentTab: state.currentTab, currentSubTab: state.currentSubTab, selectedItem: sel ? { name: sel.name, type: sel.type } : null, sortEnabled: state.sortEnabled, issuesFilter: state.issuesFilter };
   try {
-    if (!db) await initDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    store.clear();
-    for (const file of fileData) { store.add(file); }
-    store.put({ name: '__uiState__', uiState: uiState });
-    // Save appspace state
-    if (state.appspace) {
-      store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab });
-    }
+    await storage.saveAll(fileData, uiState, state.appspace, state.appspaceSubTab);
   } catch (e) { console.warn('Failed to save to IndexedDB:', e); }
 }
 
 async function clearStorage() {
   try {
-    if (!db) await initDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    store.clear();
+    await storage.clearAll();
   } catch (e) { console.warn('Failed to clear IndexedDB:', e); }
 }
 
@@ -111,11 +154,8 @@ async function clearStorage() {
 
 async function loadFromStorage() {
   try {
-    if (!db) await initDB();
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const uiStateRequest = store.get('__uiState__');
-    const uiState = await new Promise((resolve) => { uiStateRequest.onsuccess = () => resolve(uiStateRequest.result?.uiState); uiStateRequest.onerror = () => resolve(null); });
+    // Load UI state
+    const uiState = await storage.loadUiState();
     if (uiState) {
       state.currentTab = uiState.currentTab || 'modules';
       state.currentSubTab = uiState.currentSubTab || 'basic';
@@ -149,13 +189,10 @@ async function loadFromStorage() {
       }
     }
     // Load appspace data
-    const appspaceRequest = store.get('__appspace__');
-    const appspaceData = await new Promise((resolve) => { appspaceRequest.onsuccess = () => resolve(appspaceRequest.result); appspaceRequest.onerror = () => resolve(null); });
-    if (appspaceData && appspaceData.data) {
-      state.appspace = appspaceData.data;
-      state.appspaceSubTab = appspaceData.subTab || 'objects';
-      // No longer using hideUnmatched - entries are classified as objects/interactions/unknown
-      // Update UI
+    const appspaceEntry = await storage.loadAppspace();
+    if (appspaceEntry && appspaceEntry.data) {
+      state.appspace = appspaceEntry.data;
+      state.appspaceSubTab = appspaceEntry.subTab || 'objects';
       const loadBtn = document.getElementById('loadAppspaceBtn');
       const clearBtn = document.getElementById('clearAppspaceBtn');
       const separator = document.getElementById('appspaceSeparator');
@@ -166,18 +203,20 @@ async function loadFromStorage() {
       if (appspaceTab) appspaceTab.style.display = 'block';
       updateAppspaceTabCount();
     }
-    const fileRequest = store.getAll();
-    const allData = await new Promise((resolve) => { fileRequest.onsuccess = () => resolve(fileRequest.result); fileRequest.onerror = () => resolve([]); });
-    const fileData = allData.filter(f => f.name !== '__uiState__' && f.name !== '__appspace__');
+    // Load FOM files
+    const fileData = await storage.loadAllFiles();
     if (Array.isArray(fileData) && fileData.length > 0) {
-      fileData.forEach(f => {
-        try { const parser = new FOMParser(f.xml); const fom = parser.parse(); state.files.push(fom); }
+      for (const f of fileData) {
+        try { const fom = await parseInWorker(f.xml); state.files.push(fom); }
         catch (e) { console.error('Failed to parse stored file', f.name, e); }
-      });
+      }
       if (state.files.length > 0) {
         const sorted = topologicalSort(state.files);
-        state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: mergeDataTypes(sorted), transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
-        validate(); updateUI(); updateTabCounts(); updateIssuesTabVisibility();
+        const dtResult = mergeDataTypes(sorted);
+        state.conflicts = state.conflicts.filter(c => c.type !== 'enum' && c.type !== 'variant');
+        state.conflicts.push(...dtResult.conflicts);
+        state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: dtResult.result, transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
+        validate(state, makeIssue); updateUI(); updateTabCounts(); updateIssuesTabVisibility(state);
         if (state.selectedItem) {
           const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
           setTimeout(() => {
@@ -188,6 +227,7 @@ async function loadFromStorage() {
               if (file) showModuleDetails(file, false);
             } else if (state.currentTab === 'issues') {
               showIssueDetail(state.selectedItem.name);
+              issueStore.selectIssue(state.selectedItem.name);
             } else {
               showDetail(state.selectedItem.name, state.selectedItem.type);
             }
@@ -198,6 +238,12 @@ async function loadFromStorage() {
             if (firstItem) {
               firstItem.classList.add('selected');
               const name = firstItem.dataset.name;
+              const issueId = firstItem.dataset.issueId;
+              if (state.currentTab === 'issues' && issueId) {
+                showIssueDetail(issueId);
+                issueStore.selectIssue(issueId);
+                return;
+              }
               if (state.currentTab === 'issues') return;
               const type = firstItem.dataset.type || (state.currentTab === 'modules' ? null : state.currentTab === 'objects' ? 'object' : state.currentTab === 'dims' ? 'dims' : state.currentTab === 'trans' ? 'trans' : state.currentTab === 'notes' ? 'notes' : state.currentTab === 'switches' ? 'switches' : state.currentTab === 'tags' ? 'tags' : state.currentTab === 'time' ? 'time' : state.currentTab === 'interactions' ? 'interaction' : state.currentSubTab);
               if (name && type) {
@@ -219,21 +265,6 @@ async function loadFromStorage() {
 class FOMParser {
   constructor(xml) { this.xml = xml; this.parser = new DOMParser(); }
 
-  // Build full hierarchical name by walking up the DOM tree
-  buildFullName(el, validTagNames) {
-    if (!el) return '';
-    const name = el.querySelector('name')?.textContent || '';
-    if (!name) return '';
-    // HLAobjectRoot and HLAinteractionRoot are roots - don't prepend anything
-    if (name === 'HLAobjectRoot' || name === 'HLAinteractionRoot') return name;
-    const parentEl = el.parentElement;
-    if (parentEl && validTagNames.includes(parentEl.tagName)) {
-      const parentFullName = this.buildFullName(parentEl, validTagNames);
-      return parentFullName + '.' + name;
-    }
-    return name;
-  }
-
   parse() {
     const doc = this.parser.parseFromString(this.xml, 'text/xml');
     const parseError = doc.querySelector('parsererror');
@@ -241,1479 +272,38 @@ class FOMParser {
     const modelIdent = doc.querySelector('modelIdentification');
     const name = modelIdent?.querySelector('name')?.textContent || 'Unknown';
     const version = modelIdent?.querySelector('version')?.textContent || '1.0';
-    const dependencies = this.parseDependencies(modelIdent);
-    const objectClasses = this.parseObjectClasses(doc);
-    const interactionClasses = this.parseInteractionClasses(doc);
-    const dataTypes = this.parseDataTypes(doc);
-    const modelIdentification = this.parseModelIdentificationFull(modelIdent);
-    const dimResult = this.parseDimensions(doc);
-    const transResult = this.parseTransportations(doc);
-    const notes = this.parseNotes(doc);
-    const switches = this.parseSwitches(doc);
-    const tags = this.parseTags(doc);
-    const time = this.parseTime(doc);
+    const dependencies = parseDependencies(modelIdent);
+    const objectClasses = parseObjectClasses(doc);
+    const interactionClasses = parseInteractionClasses(doc);
+    const dataTypes = parseDataTypes(doc);
+    const modelIdentification = parseModelIdentificationFull(modelIdent);
+    const dimResult = parseDimensions(doc);
+    const transResult = parseTransportations(doc);
+    const notes = parseNotes(doc);
+    const switches = parseSwitches(doc);
+    const tags = parseTags(doc);
+    const time = parseTime(doc);
     return { name, version, dependencies, objectClasses, interactionClasses, dataTypes, modelIdentification, dimensions: dimResult.result, transportations: transResult.result, transportWarnings: transResult.warnings, notes, switches, tags, time, xml: this.xml };
   }
-  parseModelIdentificationFull(modelIdent) {
-    if (!modelIdent || typeof modelIdent === 'string' || !modelIdent.children) return [];
-    const result = [];
-    const seen = {};
-    
-    const children = Array.from(modelIdent.children).filter(c => c.nodeType === 1);
-    for (const child of children) {
-      const tag = child.tagName ? child.tagName.split('}').pop() : (child.tag || '').split('}').pop();
-      if (!tag || seen[tag]) continue;
-      
-      const elems = modelIdent.querySelectorAll(tag);
-      if (elems.length === 1) {
-        const text = child.textContent?.trim();
-        if (!text) continue;
-        if (child.children && child.children.length > 0) {
-          const subRows = [];
-          const subChildren = Array.from(child.children).filter(c => c.nodeType === 1);
-          for (const sub of subChildren) {
-            const subTag = sub.tagName ? sub.tagName.split('}').pop() : (sub.tag || '').split('}').pop();
-            const subText = sub.textContent?.trim();
-            if (subText) subRows.push({ key: subTag, value: subText });
-          }
-          if (subRows.length > 0) result.push({ key: tag, value: '', isSubTable: true, rows: subRows });
-        } else {
-          result.push({ key: tag, value: text });
-        }
-      } else {
-        const uniqueValues = new Set();
-        elems.forEach(e => { const t = e.textContent?.trim(); if (t) uniqueValues.add(t); });
-        const values = Array.from(uniqueValues);
-        if (values.length > 0) {
-          result.push({ key: tag, value: '', isList: true, values: values });
-        }
-      }
-      seen[tag] = true;
-    }
-    return result;
-  }
-  parseListElements(doc, selector) {
-    const els = doc.querySelectorAll(selector);
-    return Array.from(els).map(el => el.textContent?.trim()).filter(t => t);
-  }
-  parseDimensions(doc) {
-    const result = [];
-    const warnings = [];
-    const root = doc.documentElement;
-    if (!root) return { result, warnings };
-    for (let i = 0; i < root.children.length; i++) {
-      const el = root.children[i];
-      if (el.tagName && el.tagName.includes('dimensions')) {
-        const seen = {};
-        for (let j = 0; j < el.children.length; j++) {
-          const dim = el.children[j];
-          if (dim.tagName && dim.tagName.includes('dimension')) {
-            const nameEl = dim.querySelector('name');
-            const name = nameEl ? nameEl.textContent?.trim() : dim.textContent?.trim() || '';
-            if (name && !seen[name]) {
-              seen[name] = true;
-              const childEls = Array.from(dim.children).filter(c => c.nodeType === 1);
-              if (childEls.length > 0) {
-                const rows = [];
-                childEls.forEach(child => {
-                  const tag = child.tagName ? child.tagName.split('}').pop() : null;
-                  const text = child.textContent?.trim();
-                  if (tag && text && tag !== 'name') rows.push({ key: tag, value: text });
-                });
-                result.push({ name, isComplex: true, rows });
-              } else {
-                result.push({ name, isComplex: false });
-              }
-            }
-          }
-        }
-        break;
-      }
-    }
-    const merged = [];
-    const dimSeen = {};
-    for (const d of result) {
-      if (!dimSeen[d.name]) {
-        dimSeen[d.name] = d;
-        merged.push(d);
-      } else {
-        const existing = dimSeen[d.name];
-        if (d.isComplex && d.rows && d.rows.length > 0) {
-          if (!existing.rows) existing.rows = [];
-          d.rows.forEach(r => {
-            if (!existing.rows.some(er => er.key === r.key && er.value === r.value)) {
-              existing.rows.push(r);
-            }
-          });
-        }
-      }
-    }
-    return { result: merged, warnings };
-  }
-  parseNotes(doc) {
-    const result = [];
-    const root = doc.documentElement;
-    if (!root) return result;
-    for (let i = 0; i < root.children.length; i++) {
-      const el = root.children[i];
-      if (el.tagName && el.tagName.includes('notes')) {
-        for (let j = 0; j < el.children.length; j++) {
-          const note = el.children[j];
-          if (note.tagName && note.tagName.includes('note')) {
-            const label = note.querySelector('label')?.textContent?.trim() || '';
-            const semantics = note.querySelector('semantics')?.textContent?.trim() || '';
-            const rows = [];
-            const childEls = Array.from(note.children).filter(c => c.nodeType === 1);
-            childEls.forEach(child => {
-              const tag = child.tagName ? child.tagName.split('}').pop() : null;
-              const text = child.textContent?.trim();
-              if (tag && text && tag !== 'label' && tag !== 'semantics') rows.push({ key: tag, value: text });
-            });
-            result.push({ name: label, semantics: semantics, rows: rows });
-          }
-        }
-        break;
-      }
-    }
-    return result;
-  }
-  parseTransportations(doc) {
-    const result = [];
-    const warnings = [];
-    const root = doc.documentElement;
-    if (!root) return { result, warnings };
-    for (let i = 0; i < root.children.length; i++) {
-      const el = root.children[i];
-      if (el.tagName && el.tagName.includes('transportations')) {
-        for (let j = 0; j < el.children.length; j++) {
-          const trans = el.children[j];
-          if (trans.tagName && trans.tagName.includes('transportation')) {
-            const nameEl = trans.querySelector('name');
-            const name = nameEl ? nameEl.textContent?.trim() : trans.textContent?.trim() || '';
-            const reliable = trans.querySelector('reliable')?.textContent?.trim() || '';
-            const semanticsEl = trans.querySelector('semantics');
-            const semantics = semanticsEl ? semanticsEl.textContent?.trim() : '';
-            const rows = [];
-            const childEls = Array.from(trans.children).filter(c => c.nodeType === 1);
-            childEls.forEach(child => {
-              const tag = child.tagName ? child.tagName.split('}').pop() : null;
-              const text = child.textContent?.trim();
-              if (tag && text && tag !== 'name' && tag !== 'reliable' && tag !== 'semantics') rows.push({ key: tag, value: text });
-            });
-            if (name) result.push({ name, reliable, semantics, rows: rows.length > 0 ? rows : null });
-          }
-        }
-        break;
-      }
-    }
-    const merged = [];
-    const seen = {};
-    for (const t of result) {
-      if (!seen[t.name]) {
-        seen[t.name] = t;
-        merged.push(t);
-      } else {
-        const existing = seen[t.name];
-        if (existing.reliable !== t.reliable) {
-          warnings.push(`Transportation "${t.name}" has conflicting reliable values: "${existing.reliable}" vs "${t.reliable}"`);
-        }
-        if (existing.semantics !== t.semantics) {
-          warnings.push(`Transportation "${t.name}" has conflicting semantics: "${existing.semantics}" vs "${t.semantics}"`);
-        }
-        if (t.rows && t.rows.length > 0) {
-          if (!existing.rows) existing.rows = [];
-          t.rows.forEach(r => {
-            if (!existing.rows.some(er => er.key === r.key && er.value === r.value)) {
-              existing.rows.push(r);
-            }
-          });
-        }
-      }
-    }
-    return { result: merged, warnings };
-  }
-  parseSwitches(doc) {
-    const result = [];
-    const root = doc.documentElement;
-    if (!root) return result;
-    for (let i = 0; i < root.children.length; i++) {
-      const el = root.children[i];
-      if (el.tagName && el.tagName.includes('switches')) {
-        for (let j = 0; j < el.children.length; j++) {
-          const sw = el.children[j];
-          if (sw.tagName && sw.nodeType === 1) {
-            const name = sw.tagName.split('}').pop() || sw.tagName;
-            const isEnabled = sw.getAttribute('isEnabled');
-            const value = sw.getAttribute('resignAction') || isEnabled || '';
-            const semantics = sw.querySelector('semantics')?.textContent?.trim() || '';
-            if (name) result.push({ name, value, semantics });
-          }
-        }
-        break;
-      }
-    }
-    return result;
-  }
-  parseTags(doc) {
-    const result = [];
-    const root = doc.documentElement;
-    if (!root) return result;
-    for (let i = 0; i < root.children.length; i++) {
-      const el = root.children[i];
-      if (el.tagName && el.tagName.includes('tags')) {
-        for (let j = 0; j < el.children.length; j++) {
-          const tag = el.children[j];
-          if (tag.tagName && tag.nodeType === 1) {
-            const name = tag.tagName.split('}').pop() || tag.tagName;
-            const dataType = tag.querySelector('dataType')?.textContent?.trim() || '';
-            const semantics = tag.querySelector('semantics')?.textContent?.trim() || '';
-            if (name) result.push({ name, dataType, semantics });
-          }
-        }
-        break;
-      }
-    }
-    return result;
-  }
-  parseTime(doc) {
-    const result = {};
-    const root = doc.documentElement;
-    if (!root) return result;
-    for (let i = 0; i < root.children.length; i++) {
-      const el = root.children[i];
-      if (el.tagName && el.tagName.includes('time')) {
-        const timeStamp = el.querySelector('timeStamp');
-        if (timeStamp) {
-          result.timeStamp = {
-            dataType: timeStamp.querySelector('dataType')?.textContent?.trim() || '',
-            semantics: timeStamp.querySelector('semantics')?.textContent?.trim() || ''
-          };
-        }
-        const lookahead = el.querySelector('lookahead');
-        if (lookahead) {
-          result.lookahead = {
-            dataType: lookahead.querySelector('dataType')?.textContent?.trim() || '',
-            semantics: lookahead.querySelector('semantics')?.textContent?.trim() || ''
-          };
-        }
-        break;
-      }
-    }
-    return result;
-  }
-  getSource(doc) {
-    return doc.querySelector('modelIdentification > name')?.textContent || '';
-  }
-  parseDependencies(modelIdent) {
-    const refs = modelIdent?.querySelectorAll('reference') || [];
-    const deps = [];
-    refs.forEach(ref => {
-      const type = ref.querySelector('type')?.textContent;
-      if (type === 'Dependency') {
-        const name = ref.querySelector('identification')?.textContent || ref.querySelector('name')?.textContent;
-        if (name) deps.push(name);
-      }
-    });
-    return deps;
-  }
 
-  parseObjectClasses(doc) {
-    const classes = [];
-    const elements = doc.querySelectorAll('objectClass, objectClassRTI');
-    elements.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      if (!name) return;
-      // Build full hierarchical name by walking up the DOM
-      const fullName = this.buildFullName(el, ['objectClass', 'objectClassRTI']);
-      const parentEl = el.parentElement;
-      const fullParentName = (parentEl && (parentEl.tagName === 'objectClass' || parentEl.tagName === 'objectClassRTI')) ? this.buildFullName(parentEl, ['objectClass', 'objectClassRTI']) : '';
-      const sharing = el.querySelector('sharing')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      const classNotes = el.getAttribute('notes') || '';
-      const attributes = [];
-      // Only get direct child attributes, not nested ones
-      const childNodes = el.childNodes;
-      childNodes.forEach(node => {
-        if (node.nodeName === 'attribute' || node.nodeName === 'attributeRTI') {
-          const attrName = node.querySelector('name')?.textContent || '';
-          const attrSharing = node.querySelector('sharing')?.textContent || '';
-          const attrSemantics = node.querySelector('semantics')?.textContent || '';
-          const attrNotes = node.getAttribute('notes') || '';
-          const dt = node.querySelector('dataType')?.textContent || '';
-          const updateType = node.querySelector('updateType')?.textContent || '';
-          const updateCondition = node.querySelector('updateCondition')?.textContent || '';
-          const ownership = node.querySelector('ownership')?.textContent || '';
-          const transportation = node.querySelector('transportation')?.textContent || '';
-          const order = node.querySelector('order')?.textContent || '';
-          const dimensionEls = node.querySelectorAll('dimensions > dimension');
-          const dimensions = Array.from(dimensionEls).map(d => d.textContent.trim()).filter(d => d);
-          if (attrName) attributes.push({ name: attrName, sharing: attrSharing, semantics: attrSemantics, notes: attrNotes, dataType: dt, updateType, updateCondition, ownership, transportation, order, dimensions });
-        }
-      });
-      classes.push({ name: fullName, sharing, semantics, notes: classNotes, attributes, parent: fullParentName, _source: this.getSource(doc) });
-    });
-    return classes;
-  }
-
-  parseInteractionClasses(doc) {
-    const classes = [];
-    const elements = doc.querySelectorAll('interactionClass, interactionClassRTI');
-    elements.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      if (!name) return;
-      // Build full hierarchical name by walking up the DOM
-      const fullName = this.buildFullName(el, ['interactionClass', 'interactionClassRTI']);
-      const parentEl = el.parentElement;
-      const fullParentName = (parentEl && (parentEl.tagName === 'interactionClass' || parentEl.tagName === 'interactionClassRTI')) ? this.buildFullName(parentEl, ['interactionClass', 'interactionClassRTI']) : '';
-      const sharing = el.querySelector('sharing')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      const classNotes = el.getAttribute('notes') || '';
-      const dimensionEls = el.querySelectorAll('dimensions > dimension');
-      const dimensions = Array.from(dimensionEls).map(d => d.textContent).filter(d => d);
-      const transportation = el.querySelector('transportation')?.textContent || '';
-      const order = el.querySelector('order')?.textContent || '';
-      const parameters = [];
-      // Only get direct child parameters, not nested ones
-      const childNodes = el.childNodes;
-      childNodes.forEach(node => {
-        if (node.nodeName === 'parameter' || node.nodeName === 'parameterRTI') {
-          const paramName = node.querySelector('name')?.textContent || '';
-          const paramSharing = node.querySelector('sharing')?.textContent || '';
-          const paramSemantics = node.querySelector('semantics')?.textContent || '';
-          const paramNotes = node.getAttribute('notes') || '';
-          const dt = node.querySelector('dataType')?.textContent || '';
-          const order = node.querySelector('order')?.textContent || '';
-          if (paramName) parameters.push({ name: paramName, sharing: paramSharing, semantics: paramSemantics, notes: paramNotes, dataType: dt, order });
-        }
-      });
-      classes.push({ name: fullName, sharing, semantics, notes: classNotes, dimensions, transportation, order, parameters, parent: fullParentName, _source: this.getSource(doc) });
-    });
-    return classes;
-  }
-  parseDataTypes(doc) {
-    const basic = [];
-    const basicEls = doc.querySelectorAll('basicData');
-    basicEls.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      const size = el.querySelector('size')?.textContent || '';
-      const encoding = el.querySelector('encoding')?.textContent || '';
-      const endian = el.querySelector('endian')?.textContent || '';
-      const interpretation = el.querySelector('interpretation')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      if (name) basic.push({ name, size, encoding, endian, interpretation, semantics, _source: this.getSource(doc) });
-    });
-    const simple = [];
-    const simpleEls = doc.querySelectorAll('simpleData');
-    simpleEls.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      const representation = el.querySelector('representation')?.textContent || '';
-      const units = el.querySelector('units')?.textContent || '';
-      const resolution = el.querySelector('resolution')?.textContent || '';
-      const accuracy = el.querySelector('accuracy')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      const simpleNotes = el.getAttribute('notes') || '';
-      if (name) simple.push({ name, representation, units, resolution, accuracy, semantics, notes: simpleNotes, _source: this.getSource(doc) });
-    });
-    const array = [];
-    const arrayEls = doc.querySelectorAll('arrayData');
-    arrayEls.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      const dataType = el.querySelector('dataType')?.textContent || '';
-      const cardinality = el.querySelector('cardinality')?.textContent || '';
-      const encoding = el.querySelector('encoding')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      const arrayNotes = el.getAttribute('notes') || '';
-      if (name) array.push({ name, dataType, cardinality, encoding, semantics, notes: arrayNotes, _source: this.getSource(doc) });
-    });
-    const fixed = [];
-    const fixedEls = doc.querySelectorAll('fixedRecordData');
-    fixedEls.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      const encoding = el.querySelector('encoding')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      const fixedNotes = el.getAttribute('notes') || '';
-      const fields = [];
-      const fieldEls = el.querySelectorAll('field');
-      fieldEls.forEach(field => {
-        const fieldName = field.querySelector('name')?.textContent || '';
-        const fieldDt = field.querySelector('dataType')?.textContent || '';
-        const fieldEncoding = field.querySelector('encoding')?.textContent || '';
-        const fieldSemantics = field.querySelector('semantics')?.textContent || '';
-        const fieldNotes = field.getAttribute('notes') || '';
-        if (fieldName) fields.push({ name: fieldName, dataType: fieldDt, encoding: fieldEncoding, semantics: fieldSemantics, notes: fieldNotes });
-      });
-      fixed.push({ name, encoding, semantics, notes: fixedNotes, fields, _source: this.getSource(doc) });
-    });
-    const enumTypes = [];
-    const enumEls = doc.querySelectorAll('enumeratedData');
-    enumEls.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      const representation = el.querySelector('representation')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      const enumNotes = el.getAttribute('notes') || '';
-      const values = [];
-      const valueEls = el.querySelectorAll('enumerator');
-      valueEls.forEach(v => {
-        const vName = v.querySelector('name')?.textContent || '';
-        const vValue = v.querySelector('value')?.textContent || '';
-        const vNotes = v.getAttribute('notes') || '';
-        if (vName) values.push({ name: vName, value: parseInt(vValue) || 0, notes: vNotes });
-      });
-      enumTypes.push({ name, representation, semantics, notes: enumNotes, values, _source: this.getSource(doc) });
-    });
-    const variant = [];
-    const variantEls = doc.querySelectorAll('variantRecordData');
-    variantEls.forEach(el => {
-      const name = el.querySelector('name')?.textContent || '';
-      const discriminant = el.querySelector('discriminant')?.textContent || '';
-      const dataType = el.querySelector('dataType')?.textContent || '';
-      const encoding = el.querySelector('encoding')?.textContent || '';
-      const semantics = el.querySelector('semantics')?.textContent || '';
-      const variantNotes = el.getAttribute('notes') || '';
-      const alternatives = [];
-      const altEls = el.querySelectorAll('alternative');
-      altEls.forEach(alt => {
-        const altLabel = alt.querySelector('name')?.textContent || '';
-        const altEnumerator = alt.querySelector('enumerator')?.textContent || '';
-        const altDt = alt.querySelector('dataType')?.textContent || '';
-        const altSemantics = alt.querySelector('semantics')?.textContent || '';
-        const altNotes = alt.getAttribute('notes') || '';
-        if (altLabel) alternatives.push({ label: altLabel, enumerator: altEnumerator, dataType: altDt, semantics: altSemantics, notes: altNotes });
-      });
-      variant.push({ name, discriminant, dataType, encoding, semantics, notes: variantNotes, alternatives, _source: this.getSource(doc) });
-    });
-    return { basic, simple, array, fixed, enum: enumTypes, variant };
-  }
+  buildFullName(el, validTagNames) { return buildFullName(el, validTagNames); }
+  getSource(doc) { return getSource(doc); }
+  parseModelIdentificationFull(modelIdent) { return parseModelIdentificationFull(modelIdent); }
+  parseListElements(doc, selector) { return parseListElements(doc, selector); }
+  parseDimensions(doc) { return parseDimensions(doc); }
+  parseNotes(doc) { return parseNotes(doc); }
+  parseTransportations(doc) { return parseTransportations(doc); }
+  parseSwitches(doc) { return parseSwitches(doc); }
+  parseTags(doc) { return parseTags(doc); }
+  parseTime(doc) { return parseTime(doc); }
+  parseDependencies(modelIdent) { return parseDependencies(modelIdent); }
+  parseObjectClasses(doc) { return parseObjectClasses(doc); }
+  parseInteractionClasses(doc) { return parseInteractionClasses(doc); }
+  parseDataTypes(doc) { return parseDataTypes(doc); }
 }
 
-// ============================================================================
-// FOM MERGING & ANALYSIS
-// ============================================================================
 
-function topologicalSort(files) {
-  const graph = {};
-  const inDegree = {};
-  files.forEach(f => { graph[f.name] = []; inDegree[f.name] = 0; });
-  files.forEach(f => { f.dependencies.forEach(dep => { if (graph[dep] !== undefined) { graph[dep].push(f.name); inDegree[f.name]++; } }); });
-  const queue = files.filter(f => inDegree[f.name] === 0).map(f => f.name);
-  const result = [];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    const file = files.find(f => f.name === current);
-    if (file) result.push(file);
-    graph[current].forEach(neighbor => { inDegree[neighbor]--; if (inDegree[neighbor] === 0) queue.push(neighbor); });
-  }
-  return result;
-}
 
-function mergeClasses(files, type) {
-  const map = {};
-  files.forEach(file => {
-    const classes = type === 'object' ? file.objectClasses : file.interactionClasses;
-    classes.forEach(c => {
-      if (!map[c.name]) {
-        const mergedAttrs = c.attributes ? c.attributes.map(a => ({ ...a, _source: file.name })) : undefined;
-        const mergedParams = c.parameters ? c.parameters.map(p => ({ ...p, _source: file.name })) : undefined;
-        map[c.name] = {
-          ...c,
-          attributes: mergedAttrs,
-          parameters: mergedParams,
-          _sources: [file.name]
-        };
-      }
-      else { 
-        map[c.name]._sources.push(file.name); 
-        // Merge unique attributes from all sources
-        if (c.attributes) {
-          const existingAttrs = map[c.name].attributes || [];
-          const existingNames = new Set(existingAttrs.map(a => a.name));
-          c.attributes.forEach(attr => {
-            if (!existingNames.has(attr.name)) {
-              existingAttrs.push({ ...attr, _source: file.name });
-              existingNames.add(attr.name);
-            }
-          });
-          map[c.name].attributes = existingAttrs;
-        }
-        // Merge unique parameters
-        if (c.parameters) {
-          const existingParams = map[c.name].parameters || [];
-          const existingNames = new Set(existingParams.map(p => p.name));
-          c.parameters.forEach(param => {
-            if (!existingNames.has(param.name)) {
-              existingParams.push({ ...param, _source: file.name });
-              existingNames.add(param.name);
-            }
-          });
-          map[c.name].parameters = existingParams;
-        }
-      }
-    });
-  });
-  return Object.values(map);
-}
-
-function mergeTransportations(files) {
-  const map = {};
-  const warnings = [];
-  files.forEach(f => {
-    const transList = f.transportations || [];
-    transList.forEach(t => {
-      if (!map[t.name]) {
-        map[t.name] = { ...t, _sources: [f.name] };
-      } else {
-        map[t.name]._sources.push(f.name);
-        if (map[t.name].reliable !== t.reliable && t.reliable) {
-          warnings.push(`Transportation "${t.name}" has conflicting reliable values`);
-        }
-        if (!map[t.name].semantics && t.semantics) {
-          map[t.name].semantics = t.semantics;
-        } else if (map[t.name].semantics !== t.semantics && t.semantics) {
-          warnings.push(`Transportation "${t.name}" has conflicting semantics`);
-        }
-        if (t.rows && t.rows.length > 0) {
-          if (!map[t.name].rows) map[t.name].rows = [];
-          t.rows.forEach(r => {
-            if (!map[t.name].rows.some(er => er.key === r.key && er.value === r.value)) {
-              map[t.name].rows.push(r);
-            }
-          });
-        }
-      }
-    });
-  });
-  return Object.values(map);
-}
-
-function mergeDataTypes(files) {
-  const result = { basic: [], simple: [], array: [], fixed: [], enum: [], variant: [] };
-  const typeMap = { basic: 'basic', simple: 'simple', array: 'array', fixed: 'fixed', enum: 'enum', variant: 'variant' };
-  Object.keys(typeMap).forEach(type => {
-    const map = {};
-    const addToMap = (items) => {
-      items.forEach(item => {
-        if (!map[item.name]) { map[item.name] = { ...item, _sources: [item._source] }; }
-        else { map[item.name]._sources.push(item._source); if (type === 'fixed' || type === 'enum' || type === 'variant') map[item.name][type === 'enum' ? 'values' : type === 'variant' ? 'alternatives' : 'fields'] = mergeArrayProperty(map[item.name], item, type); }
-      });
-    };
-    files.forEach(f => addToMap(f.dataTypes[typeMap[type]] || []));
-    const values = Object.values(map);
-    if (type === 'enum' || type === 'variant') { state.conflicts = state.conflicts.filter(c => c.type !== type); checkConflicts(values, type); }
-    result[type] = values;
-  });
-  return result;
-}
-
-function mergeArrayProperty(existing, incoming, type) {
-  const propName = type === 'fixed' ? 'fields' : type === 'enum' ? 'values' : 'alternatives';
-  const existingArr = existing[propName] || [];
-  const incomingArr = incoming[propName] || [];
-  return [...existingArr, ...incomingArr];
-}
-
-function checkConflicts(items, type) {
-  items.forEach(item => {
-    if (item._sources && item._sources.length > 1) {
-      if (type === 'enum') {
-        const values = item.values || [];
-        const valueMap = {};
-        values.forEach(v => {
-          if (!valueMap[v.value]) valueMap[v.value] = [];
-          valueMap[v.value].push(v.name);
-        });
-        let hasConflict = false;
-        Object.keys(valueMap).forEach(val => {
-          const names = valueMap[val];
-          if (names.length > 1) {
-            const uniqueNames = [...new Set(names)];
-            if (uniqueNames.length > 1) hasConflict = true;
-          }
-        });
-        if (hasConflict) {
-          state.conflicts.push({ name: item.name, type, sources: item._sources, reason: 'Enumerators with same value have different names' });
-        }
-      } else if (type === 'variant') {
-        const hasConflict = item._sources.some(source1 => {
-          const alt1 = getSourceVariantAlternatives(item, source1);
-          return item._sources.some(source2 => {
-            if (source1 === source2) return false;
-            const alt2 = getSourceVariantAlternatives(item, source2);
-            return !areVariantAlternativesEqual(alt1, alt2);
-          });
-        });
-        if (hasConflict) {
-          state.conflicts.push({ name: item.name, type, sources: item._sources, reason: 'Alternatives differ across modules' });
-        }
-      }
-    }
-  });
-}
-
-function getSourceVariantAlternatives(item, source) {
-  const file = state.files.find(f => f.name === source);
-  if (!file) return item.alternatives || [];
-  const variantType = file.dataTypes.variant?.find(v => v.name === item.name);
-  return variantType?.alternatives || [];
-}
-
-function areVariantAlternativesEqual(alt1, alt2) {
-  if (!alt1 && !alt2) return true;
-  if (!alt1 || !alt2) return false;
-  if (alt1.length !== alt2.length) return false;
-  const sorted1 = [...alt1].sort((a, b) => a.label.localeCompare(b.label));
-  const sorted2 = [...alt2].sort((a, b) => a.label.localeCompare(b.label));
-  return sorted1.every((a1, i) => a1.label === sorted2[i].label && a1.dataType === sorted2[i].dataType);
-}
-
-function validate() {
-  state.issues = [];
-  issueCounter = 0;
-  _checkConflicts();
-  _checkCrossReferences(state.files, state.mergedFOM);
-  _detectCircularDependencies();
-}
-
-function updateIssuesTabVisibility() {
-  const tab = document.querySelector('.tab[data-tab="issues"]');
-  if (!tab) return;
-  tab.style.display = state.issues.length > 0 ? '' : 'none';
-}
-
-function _checkConflicts() {
-  const files = state.files;
-  if (!files || files.length < 2) return;
-  const merged = state.mergedFOM;
-  if (!merged) return;
-
-  // 1. Fixed-record field count mismatch
-  const fixedRecords = merged.dataTypes?.fixed || [];
-  fixedRecords.forEach(record => {
-    const sources = record._sources;
-    if (!sources || sources.length < 2) return;
-    const counts = sources.map(s => {
-      const file = files.find(f => f.name === s);
-      const src = file?.dataTypes?.fixed?.find(r => r.name === record.name);
-      return src?.fields?.length || 0;
-    });
-    if (new Set(counts).size > 1) {
-      state.issues.push(makeIssue('warning', 'load-conflict', 'fixed-record-fields',
-        `Fixed record "${record.name}" has different field counts across modules`,
-        counts.map((c, i) => `${sources[i]}: ${c} fields`).join('; '),
-        [...sources],
-        [{ tab: 'datatypes', subTab: 'fixed', itemName: record.name }]
-      ));
-    }
-  });
-
-  // 2. Enum value conflict (same numeric value → different names)
-  const enumTypes = merged.dataTypes?.enum || [];
-  enumTypes.forEach(enumType => {
-    const sources = enumType._sources;
-    if (!sources || sources.length < 2) return;
-    const valueMap = {};
-    (enumType.values || []).forEach(v => {
-      if (!valueMap[v.value]) valueMap[v.value] = [];
-      valueMap[v.value].push(v.name);
-    });
-    const hasConflict = Object.values(valueMap).some(names => new Set(names).size > 1);
-    if (hasConflict) {
-      state.issues.push(makeIssue('warning', 'load-conflict', 'enum-values',
-        `Enum "${enumType.name}" has same numeric value with different names across modules`,
-        '',
-        [...sources],
-        [{ tab: 'datatypes', subTab: 'enum', itemName: enumType.name }]
-      ));
-    }
-  });
-
-  // 3. Variant alternative structure mismatch
-  const variantTypes = merged.dataTypes?.variant || [];
-  variantTypes.forEach(variantType => {
-    const sources = variantType._sources;
-    if (!sources || sources.length < 2) return;
-    let hasConflict = false;
-    for (let i = 0; i < sources.length && !hasConflict; i++) {
-      for (let j = i + 1; j < sources.length && !hasConflict; j++) {
-        const alt1 = getSourceVariantAlternatives(variantType, sources[i]);
-        const alt2 = getSourceVariantAlternatives(variantType, sources[j]);
-        if (!areVariantAlternativesEqual(alt1, alt2)) hasConflict = true;
-      }
-    }
-    if (hasConflict) {
-      state.issues.push(makeIssue('warning', 'load-conflict', 'variant-alternatives',
-        `Variant record "${variantType.name}" has different alternatives across modules`,
-        '',
-        [...sources],
-        [{ tab: 'datatypes', subTab: 'variant', itemName: variantType.name }]
-      ));
-    }
-  });
-
-  // 4. Object class attribute count mismatch
-  const objectClasses = merged.objectClasses || [];
-  objectClasses.forEach(cls => {
-    const sources = cls._sources;
-    if (!sources || sources.length < 2) return;
-    const counts = sources.map(s => {
-      const file = files.find(f => f.name === s);
-      const src = file?.objectClasses?.find(c => c.name === cls.name);
-      return src?.attributes?.length || 0;
-    });
-    const nonZeroCounts = counts.filter(c => c > 0);
-    if (nonZeroCounts.length >= 2 && new Set(nonZeroCounts).size > 1) {
-      const perSourceDetails = sources.map((s, i) => {
-        const file = files.find(f => f.name === s);
-        const src = file?.objectClasses?.find(c => c.name === cls.name);
-        const attrNames = src?.attributes?.map(a => a.name) || [];
-        const visibleText = `${s}: ${counts[i]} attributes`;
-        const tooltipText = attrNames.length > 0 ? attrNames.join(', ') : '';
-        return tooltipText ? `${visibleText}||${tooltipText}` : visibleText;
-      }).join('; ');
-      state.issues.push(makeIssue('warning', 'load-conflict', 'object-attributes',
-        `Object class "${cls.name}" has different attribute counts across modules`,
-        perSourceDetails,
-        [...sources],
-        [{ tab: 'objects', subTab: '', itemName: cls.name }]
-      ));
-    }
-  });
-
-  // 5. Interaction class parameter count mismatch
-  const interactionClasses = merged.interactionClasses || [];
-  interactionClasses.forEach(cls => {
-    const sources = cls._sources;
-    if (!sources || sources.length < 2) return;
-    const counts = sources.map(s => {
-      const file = files.find(f => f.name === s);
-      const src = file?.interactionClasses?.find(c => c.name === cls.name);
-      return src?.parameters?.length || 0;
-    });
-    const nonZeroCounts = counts.filter(c => c > 0);
-    if (nonZeroCounts.length >= 2 && new Set(nonZeroCounts).size > 1) {
-      const perSourceDetails = sources.map((s, i) => {
-        const file = files.find(f => f.name === s);
-        const src = file?.interactionClasses?.find(c => c.name === cls.name);
-        const paramNames = src?.parameters?.map(p => p.name) || [];
-        const visibleText = `${s}: ${counts[i]} parameters`;
-        const tooltipText = paramNames.length > 0 ? paramNames.join(', ') : '';
-        return tooltipText ? `${visibleText}||${tooltipText}` : visibleText;
-      }).join('; ');
-      state.issues.push(makeIssue('warning', 'load-conflict', 'interaction-parameters',
-        `Interaction class "${cls.name}" has different parameter counts across modules`,
-        perSourceDetails,
-        [...sources],
-        [{ tab: 'interactions', subTab: '', itemName: cls.name }]
-      ));
-    }
-  });
-
-  // 6. Transportation semantics/reliable conflict
-  const transportations = merged.transportations || [];
-  transportations.forEach(t => {
-    const sources = t._sources;
-    if (!sources || sources.length < 2) return;
-    const seenSemantics = new Set();
-    const seenReliable = new Set();
-    sources.forEach(s => {
-      const file = files.find(f => f.name === s);
-      const src = file?.transportations?.find(tr => tr.name === t.name);
-      if (src?.semantics) seenSemantics.add(src.semantics);
-      if (src?.reliable) seenReliable.add(src.reliable);
-    });
-    if (seenSemantics.size > 1 || seenReliable.size > 1) {
-      state.issues.push(makeIssue('warning', 'load-conflict', 'transportation',
-        `Transportation "${t.name}" has conflicting semantics or reliable values across modules`,
-        sources.map(s => {
-          const file = files.find(f => f.name === s);
-          const src = file?.transportations?.find(tr => tr.name === t.name);
-          return `${s}: reliable=${src?.reliable || ''} semantics=${src?.semantics || ''}`;
-        }).join('; '),
-        [...sources],
-        [{ tab: 'trans', subTab: '', itemName: t.name }]
-      ));
-    }
-  });
-
-  // 7. Switch value conflict
-  const switches = merged.switches || [];
-  switches.forEach(sw => {
-    const sources = sw._sources;
-    if (!sources || sources.length < 2) return;
-    const seenValues = new Set();
-    sources.forEach(s => {
-      const file = files.find(f => f.name === s);
-      const src = file?.switches?.find(s2 => s2.name === sw.name);
-      if (src?.value) seenValues.add(src.value);
-    });
-    if (seenValues.size > 1) {
-      state.issues.push(makeIssue('warning', 'load-conflict', 'switch',
-        `Switch "${sw.name}" has different values across modules`,
-        sources.map(s => {
-          const file = files.find(f => f.name === s);
-          const src = file?.switches?.find(s2 => s2.name === sw.name);
-          return `${s}: ${src?.value || '(empty)'}`;
-        }).join('; '),
-        [...sources],
-        [{ tab: 'switches', subTab: '', itemName: sw.name }]
-      ));
-    }
-  });
-
-  // 8. Time configuration conflict
-  if (files.length >= 2) {
-    const uniqueTimestamps = new Set();
-    const uniqueLookaheads = new Set();
-    files.forEach(f => {
-      if (f.time?.timeStamp?.dataType) uniqueTimestamps.add(f.time.timeStamp.dataType);
-      if (f.time?.lookahead?.dataType) uniqueLookaheads.add(f.time.lookahead.dataType);
-    });
-    if (uniqueTimestamps.size > 1) {
-      state.issues.push(makeIssue('warning', 'load-conflict', 'time',
-        'Timestamp data type differs across modules',
-        files.map(f => `${f.name}: ${f.time?.timeStamp?.dataType || '(none)'}`).join('; '),
-        files.map(f => f.name),
-        [{ tab: 'time', subTab: '', itemName: '' }]
-      ));
-    }
-    if (uniqueLookaheads.size > 1) {
-      state.issues.push(makeIssue('warning', 'load-conflict', 'time',
-        'Lookahead data type differs across modules',
-        files.map(f => `${f.name}: ${f.time?.lookahead?.dataType || '(none)'}`).join('; '),
-        files.map(f => f.name),
-        [{ tab: 'time', subTab: '', itemName: '' }]
-      ));
-    }
-  }
-}
-
-function _checkCrossReferences(files, merged) {
-  if (!merged) return;
-  
-  // Collect known references
-  // Build dimNames from state.files directly (mergedFOM has no 'dimensions' key)
-  const dimNames = new Set();
-  (files || []).forEach(f => (f.dimensions || []).forEach(d => dimNames.add((d.name || d).trim())));
-  const transNames = new Set((merged.transportations || []).map(t => t.name.trim()));
-  const dataTypeNames = new Set();
-  ['basic', 'simple', 'array', 'fixed', 'enum', 'variant'].forEach(cat => {
-    (merged.dataTypes?.[cat] || []).forEach(dt => dataTypeNames.add(dt.name));
-  });
-  // IEEE 1516 standard built-in data types (always available per standard)
-  const hlaBuiltins = ['HLAinteger32BE','HLAinteger32LE','HLAinteger64BE','HLAinteger64LE',
-    'HLAinteger16BE','HLAinteger16LE','HLAoctet','HLAoctetPairBE','HLAoctetPairLE',
-    'HLAfloat32BE','HLAfloat32LE','HLAfloat64BE','HLAfloat64LE',
-    'HLAunicodeString','HLAASCIIstring','HLAboolean','HLAbyte',
-    'HLAvariableArrayData','HLAfixedArrayData','HLAfixedRecordData','HLAvariantRecordData',
-    'HLAopaqueData','HLAunicodeChar','HLAASCIIchar','HLAintegerSize','HLAinteger'];
-  hlaBuiltins.forEach(t => dataTypeNames.add(t));
-  // IEEE 1516 standard built-in transportations (always available per standard)
-  ['HLAreliable', 'HLAbestEffort'].forEach(t => transNames.add(t));
-  const loadedFileNames = new Set((files || []).map(f => f.name));
-  
-  // 1. Walk interactions — check dimensions, transportation, parameter dataTypes
-  (merged.interactionClasses || []).forEach(int => {
-    const intSources = int._sources || (int._source ? [int._source] : []);
-    // 1a. Interaction dimensions
-    (int.dimensions || []).forEach(dim => {
-      if (!dimNames.has(dim.trim())) {
-        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-dimension',
-          `Interaction "${int.name}" references unknown dimension "${dim}"`,
-          `The dimension "${dim}" is not defined in any loaded FOM module.`,
-          intSources,
-          [{ tab: 'interactions', itemName: int.name }]
-        ));
-      }
-    });
-    // 1b. Interaction transportation
-    if (int.transportation && !transNames.has(int.transportation.trim())) {
-      state.issues.push(makeIssue('warning', 'cross-reference', 'missing-transportation',
-        `Interaction "${int.name}" references unknown transportation "${int.transportation}"`,
-        `The transportation "${int.transportation}" is not defined in any loaded FOM module.`,
-        intSources,
-        [{ tab: 'interactions', itemName: int.name }]
-      ));
-    }
-    // 1c. Interaction parameter dataTypes
-    (int.parameters || []).forEach(param => {
-      if (param.dataType && !dataTypeNames.has(param.dataType)) {
-        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-data-type',
-          `Parameter "${param.name}" of interaction "${int.name}" references unknown data type "${param.dataType}"`,
-          `The data type "${param.dataType}" is not defined in any loaded FOM module.`,
-          intSources,
-          [{ tab: 'interactions', itemName: int.name }]
-        ));
-      }
-    });
-  });
-  
-  // 2. Walk object classes — check attribute dimensions, transportation, dataTypes
-  (merged.objectClasses || []).forEach(obj => {
-    const objSources = obj._sources || (obj._source ? [obj._source] : []);
-    (obj.attributes || []).forEach(attr => {
-      // 2a. Attribute dimensions
-      (attr.dimensions || []).forEach(dim => {
-        if (!dimNames.has(dim.trim())) {
-          state.issues.push(makeIssue('warning', 'cross-reference', 'missing-dimension',
-            `Attribute "${attr.name}" of object "${obj.name}" references unknown dimension "${dim}"`,
-            `The dimension "${dim}" is not defined in any loaded FOM module.`,
-            objSources,
-            [{ tab: 'objects', itemName: obj.name }]
-          ));
-        }
-      });
-      // 2b. Attribute transportation
-      if (attr.transportation && !transNames.has(attr.transportation.trim())) {
-        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-transportation',
-          `Attribute "${attr.name}" of object "${obj.name}" references unknown transportation "${attr.transportation}"`,
-          `The transportation "${attr.transportation}" is not defined in any loaded FOM module.`,
-          objSources,
-          [{ tab: 'objects', itemName: obj.name }]
-        ));
-      }
-      // 2c. Attribute dataType
-      if (attr.dataType && !dataTypeNames.has(attr.dataType)) {
-        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-data-type',
-          `Attribute "${attr.name}" of object "${obj.name}" references unknown data type "${attr.dataType}"`,
-          `The data type "${attr.dataType}" is not defined in any loaded FOM module.`,
-          objSources,
-          [{ tab: 'objects', itemName: obj.name }]
-        ));
-      }
-    });
-  });
-  
-  // 3. Walk complex dimensions — check dataType row references
-  (files || []).forEach(f => {
-    (f.dimensions || []).forEach(dim => {
-      const dimName = dim.name || dim;
-      if (dim.rows && dim.rows.length > 0) {
-        dim.rows.forEach(row => {
-          if (row.key === 'dataType' && row.value && !dataTypeNames.has(row.value)) {
-            state.issues.push(makeIssue('warning', 'cross-reference', 'missing-data-type',
-              `Dimension "${dimName}" references unknown data type "${row.value}"`,
-              `The data type "${row.value}" is not defined in any loaded FOM module.`,
-              [f.name],
-              [{ tab: 'dims', itemName: dimName }]
-            ));
-          }
-        });
-      }
-    });
-  });
-  
-  // 4. Check module dependencies
-  (files || []).forEach(file => {
-    (file.dependencies || []).forEach(dep => {
-      if (!loadedFileNames.has(dep)) {
-        state.issues.push(makeIssue('warning', 'cross-reference', 'missing-dependency',
-          `Module "${file.name}" depends on missing module "${dep}"`,
-          `The module "${dep}" is required by "${file.name}" but is not loaded.`,
-          [file.name],
-          []
-        ));
-      }
-    });
-  });
-}
-
-function _detectCircularDependencies() {
-  const files = state.files;
-  if (!files || files.length < 2) return;
-
-  const fileNames = new Set(files.map(f => f.name));
-
-  // Build adjacency list: edge dep -> dependent (same direction as existing topologicalSort)
-  const graph = {};
-  files.forEach(f => { graph[f.name] = []; });
-  files.forEach(f => {
-    (f.dependencies || []).forEach(dep => {
-      if (fileNames.has(dep)) {
-        graph[dep].push(f.name);
-      }
-    });
-  });
-
-  // Tarjan's SCC
-  const index = {};
-  const lowlink = {};
-  const onStack = {};
-  const stack = [];
-  let nextIndex = 0;
-  const sccs = [];
-
-  function strongconnect(v) {
-    index[v] = nextIndex;
-    lowlink[v] = nextIndex;
-    nextIndex++;
-    stack.push(v);
-    onStack[v] = true;
-
-    (graph[v] || []).forEach(w => {
-      if (index[w] === undefined) {
-        strongconnect(w);
-        lowlink[v] = Math.min(lowlink[v], lowlink[w]);
-      } else if (onStack[w]) {
-        lowlink[v] = Math.min(lowlink[v], index[w]);
-      }
-    });
-
-    if (lowlink[v] === index[v]) {
-      const scc = [];
-      let w;
-      do {
-        w = stack.pop();
-        onStack[w] = false;
-        scc.push(w);
-      } while (w !== v);
-      sccs.push(scc);
-    }
-  }
-
-  files.forEach(f => {
-    if (index[f.name] === undefined) strongconnect(f.name);
-  });
-
-  // Report SCCs with size > 1 (true cycles)
-  // Or size === 1 if self-loop (node has edge to itself)
-  sccs.forEach(scc => {
-    if (scc.length > 1) {
-      state.issues.push(makeIssue('error', 'circular-dependency', 'cycle-detected',
-        'Circular dependency detected among modules',
-        `Modules involved in cycle: ${scc.sort().join(', ')}`,
-        [...scc],
-        []
-      ));
-    } else {
-      // Check for self-loop: does the single node have an edge to itself?
-      const node = scc[0];
-      if ((graph[node] || []).includes(node)) {
-        state.issues.push(makeIssue('error', 'circular-dependency', 'cycle-detected',
-          'Circular dependency detected among modules',
-          `Module has a self-referencing dependency: ${node}`,
-          [node],
-          []
-        ));
-      }
-    }
-  });
-}
-
-// ============================================================================
-// DETAIL RENDERING
-// ============================================================================
-
-function getTypeIcon(type) {
-  const icons = { basic: '🔵', simple: '🔷', array: '🟠', fixed: '🔴', enum: '🟣', variant: '🟩' };
-  return icons[type] || '⚪';
-}
-
-function renderDetail(item, type, parents = []) {
-  if (!item) return '';
-  let html = '';
-  if (type === 'object' || type === 'interaction') {
-    const props = type === 'object' ? item.attributes : item.parameters;
-    const isObject = type === 'object';
-    if (parents.length > 0) {
-      html += '<div class="detail-section"><div class="breadcrumb">';
-      parents.forEach((p, idx) => {
-        const baseName = p.name.split('.').pop();
-        html += `<span class="breadcrumb-item clickable-item" onclick="showDetail('${p.name.replace(/'/g, "\\'")}', '${type}', true); return false;">${baseName}</span>`;
-        if (idx < parents.length - 1) html += ' <span class="breadcrumb-sep">></span> ';
-      });
-      html += ` <span class="breadcrumb-sep">></span> <span class="breadcrumb-current">${item.name.split('.').pop()}</span>`;
-      html += '</div></div>';
-    }
-    html += '<div class="detail-section"><h3>Class Information</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name.split('.').pop()}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
-    if (item.sharing) html += `<tr><th>Sharing</th><td>${item.sharing}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    if (item.parent) { const parentBase = item.parent.split('.').pop(); html += `<tr><th>Parent</th><td><span class="clickable-item" onclick="showDetail('${item.parent.replace(/'/g, "\\'")}', '${type}', true)">${parentBase}</span></td></tr>`; }
-    // Appspaces row
-    if (state.appspace) {
-      const apps = findAppspaceForClass(item.name, type);
-      if (apps && apps.length > 0) {
-        html += '<tr><th>Appspaces</th><td><ul class="apps-list">';
-        apps.forEach(a => { html += `<li>${a}</li>`; });
-        html += '</ul></td></tr>';
-      }
-    }
-    if (type === 'interaction') {
-      if (item.dimensions && item.dimensions.length > 0) {
-        html += '<tr><th>Dimensions</th><td>';
-        item.dimensions.forEach(d => {
-          const dimExists = findDimensionByName(d);
-          if (dimExists) {
-            html += `<div><span class="clickable-item" onclick="showDetail('${d.replace(/'/g, "\\'")}', 'dims', true)">${d}</span></div>`;
-          } else {
-            html += `<div><span style="color:red;">${d}</span></div>`;
-          }
-        });
-        html += '</td></tr>';
-      }
-      if (item.transportation) {
-        const transportExists = state.mergedFOM?.transportations?.some(t => t.name.trim() === item.transportation.trim());
-        if (transportExists) {
-          html += `<tr><th>Transportation</th><td><span class="clickable-item" onclick="showDetail('${item.transportation.replace(/'/g, "\\'")}', 'trans', true)">${item.transportation}</span></td></tr>`;
-        } else {
-          html += `<tr><th>Transportation</th><td><span style="color:red;">${item.transportation}</span></td></tr>`;
-        }
-      }
-      if (item.order) html += `<tr><th>Order</th><td>${item.order}</td></tr>`;
-    }
-const sources = item._sources || (item._source ? [item._source] : []);
-    if (sources.length > 0) {
-      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
-      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
-      html += `</ul></td></tr>`;
-    }
-    html += '</table></div>';
-    
-      if (props && props.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">' + (isObject ? 'Attributes' : 'Parameters') + '</h4>';
-      html += '<table class="property-table"><tr><th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th><th>Module</th>' + (isObject ? '<th>Update Type</th><th>Update Condition</th><th>Ownership</th><th>Transportation</th><th>Dimensions</th><th>Order</th>' : '<th>Order</th>') + '</tr>';
-      props.forEach(p => {
-        const dataTypeLink = p.dataType ? `<span class="clickable-item" onclick="showDataType('${p.dataType.replace(/'/g, "\\'")}', getPreferredType('${p.dataType.replace(/'/g, "\\'")}'))">${p.dataType}</span>` : '';
-        const srcModule = p._source || (item._sources && item._sources[0]) || '';
-        const moduleHtml = srcModule ? `<span class="clickable-item" onclick="switchToModule('${srcModule.replace(/'/g, "\\'")}')">${srcModule}</span>` : '';
-        html += `<tr><td>${p.name}${p.notes ? ' ' + renderNoteIcon(p.notes) : ''}</td><td>${dataTypeLink}</td><td>${p.sharing || ''}</td><td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">${p.semantics || ''}</td><td>${moduleHtml}</td>`;
-        if (isObject) {
-          let transportHtml = p.transportation || '';
-          if (p.transportation) {
-            const transportExists = state.mergedFOM?.transportations?.some(t => t.name.trim() === p.transportation.trim());
-            if (transportExists) {
-              transportHtml = `<span class="clickable-item" onclick="showDetail('${p.transportation.replace(/'/g, "\\'")}', 'trans', true)">${p.transportation}</span>`;
-            } else {
-              transportHtml = `<span style="color:red;">${p.transportation}</span>`;
-            }
-          }
-          // Build dimensions HTML
-          let dimsHtml = '';
-          if (p.dimensions && p.dimensions.length > 0) {
-            dimsHtml = '<ul style="list-style:none;margin:0;padding:0;">';
-            p.dimensions.forEach(dim => {
-              const dimExists = findDimensionByName(dim);
-              if (dimExists) {
-                dimsHtml += `<li><span class="clickable-item" onclick="showDetail('${dim.replace(/'/g, "\\'")}', 'dims', true)">${dim}</span></li>`;
-              } else {
-                dimsHtml += `<li><span style="color:red;">${dim}</span></li>`;
-              }
-            });
-            dimsHtml += '</ul>';
-          }
-          html += `<td>${p.updateType || ''}</td><td>${p.updateCondition || ''}</td><td>${p.ownership || ''}</td><td>${transportHtml}</td><td>${dimsHtml}</td><td>${p.order || ''}</td>`;
-        } else {
-          html += `<td>${p.order || ''}</td>`;
-        }
-        html += '</tr>';
-      });
-      html += '</table>';
-    }
-    
-    const classUsages = type === 'object' ? 
-      findDataTypeUsages(item.name).filter(u => u.location.startsWith('Object:')) :
-      findDataTypeUsages(item.name).filter(u => u.location.startsWith('Interaction:'));
-    if (classUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      classUsages.forEach(u => { html += `<tr><td><span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span></td><td>${u.type === 'object' ? 'Object Class' : 'Interaction Class'}</td><td>${u.location}</td></tr>`; });
-      html += '</table>';
-    }
-  } else if (type === 'basic') {
-    html += '<div class="detail-section"><h3>Basic Data Type</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
-    if (item.size) html += `<tr><th>Size</th><td>${item.size}</td></tr>`;
-    if (item.encoding) html += `<tr><th>Encoding</th><td>${item.encoding}</td></tr>`;
-    if (item.endian) html += `<tr><th>Endian</th><td>${item.endian}</td></tr>`;
-    if (item.interpretation) html += `<tr><th>Interpretation</th><td>${item.interpretation}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    const sources = item._sources || (item._source ? [item._source] : []);
-    if (sources.length > 0) {
-      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
-      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
-      html += `</ul></td></tr>`;
-    }
-    html += '</table></div>';
-    
-    const basicUsages = findDataTypeUsages(item.name);
-    if (basicUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      const makeLink = (u) => {
-        if (u.type === 'object' || u.type === 'interaction') {
-          return `<span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span>`;
-        }
-        return `<span class="clickable-item" onclick="showDataType('${u.name}', '${u.type}')">${u.name}</span>`;
-      };
-      const typeLabels = { simple: 'Simple', array: 'Array', fixed: 'Fixed', variant: 'Variant', enum: 'Enum', object: 'Object Class', interaction: 'Interaction Class' };
-      basicUsages.forEach(u => { html += `<tr><td>${makeLink(u)}</td><td>${typeLabels[u.type]}</td><td>${u.location}</td></tr>`; });
-      html += '</table>';
-    }
-  } else if (type === 'simple') {
-    html += '<div class="detail-section"><h3>Simple Data Type</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
-    if (item.representation) html += `<tr><th>Representation</th><td><span class="clickable-item" onclick="showDataType('${item.representation}', 'basic')">${item.representation}</span></td></tr>`;
-    if (item.units) html += `<tr><th>Units</th><td>${item.units}</td></tr>`;
-    if (item.resolution) html += `<tr><th>Resolution</th><td>${item.resolution}</td></tr>`;
-    if (item.accuracy) html += `<tr><th>Accuracy</th><td>${item.accuracy}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-const sources = item._sources || (item._source ? [item._source] : []);
-    if (sources.length > 0) {
-      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
-      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
-      html += `</ul></td></tr>`;
-    }
-    html += '</table></div>';
-    
-    const simpleUsages = findDataTypeUsages(item.name);
-    if (simpleUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      const makeLink = (u) => {
-        if (u.type === 'object' || u.type === 'interaction') {
-          return `<span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span>`;
-        }
-        return `<span class="clickable-item" onclick="showDataType('${u.name}', '${u.type}')">${u.name}</span>`;
-      };
-      const typeLabels = { simple: 'Simple', array: 'Array', fixed: 'Fixed', variant: 'Variant', enum: 'Enum', object: 'Object Class', interaction: 'Interaction Class' };
-      simpleUsages.forEach(u => { html += `<tr><td>${makeLink(u)}</td><td>${typeLabels[u.type]}</td><td>${u.location}</td></tr>`; });
-      html += '</table>';
-    }
-  } else if (type === 'array') {
-    html += '<div class="detail-section"><h3>Array Data Type</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
-    html += `<tr><th>Data Type</th><td>${item.dataType ? '<span class="clickable-item" onclick="showDataType(\'' + item.dataType + '\', getPreferredType(\'' + item.dataType + '\'))">' + item.dataType + '</span>' : ''}</td></tr>`;
-    if (item.cardinality) html += `<tr><th>Cardinality</th><td>${item.cardinality}</td></tr>`;
-    if (item.encoding) html += `<tr><th>Encoding</th><td>${item.encoding}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    const sources = item._sources || (item._source ? [item._source] : []);
-    if (sources.length > 0) {
-      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
-      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
-      html += `</td></tr>`;
-    }
-    html += '</table></div>';
-    
-    const arrayUsages = findDataTypeUsages(item.name);
-    if (arrayUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      const makeLink = (u) => {
-        if (u.type === 'object' || u.type === 'interaction') {
-          return `<span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span>`;
-        }
-        return `<span class="clickable-item" onclick="showDataType('${u.name}', '${u.type}')">${u.name}</span>`;
-      };
-      const typeLabels = { simple: 'Simple', array: 'Array', fixed: 'Fixed', variant: 'Variant', enum: 'Enum', object: 'Object Class', interaction: 'Interaction Class' };
-      arrayUsages.forEach(u => { html += `<tr><td>${makeLink(u)}</td><td>${typeLabels[u.type]}</td><td>${u.location}</td></tr>`; });
-      html += '</table>';
-    }
-  } else if (type === 'fixed') {
-    html += '<div class="detail-section"><h3>Fixed Record Data Type</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}${item.notes ? ' ' + renderNoteIcon(item.notes) : ''}</td></tr>`;
-    if (item.encoding) html += `<tr><th>Encoding</th><td>${item.encoding}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-const sources = item._sources || (item._source ? [item._source] : []);
-    if (sources.length > 0) {
-      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
-      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
-      html += `</td></tr>`;
-    }
-    html += '</table></div>';
-    if (item.fields && item.fields.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Fields (original order)</h4><table class="property-table"><tr><th>Name</th><th>Data Type</th><th>Encoding</th><th>Semantics</th></tr>';
-      item.fields.forEach(f => { html += `<tr><td>${f.name}${f.notes ? ' ' + renderNoteIcon(f.notes) : ''}</td><td>${f.dataType ? '<span class="clickable-item" onclick="showDataType(\'' + f.dataType + '\', getPreferredType(\'' + f.dataType + '\'))">' + f.dataType + '</span>' : ''}</td><td>${f.encoding || ''}</td><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${f.semantics || ''}</td></tr>`; });
-      html += '</table>';
-    }
-    const fixedUsages = findDataTypeUsages(item.name);
-    if (fixedUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      const makeLink = (u) => {
-        if (u.type === 'object' || u.type === 'interaction') {
-          return `<span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span>`;
-        }
-        return `<span class="clickable-item" onclick="showDataType('${u.name}', '${u.type}')">${u.name}</span>`;
-      };
-      const typeLabels = { simple: 'Simple', array: 'Array', fixed: 'Fixed', variant: 'Variant', enum: 'Enum', object: 'Object Class', interaction: 'Interaction Class' };
-      fixedUsages.forEach(u => { html += `<tr><td>${makeLink(u)}</td><td>${typeLabels[u.type]}</td><td>${u.location}</td></tr>`; });
-      html += '</table>';
-    }
-  } else if (type === 'enum') {
-    html += '<div class="detail-section"><h3>Enumerated Data Type</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
-    if (item.representation) html += `<tr><th>Representation</th><td><span class="clickable-item" onclick="showDataType('${item.representation}', 'basic')">${item.representation}</span></td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    const sources = item._sources || (item._source ? [item._source] : []);
-    if (sources.length > 0) {
-      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
-      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
-      html += `</td></tr>`;
-    }
-    html += '</table></div>';
-    if (item.values && item.values.length > 0) {
-      const sortedValues = state.sortEnabled ? [...item.values].sort((a, b) => a.value - b.value) : item.values;
-      html += '<h4 style="margin:12px 0 8px">Enumerators</h4><table class="property-table"><tr><th>Name</th><th>Value</th></tr>';
-      sortedValues.forEach(v => { html += `<tr><td>${v.name}${v.notes ? ' ' + renderNoteIcon(v.notes) : ''}</td><td>${v.value}</td></tr>`; });
-      html += '</table>';
-    }
-    
-    const enumUsages = findDataTypeUsages(item.name);
-    if (enumUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      const makeLink = (u) => {
-        if (u.type === 'object' || u.type === 'interaction') {
-          return `<span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span>`;
-        }
-        return `<span class="clickable-item" onclick="showDataType('${u.name}', '${u.type}')">${u.name}</span>`;
-      };
-      const typeLabels = { simple: 'Simple', array: 'Array', fixed: 'Fixed', variant: 'Variant', enum: 'Enum', object: 'Object Class', interaction: 'Interaction Class' };
-      enumUsages.forEach(u => { html += `<tr><td>${makeLink(u)}</td><td>${typeLabels[u.type]}</td><td>${u.location}</td></tr>`; });
-      html += '</table>';
-    }
-  } else if (type === 'variant') {
-    html += '<div class="detail-section"><h3>Variant Record Data Type</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
-    if (item.discriminant) html += `<tr><th>Discriminant</th><td>${item.discriminant}</td></tr>`;
-    if (item.dataType) html += `<tr><th>Discriminant Type</th><td>${item.dataType}</td></tr>`;
-    if (item.encoding) html += `<tr><th>Encoding</th><td>${item.encoding}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    const sources = item._sources || (item._source ? [item._source] : []);
-    if (sources.length > 0) {
-      html += `<tr><th>Module${sources.length > 1 ? 's' : ''}</th><td><ul style="list-style:none;margin:0;padding:0;">`;
-      html += sources.map(s => `<li><span class="clickable-item" onclick="switchToModule('${s.replace(/'/g, "\\'")}')">${s}</span></li>`).join('');
-      html += `</td></tr>`;
-    }
-    html += '</table></div>';
-    if (item.alternatives && item.alternatives.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Alternatives</h4><table class="property-table"><tr><th>Name</th><th>Enumerator</th><th>Data Type</th><th>Semantics</th></tr>';
-      item.alternatives.forEach(a => { html += `<tr><td>${a.label}${a.notes ? ' ' + renderNoteIcon(a.notes) : ''}</td><td>${a.enumerator || ''}</td><td>${a.dataType ? '<span class="clickable-item" onclick="showDataType(\'' + a.dataType + '\', getPreferredType(\'' + a.dataType + '\'))">' + a.dataType + '</span>' : ''}</td><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${a.semantics || ''}</td></tr>`; });
-      html += '</table>';
-    }
-    
-    const variantUsages = findDataTypeUsages(item.name);
-    if (variantUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      const makeLink = (u) => {
-        if (u.type === 'object' || u.type === 'interaction') {
-          return `<span class="clickable-item" onclick="showDetail('${u.name}', '${u.type}', true)">${u.name}</span>`;
-        }
-        return `<span class="clickable-item" onclick="showDataType('${u.name}', '${u.type}')">${u.name}</span>`;
-      };
-      const typeLabels = { simple: 'Simple', array: 'Array', fixed: 'Fixed', variant: 'Variant', enum: 'Enum', object: 'Object Class', interaction: 'Interaction Class' };
-      variantUsages.forEach(u => { html += `<tr><td>${makeLink(u)}</td><td>${typeLabels[u.type]}</td><td>${u.location}</td></tr>`; });
-      html += '</table>';
-    }
-  } else if (type === 'ident') {
-    html += '<div class="detail-section"><h3>Model Identification</h3><table class="property-table">';
-    if (item.name) html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
-    if (item.type) html += `<tr><th>Type</th><td>${item.type}</td></tr>`;
-    if (item.version) html += `<tr><th>Version</th><td>${item.version}</td></tr>`;
-    if (item.modificationDate) html += `<tr><th>Modification Date</th><td>${item.modificationDate}</td></tr>`;
-    if (item.securityClassification) html += `<tr><th>Security Classification</th><td>${item.securityClassification}</td></tr>`;
-    if (item.purpose) html += `<tr><th>Purpose</th><td>${item.purpose}</td></tr>`;
-    if (item.applicationDomain) html += `<tr><th>Application Domain</th><td>${item.applicationDomain}</td></tr>`;
-    if (item.description) html += `<tr><th>Description</th><td>${item.description}</td></tr>`;
-    html += '</table></div>';
-    if (item.poc) {
-      html += '<div class="detail-section"><h3>Point of Contact</h3><table class="property-table">';
-      if (item.poc.pocType) html += `<tr><th>Type</th><td>${item.poc.pocType}</td></tr>`;
-      if (item.poc.pocName) html += `<tr><th>Name</th><td>${item.poc.pocName}</td></tr>`;
-      if (item.poc.pocOrg) html += `<tr><th>Organization</th><td>${item.poc.pocOrg}</td></tr>`;
-      if (item.poc.pocTelephone) html += `<tr><th>Telephone</th><td>${item.poc.pocTelephone}</td></tr>`;
-      if (item.poc.pocEmail) html += `<tr><th>Email</th><td>${item.poc.pocEmail}</td></tr>`;
-      html += '</table></div>';
-    }
-  } else if (type === 'dims') {
-    html += '<div class="detail-section"><h3>Dimension</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
-    if (item.isComplex && item.rows && item.rows.length > 0) {
-      item.rows.forEach(r => {
-        let valueHtml = r.value;
-        if (r.key === 'dataType' && r.value) {
-          const dt = r.value;
-          const dtType = getPreferredType(dt);
-          if (dtType) {
-            valueHtml = `<span class="clickable-item" onclick="showDataType('${dt.replace(/'/g, "\\'")}', '${dtType}')">${dt}</span>`;
-          } else {
-            valueHtml = `<span style="color:red;">${dt}</span>`;
-          }
-        }
-        html += `<tr><th>${r.key}</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${valueHtml}</td></tr>`;
-      });
-    }
-    html += '</table></div>';
-  } else if (type === 'trans') {
-    html += '<div class="detail-section"><h3>Transportation</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
-    if (item.reliable) html += `<tr><th>Reliable</th><td>${item.reliable}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    if (item.rows && item.rows.length > 0) {
-      item.rows.forEach(r => { html += `<tr><th>${r.key}</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${r.value}</td></tr>`; });
-    }
-    html += '</table></div>';
-  } else if (type === 'notes') {
-    html += '<div class="detail-section"><h3>Note</h3><table class="property-table">';
-    html += `<tr><th>Label</th><td>${item.name}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    if (item.rows && item.rows.length > 0) {
-      item.rows.forEach(r => { html += `<tr><th>${r.key}</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${r.value}</td></tr>`; });
-    }
-    html += '</table></div>';
-    
-    const noteUsages = findNoteUsages(item.name);
-    if (noteUsages.length > 0) {
-      html += '<h4 style="margin:12px 0 8px">Used By</h4><table class="property-table"><tr><th>Name</th><th>Type</th><th>Location</th></tr>';
-      const typeLabels = { object: 'Object Class', interaction: 'Interaction Class', simple: 'Simple', array: 'Array', fixed: 'Fixed', enum: 'Enumeration', variant: 'Variant' };
-      noteUsages.forEach(u => {
-        const makeLink = () => {
-          if (u.type === 'object' || u.type === 'interaction') {
-            return `<span class="clickable-item" onclick="showDetail('${u.name.replace(/'/g, "\\'")}', '${u.type}', true)">${u.name}</span>`;
-          }
-          return `<span class="clickable-item" onclick="showDataType('${u.name.replace(/'/g, "\\'")}', '${u.type}')">${u.name}</span>`;
-        };
-        html += `<tr><td>${makeLink()}</td><td>${typeLabels[u.type] || u.type}</td><td>${u.location}</td></tr>`;
-      });
-      html += '</table>';
-    }
-  } else if (type === 'switches') {
-    html += '<div class="detail-section"><h3>Switch</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
-    if (item.value) html += `<tr><th>Value</th><td>${item.value}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    html += '</table></div>';
-  } else if (type === 'tags') {
-    html += '<div class="detail-section"><h3>Tag</h3><table class="property-table">';
-    html += `<tr><th>Name</th><td>${item.name}</td></tr>`;
-    if (item.dataType) html += `<tr><th>Data Type</th><td>${item.dataType}</td></tr>`;
-    if (item.semantics) html += `<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.semantics}</td></tr>`;
-    html += '</table></div>';
-  } else if (type === 'time') {
-    html += '<div class="detail-section"><h3>Time Configuration</h3><table class="property-table">';
-    if (item.timeStamp) {
-      html += `<tr><th>Time Stamp Data Type</th><td>${item.timeStamp.dataType || ''}</td></tr>`;
-      if (item.timeStamp.semantics) html += `<tr><th>Time Stamp Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.timeStamp.semantics}</td></tr>`;
-    }
-    if (item.lookahead) {
-      html += `<tr><th>Lookahead Data Type</th><td>${item.lookahead.dataType || ''}</td></tr>`;
-      if (item.lookahead.semantics) html += `<tr><th>Lookahead Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">${item.lookahead.semantics}</td></tr>`;
-    }
-    html += '</table></div>';
-  }
-
-  // Related Issues section
-  if (item && item.name && state.issues && state.issues.length > 0) {
-    const relatedIssues = findIssuesForItem(item.name, type);
-    if (relatedIssues.length > 0) {
-      html += `<div class="detail-section">
-        <h4 style="margin-bottom:8px;color:var(--text-muted);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Related Issues (${relatedIssues.length})</h4>`;
-      relatedIssues.forEach(issue => {
-        const icon = issue.severity === 'error' ? '❗' : '⚠️';
-        html += `<div class="related-issue" data-tab="issues" data-issue-id="${issue.id}" style="cursor:pointer;padding:4px 8px;margin:2px 0;background:var(--bg-tertiary);border-radius:4px;font-size:13px;display:flex;align-items:center;gap:6px;">
-          <span>${icon}</span>
-          <span>${issue.message}</span>
-        </div>`;
-      });
-      html += '</div>';
-    }
-  }
-
-  return html;
-}
 
 // ============================================================================
 // DATA TYPE UTILITIES
@@ -1740,36 +330,6 @@ function findDimensionByName(dimName) {
     }
   }
   return false;
-}
-
-function findNoteByName(noteName) {
-  if (!noteName) return null;
-  for (const f of state.files) {
-    if (f.notes) {
-      const found = f.notes.find(n => (typeof n === 'string' ? n : n.name) === noteName);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function renderNoteIcon(noteNames) {
-  if (!noteNames) return '';
-  const notes = noteNames.split(' ').filter(n => n.trim());
-  if (notes.length === 0) return '';
-  
-  let html = '';
-  notes.forEach(noteName => {
-    const note = findNoteByName(noteName);
-    if (!note) {
-      html += `<span class="note-icon" title="Note not found: ${noteName}">⚠️</span>`;
-    } else {
-      const semantics = typeof note === 'string' ? '' : (note.semantics || '');
-      const tooltip = semantics ? `${noteName}: ${semantics.substring(0, 100)}${semantics.length > 100 ? '...' : ''}` : noteName;
-      html += `<span class="note-icon clickable-item" onclick="showDetail('${noteName.replace(/'/g, "\\'")}', 'notes', true)" title="${tooltip.replace(/"/g, '&quot;')}">📝</span>`;
-    }
-  });
-  return html;
 }
 
 function findNoteUsages(noteName) {
@@ -1921,205 +481,8 @@ function findDataTypeUsages(typeName) {
 }
 
 // ============================================================================
-// TREE RENDERING
-// ============================================================================
-
-function buildClassTree(classes, sortDir) {
-  const roots = [];
-  const map = {};
-  classes.forEach(c => { map[c.name] = { ...c, children: [] }; });
-  classes.forEach(c => {
-    const node = map[c.name];
-    if (c.parent && map[c.parent]) { map[c.parent].children.push(node); }
-    else { roots.push(node); }
-  });
-  const sortTree = nodes => { 
-    if (sortDir === 'asc') nodes.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sortDir === 'desc') nodes.sort((a, b) => b.name.localeCompare(a.name));
-    nodes.forEach(n => sortTree(n.children)); 
-  };
-  sortTree(roots);
-  return roots;
-}
-
-function renderTree(nodes, type, depth = 0) {
-  let html = '';
-  nodes.forEach(node => {
-    const itemCount = type === 'object' ? node.attributes?.length || 0 : node.parameters?.length || 0;
-    const hasChildren = node.children && node.children.length > 0;
-    const isRoot = depth === 0;
-    html += `<div class="tree-item" data-name="${node.name}" data-type="${type}" data-depth="${depth}" style="padding-left:${depth * 20}px">
-      ${hasChildren ? `<span class="tree-toggle" data-expanded="${isRoot}">${isRoot ? '▼' : '▶'}</span>` : '<span class="tree-toggle"></span>'}
-      <span class="name" title="${node.name}">${node.name.split('.').pop()}</span>
-      ${itemCount > 0 ? `<span class="count">${itemCount}</span>` : ''}
-    </div>`;
-    if (hasChildren) { html += `<div class="tree-children${isRoot ? '' : ' collapsed'}">${renderTree(node.children, type, depth + 1)}</div>`; }
-  });
-  return html;
-}
-
-function renderDataTypeList(type) {
-  if (!state.mergedFOM) return '<div class="empty-state">No data loaded. Load FOM files to view data types.</div>';
-  const items = state.mergedFOM.dataTypes[type];
-  const hasConflict = type === 'enum' || type === 'variant';
-  if (!items || items.length === 0) return '<div class="empty-state">No ' + type + ' data types in loaded FOM files.</div>';
-  const sortedItems = state.sortEnabled === 'asc' ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...items].sort((a, b) => b.name.localeCompare(a.name)) : items;
-  let html = '';
-  sortedItems.forEach(item => {
-    const conflict = hasConflict ? state.conflicts.find(c => c.type === type && c.name === item.name) : null;
-    html += `<div class="tree-item" data-name="${item.name}" data-type="${type}">
-      <span class="icon">${getTypeIcon(type)}</span>
-      <span class="name">${item.name}</span>
-      ${conflict ? '<span class="warning-icon" title="Defined in multiple modules">⚠</span>' : ''}
-    </div>`;
-  });
-  return html;
-}
-
-// ============================================================================
 // NAVIGATION (showDetail, showDataType, showModuleDetails)
 // ============================================================================
-
-function buildConflictDetailTable(issue) {
-  const items = issue.detail ? issue.detail.split('; ') : [];
-  const isAttrs = issue.type === 'object-attributes';
-  let html = '<table class="conflict-table"><tr><th>Module</th><th>Count</th><th></th></tr>';
-  items.forEach(item => {
-    const parts = item.split('||');
-    const visibleText = parts[0];
-    const tooltipText = parts[1] || '';
-    const match = visibleText.match(/^(.+?):\s*(\d+)\s*(?:attribute|parameter)s?/);
-    if (!match) {
-      html += `<tr><td colspan="3">${visibleText}</td></tr>`;
-      return;
-    }
-    const moduleName = match[1];
-    const count = match[2];
-    const hasDetail = tooltipText.length > 0;
-    html += `<tr class="conflict-row" onclick="${hasDetail ? 'toggleConflictRow(this)' : ''}">`;
-    html += `<td>${moduleName}</td>`;
-    html += `<td><span class="count-badge ${count === '0' ? 'same' : 'different'}">${count}</span></td>`;
-    html += `<td>${hasDetail ? '<span class="arrow">▶</span>' : ''}</td></tr>`;
-    if (hasDetail) {
-      html += `<tr class="conflict-detail-row" style="display:none"><td colspan="3">${tooltipText}</td></tr>`;
-    }
-  });
-  html += '</table>';
-  return html;
-}
-
-// eslint-disable-next-line no-unused-vars
-function toggleConflictRow(row) {
-  const detailRow = row.nextElementSibling;
-  if (detailRow && detailRow.classList.contains('conflict-detail-row')) {
-    const isHidden = detailRow.style.display === 'none';
-    detailRow.style.display = isHidden ? '' : 'none';
-    const arrow = row.querySelector('.arrow');
-    if (arrow) arrow.classList.toggle('expanded', isHidden);
-  }
-}
-
-function showIssueDetail(issueId) {
-  const issue = state.issues.find(i => i.id === issueId);
-  if (!issue) return;
-
-  state.selectedItem = { name: issue.id, type: 'issue' };
-
-  const header = document.getElementById('detailHeader');
-  const welcome = document.getElementById('welcomeScreen');
-  const title = document.getElementById('detailTitle');
-  const meta = document.getElementById('detailMeta');
-  const body = document.getElementById('detailBody');
-
-  welcome.style.display = 'none';
-  header.style.display = 'block';
-  title.textContent = issue.message;
-  meta.textContent = issue.severity.toUpperCase();
-
-  // Build locations HTML
-  let locationsHtml = '';
-  if (issue.locations && issue.locations.length > 0) {
-    const locationItems = issue.locations.map(loc => {
-      const targetTab = loc.subTab ? `${loc.tab}:${loc.subTab}` : loc.tab;
-      return `<div class="location-item" data-tab="${loc.tab}" data-subtab="${loc.subTab || ''}" data-item="${loc.itemName}" style="padding:6px 10px;margin:2px 0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;cursor:pointer;display:flex;align-items:center;gap:8px;">
-        <span style="color:var(--accent);font-size:12px;">📍</span>
-        <span style="flex:1;">${loc.itemName}</span>
-        <span style="color:var(--text-muted);font-size:11px;">${targetTab}</span>
-      </div>`;
-    }).join('');
-    locationsHtml = `<div style="margin-top:16px;">
-      <h4 style="margin-bottom:8px;color:var(--text-muted);font-size:13px;text-transform:uppercase;letter-spacing:0.5px;">Navigation Targets</h4>
-      ${locationItems}
-    </div>`;
-  }
-
-  // Build detail items — use comparison table for count mismatches
-  let detailHtml = '';
-  if (issue.detail) {
-    if (issue.type === 'object-attributes' || issue.type === 'interaction-parameters') {
-      detailHtml = buildConflictDetailTable(issue);
-    } else {
-      const items = issue.detail.split('; ');
-      detailHtml = '<div class="detail-list">';
-      items.forEach(item => {
-        const parts = item.split('||');
-        const visibleText = parts[0];
-        const tooltipText = parts[1] || '';
-        detailHtml += tooltipText
-          ? `<div class="detail-list-item" title="${tooltipText.replace(/"/g, '&quot;')}">${visibleText}</div>`
-          : `<div class="detail-list-item">${visibleText}</div>`;
-      });
-      detailHtml += '</div>';
-    }
-  }
-
-  // Build source modules list (clickable, non-bullet)
-  let sourcesHtml = '';
-  if (issue.sources?.length) {
-    sourcesHtml = '<div class="source-module-list"><p class="source-module-heading"><strong>Source Modules:</strong></p>';
-    issue.sources.forEach(s => {
-      const escapedName = s.replace(/"/g, '&quot;');
-      sourcesHtml += `<div class="source-module-item" data-source="${escapedName}">${s}</div>`;
-    });
-    sourcesHtml += '</div>';
-  }
-
-  body.innerHTML = `
-    <div class="detail-section">
-      <h3 style="margin-bottom:8px;">${issue.severity === 'error' ? '❗ Error' : '⚠️ Warning'}: ${issue.message}</h3>
-      ${detailHtml}
-      ${sourcesHtml}
-      ${issue.type ? `<p style="margin-bottom:4px;color:var(--text-muted);font-size:12px;"><strong>Category:</strong> ${issue.category} / ${issue.type}</p>` : ''}
-      ${locationsHtml}
-      <p style="margin-top:16px;color:var(--text-muted);font-size:11px;border-top:1px solid var(--border);padding-top:8px;">Issue ID: ${issue.id}</p>
-    </div>`;
-
-  saveToStorage();
-}
-
-// Map type values to their corresponding tab names
-function typeToTab(type) {
-  const typeMap = {
-    'object': 'objects',
-    'interaction': 'interactions',
-  };
-  const dataTypes = ['basic', 'simple', 'array', 'fixed', 'enum', 'variant'];
-  if (dataTypes.includes(type)) return 'datatypes';
-  return typeMap[type] || type;
-}
-
-// Find issues that reference a specific item by name and type
-function findIssuesForItem(itemName, type) {
-  if (!state.issues || state.issues.length === 0) return [];
-
-  return state.issues.filter(issue => {
-    if (!issue || typeof issue !== 'object' || !issue.locations || issue.locations.length === 0) return false;
-    return issue.locations.some(loc => {
-      if (loc.itemName !== itemName) return false;
-      return loc.tab === typeToTab(type);
-    });
-  });
-}
 
 // Map tab names to showDetail()-compatible type values
 function tabToType(tab, subTab) {
@@ -2144,33 +507,6 @@ function navigateToLocation(loc) {
   const type = tabToType(loc.tab, loc.subTab);
   showDetail(loc.itemName, type, true);
 }
-
-const TYPE_ICONS = {
-  object: '\u{1F4E6}', interaction: '\u{1F4AC}', basic: '\u{1F524}', simple: '\u{1F4DD}',
-  array: '\u{1F4CB}', fixed: '\u{1F4D1}', enum: '\u{1F522}', variant: '\u{1F500}',
-  trans: '\u{1F69A}', switches: '\u{1F518}', tags: '\u{1F3F7}\uFE0F', dims: '\u{1F4D0}',
-  notes: '\u{1F4DD}', time: '\u{23F1}\uFE0F',
-  appspace_object: '\u{1F4E6}', appspace_interaction: '\u{1F4AC}', appspace_unknown: '\u{2753}',
-  module: '\u{1F4C1}', attribute: '\u{1F4C4}', parameter: '\u{1F4C4}',
-  enumerator: '\u{1F522}', field: '\u{1F4CB}', alternative: '\u{1F500}',
-  appspace_app: '\u{1F4E6}'
-};
-
-const GROUP_LABELS = {
-  object: 'Object Classes', interaction: 'Interaction Classes',
-  basic: 'Basic Data Types', simple: 'Simple Data Types',
-  array: 'Array Data Types', fixed: 'Fixed Record Data Types',
-  enum: 'Enumerated Data Types', variant: 'Variant Record Data Types',
-  trans: 'Transportations', switches: 'Switches',
-  tags: 'Tags', dims: 'Dimensions',
-  notes: 'Notes', time: 'Time',
-  appspace_object: 'Appspace Objects', appspace_interaction: 'Appspace Interactions', appspace_unknown: 'Appspace Unknown',
-  module: 'FOM Modules', attribute: 'Object Attributes', parameter: 'Interaction Parameters',
-  enumerator: 'Enumerators', field: 'Fixed Record Fields', alternative: 'Variant Alternatives',
-  appspace_app: 'Appspace Applications'
-};
-
-const GROUP_ORDER = ['module', 'object', 'interaction', 'basic', 'simple', 'array', 'fixed', 'enum', 'variant', 'attribute', 'parameter', 'enumerator', 'field', 'alternative', 'trans', 'switches', 'tags', 'dims', 'notes', 'time', 'appspace_object', 'appspace_interaction', 'appspace_unknown', 'appspace_app'];
 
 function showDetail(name, type, isManualNav = false) {
   // Save current tab before any changes
@@ -2222,132 +558,19 @@ function showDetail(name, type, isManualNav = false) {
       // but we still need history for next click - so save current item
       currentSelected = { name, type };
     }
-    state.history.push({ tab: prevTab, subTab: prevSubTab, selected: currentSelected, detail: document.getElementById('detailHeader').style.display });
+    state.history.push({ tab: prevTab, subTab: prevSubTab, selected: currentSelected, detail: document.getElementById('detailHeader')?.style.display || 'none' });
   }
   state.selectedItem = { name, type };
-  const header = document.getElementById('detailHeader');
-  const welcome = document.getElementById('welcomeScreen');
-  const title = document.getElementById('detailTitle');
-  const meta = document.getElementById('detailMeta');
-  const body = document.getElementById('detailBody');
-  welcome.style.display = 'none';
-  header.style.display = 'block';
+  
+  // Ensure detail panel is visible (tab/subtab click handlers hide it)
+  const detailHdr = document.getElementById('detailHeader');
+  if (detailHdr && detailHdr.style.display !== 'block') detailHdr.style.display = 'block';
   
   const backBtn = document.getElementById('backBtn');
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
   
-  let item, source = '';
-  if (type === 'object') { item = state.mergedFOM.objectClasses.find(c => c.name === name); source = item?._source || ''; }
-  else if (type === 'interaction') { item = state.mergedFOM.interactionClasses.find(c => c.name === name); source = item?._source || ''; }
-  else if (type === 'ident') {
-    const file = state.files.find(f => f.name === name);
-    item = file?.identification; source = name;
-  } else if (type === 'dims') {
-    let dimItem = null;
-    for (const f of state.files) {
-      if (f.dimensions) {
-        const found = f.dimensions.find(d => d.name === name);
-        if (found) { dimItem = found; break; }
-      }
-    }
-    item = dimItem || { name }; source = name;
-  } else if (type === 'trans') {
-    let transItem = null;
-    const trimmedName = name.trim();
-    if (state.mergedFOM && state.mergedFOM.transportations) {
-      transItem = state.mergedFOM.transportations.find(t => t.name.trim() === trimmedName);
-    }
-    if (!transItem) {
-      for (const f of state.files) {
-        if (f.transportations) {
-          const found = f.transportations.find(t => t.name.trim() === trimmedName);
-          if (found) { transItem = found; break; }
-        }
-      }
-    }
-    item = transItem || { name: trimmedName }; source = name;
-  } else if (type === 'notes') {
-    let noteItem = null;
-    for (const f of state.files) {
-      if (f.notes) {
-        const found = f.notes.find(n => (typeof n === 'string' ? n : n.name) === name);
-        if (found) { noteItem = found; break; }
-      }
-    }
-    item = noteItem || { name }; source = name;
-  } else if (type === 'switches') {
-    let switchItem = null;
-    if (state.mergedFOM && state.mergedFOM.switches) {
-      switchItem = state.mergedFOM.switches.find(s => s.name.trim() === name.trim());
-    }
-    if (!switchItem) {
-      for (const f of state.files) {
-        if (f.switches) {
-          const found = f.switches.find(s => s.name.trim() === name.trim());
-          if (found) { switchItem = found; break; }
-        }
-      }
-    }
-    item = switchItem || { name }; source = name;
-  } else if (type === 'tags') {
-    let tagItem = null;
-    if (state.mergedFOM && state.mergedFOM.tags) {
-      tagItem = state.mergedFOM.tags.find(t => t.name.trim() === name.trim());
-    }
-    if (!tagItem) {
-      for (const f of state.files) {
-        if (f.tags) {
-          const found = f.tags.find(t => t.name.trim() === name.trim());
-          if (found) { tagItem = found; break; }
-        }
-      }
-    }
-    item = tagItem || { name }; source = name;
-  } else if (type === 'time') {
-    item = state.mergedFOM?.time || {}; source = 'Time Configuration';
-  } else if (type === 'appspace_object' || type === 'appspace_interaction' || type === 'appspace_unknown') {
-    const key = type === 'appspace_object' ? 'entries' : type === 'appspace_interaction' ? 'interactions' : 'unknown';
-    const entry = state.appspace?.[key]?.find(e => e.className === name);
-    item = entry || { className: name, apps: [] };
-    source = state.appspace?.fileName || 'Appspace';
-  }
-  else { item = state.mergedFOM.dataTypes[type]?.find(d => d.name === name); }
-  title.textContent = name;
-  meta.textContent = source;
-  
-if (type === 'object') {
-    const allClasses = state.mergedFOM.objectClasses;
-    const parentChain = [];
-    let current = allClasses.find(c => c.name === name);
-    while (current && current.parent) {
-      const parentClass = allClasses.find(c => c.name === current.parent);
-      if (parentClass) {
-        parentChain.push(parentClass);
-        current = parentClass;
-      } else {
-        break;
-      }
-    }
-    parentChain.reverse();
-    body.innerHTML = renderDetail(item, type, parentChain);
-  } else if (type === 'interaction') {
-    const allClasses = state.mergedFOM.interactionClasses;
-    const current = allClasses.find(c => c.name === name);
-    const parentChain = [];
-    let iter = current;
-    while (iter && iter.parent) {
-      const parentClass = allClasses.find(c => c.name === iter.parent);
-      if (parentClass) {
-        parentChain.push(parentClass);
-        iter = parentClass;
-      } else {
-        break;
-      }
-    }
-    parentChain.reverse();
-    body.innerHTML = renderDetail(item, type, parentChain);
-  } else if (type === 'appspace_object' || type === 'appspace_interaction' || type === 'appspace_unknown') {
-    // Appspace search result - render the panel and scroll to entry
+  // Appspace search result - render the panel and scroll to entry
+  if (type === 'appspace_object' || type === 'appspace_interaction' || type === 'appspace_unknown') {
     const subTab = type === 'appspace_object' ? 'objects' : type === 'appspace_interaction' ? 'interactions' : 'unknown';
     state.appspaceSubTab = subTab;
     document.getElementById('appspaceTabs').style.display = 'flex';
@@ -2364,15 +587,16 @@ if (type === 'object') {
         }
       }
     }, 100);
-  } else {
-    body.innerHTML = renderDetail(item, type);
+    return;
   }
   
-  // Highlight search query text within detail body
-  (function highlightBody() {
+  // Highlight search query text within detail body (deferred for Svelte render)
+  setTimeout(() => {
+    const body = document.getElementById('detailBody');
+    if (!body) return;
     const searchInput = document.getElementById('globalSearch');
     const searchQuery = searchInput ? searchInput.value.trim() : '';
-    if (!searchQuery || !body.innerHTML) return;
+    if (!searchQuery || !body.textContent) return;
     const q = searchQuery.toLowerCase();
     try {
       const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
@@ -2405,7 +629,7 @@ if (type === 'object') {
         firstHighlight.scrollIntoView({ block: 'center' });
       }
     } catch(e) { /* silently ignore highlight errors */ }
-  })();
+  }, 100);
   
   // Highlight selected item in tree after tree is rebuilt
   const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -2465,23 +689,11 @@ function showModuleDetails(file, addToHistory = true) {
   const prevSubTab = state.currentSubTab;
   const prevSelected = state.selectedItem || { name: file.name, type: 'module' };
   if (addToHistory) {
-    state.history.push({ tab: prevTab, subTab: prevSubTab, selected: prevSelected, detail: document.getElementById('detailHeader').style.display });
+    const prevDetail = document.getElementById('detailHeader')?.style.display || 'none';
+    state.history.push({ tab: prevTab, subTab: prevSubTab, selected: prevSelected, detail: prevDetail });
   }
   state.selectedItem = { name: file.name, type: 'module' };
-  const header = document.getElementById('detailHeader');
-  const welcome = document.getElementById('welcomeScreen');
-  const title = document.getElementById('detailTitle');
-  const meta = document.getElementById('detailMeta');
-  const body = document.getElementById('detailBody');
-  welcome.style.display = 'none';
-  header.style.display = 'block';
-  title.textContent = file.name;
-  meta.textContent = '';
-  
-  const backBtn = document.getElementById('backBtn');
-  backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
-  
-  body.innerHTML = renderModuleBody(file);
+  window.__moduleBodyHtml = renderModuleBody(file);
   saveToStorage();
 }
 
@@ -2551,358 +763,204 @@ function renderModuleBody(file) {
 // UI UPDATES
 // ============================================================================
 
-function updateUI() {
+function showPanel(panelId) {
+  ['treeViewTree', 'treeViewModules', 'treeViewDataTypes', 'treeViewIssues'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === panelId ? '' : 'none';
+  });
+  const treeControls = document.getElementById('treeControls');
+  if (treeControls) treeControls.style.display = panelId ? '' : 'none';
+}
+
+function getFirstDisplayedIssue() {
+  const CATEGORY_ORDER = ['cross-reference', 'load-conflict', 'validation', 'circular-dependency'];
+  for (const cat of CATEGORY_ORDER) {
+    const issue = state.issues.find(i => i.category === cat);
+    if (issue) return issue;
+  }
+  return state.issues[0];
+}
+
+function updateUI(skipAutoSelect) {
   updateTabCounts();
   updateTabScrollButtons();
   const treeView = document.getElementById('treeView');
   const exportBtn = document.getElementById('exportBtn');
   const backBtn = document.getElementById('backBtn');
-  const treeControls = document.getElementById('treeControls');
   const sidebar = document.querySelector('.sidebar');
   const hasData = state.files.length > 0;
   exportBtn.style.display = hasData ? 'inline-block' : 'none';
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
-  
+
   // Hide tree/sidebar for Appspaces tab (uses main panel, not sidebar)
   if (state.currentTab === 'appspaces') {
-    treeView.innerHTML = '';
-    if (treeControls) treeControls.style.display = 'none';
+    showPanel(null);
     if (sidebar) sidebar.style.display = 'none';
-    document.getElementById('detailHeader').style.display = 'block';
-    document.getElementById('welcomeScreen').style.display = 'none';
-    document.getElementById('detailTitle').textContent = 'Appspaces';
-    document.getElementById('detailMeta').textContent = 'Loaded from ' + (state.appspace?.fileName || 'file');
+    const dh = document.getElementById('detailHeader'); if (dh) dh.style.display = 'block';
+    const ws = document.getElementById('welcomeScreen'); if (ws) ws.style.display = 'none';
+    const dt = document.getElementById('detailTitle'); if (dt) dt.textContent = 'Appspaces';
+    const dm = document.getElementById('detailMeta'); if (dm) dm.textContent = 'Loaded from ' + (state.appspace?.fileName || 'file');
     renderAppspacesPanel();
     return;
   } else {
     if (sidebar) sidebar.style.display = '';
   }
-  
-  if (!state.mergedFOM && state.currentTab !== 'modules') { treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>'; return; }
+
+  if (!state.mergedFOM && state.currentTab !== 'modules') {
+    showPanel(null);
+    treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>';
+    return;
+  }
+
+  const sel = state.selectedItem;
+
   if (state.currentTab === 'modules') {
-    const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
-    treeView.innerHTML = '<div class="tree-wrapper">' + (files.length > 0 ? files.map(f => `<div class="tree-item" data-name="${f.name}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded. Use the "Load FOM" button in the header.</div>') + '</div>';
-    if (state.selectedItem && state.selectedItem.type === 'module') {
-      const selectedItem = treeView.querySelector(`.tree-item[data-name="${state.selectedItem.name}"]`);
-      if (selectedItem) {
-        selectedItem.classList.add('selected');
-        selectedItem.scrollIntoView({ block: 'nearest' });
+    showPanel('treeViewModules');
+    const sortedFiles = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
+    window.__moduleListComponent?.setFiles(sortedFiles, state.sortEnabled);
+    if (!sel && !skipAutoSelect && sortedFiles.length > 0) {
+      const file = state.files.find(f => f.name === sortedFiles[0].name);
+      if (file) {
+        showModuleDetails(file, true);
+        window.__moduleListComponent?.setSelected(file.name);
       }
+    } else if (sel && sel.name) {
+      window.__moduleListComponent?.setSelected(sel.name);
     }
   } else if (state.currentTab === 'objects') {
+    showPanel('treeViewTree');
     const classes = mergeClasses(state.files, 'object');
-    const tree = buildClassTree(classes, state.sortEnabled);
-    treeView.innerHTML = '<div class="tree-header"><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.remove(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'true\';el.textContent=\'▼\';});">⬇ Expand All</button><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.add(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'false\';el.textContent=\'▶\';});">⬆ Collapse All</button></div><div class="tree-wrapper">' + renderTree(tree, 'object') + '</div>';
+    const sorted = state.sortEnabled === 'asc' ? [...classes].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...classes].sort((a, b) => b.name.localeCompare(a.name)) : classes;
+    window.__treeViewComponent?.setItems(sorted, 'tree');
+    if (!sel && !skipAutoSelect && classes.length > 0) {
+      showDetail(classes[0].name, 'object', true);
+      window.__treeViewComponent?.setSelected(classes[0].name);
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
+    }
   } else if (state.currentTab === 'interactions') {
+    showPanel('treeViewTree');
     const classes = mergeClasses(state.files, 'interaction');
-    const tree = buildClassTree(classes, state.sortEnabled);
-    treeView.innerHTML = '<div class="tree-header"><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.remove(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'true\';el.textContent=\'▼\';});">⬇ Expand All</button><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.add(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'false\';el.textContent=\'▶\';});">⬆ Collapse All</button></div><div class="tree-wrapper">' + renderTree(tree, 'interaction') + '</div>';
+    const sorted = state.sortEnabled === 'asc' ? [...classes].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...classes].sort((a, b) => b.name.localeCompare(a.name)) : classes;
+    window.__treeViewComponent?.setItems(sorted, 'tree');
+    if (!sel && !skipAutoSelect && classes.length > 0) {
+      showDetail(classes[0].name, 'interaction', true);
+      window.__treeViewComponent?.setSelected(classes[0].name);
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
+    }
   } else if (state.currentTab === 'dims') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderDimensionsList() + '</div>';
-    if (!state.selectedItem && state.files?.some(f => f.dimensions?.length > 0)) {
-      const firstItem = treeView.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        firstItem.scrollIntoView({ block: 'nearest' });
-        const name = firstItem.dataset.name;
-        if (name) showDetail(name, 'dims');
-      }
+    showPanel('treeViewTree');
+    let allDims = [];
+    state.files.forEach(f => { if (f.dimensions) f.dimensions.forEach(d => { const n = d.name || d; allDims.push({ name: n, icon: '📐', fullName: n }); }); });
+    if (state.sortEnabled === 'asc') allDims.sort((a, b) => a.name.localeCompare(b.name));
+    else if (state.sortEnabled === 'desc') allDims.sort((a, b) => b.name.localeCompare(a.name));
+    window.__treeViewComponent?.setItems(allDims, 'flat');
+    if (!sel && !skipAutoSelect && allDims.length > 0) {
+      showDetail(allDims[0].name, 'dims');
+      window.__treeViewComponent?.setSelected(allDims[0].name);
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
     }
   } else if (state.currentTab === 'trans') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderTransList() + '</div>';
-    if (!state.selectedItem && state.mergedFOM?.transportations?.length > 0) {
-      const firstItem = treeView.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        firstItem.scrollIntoView({ block: 'nearest' });
-        const name = firstItem.dataset.name;
-        if (name) showDetail(name, 'trans');
-      }
+    showPanel('treeViewTree');
+    const list = state.mergedFOM?.transportations || [];
+    let items = list.map(t => ({ name: t.name, icon: '🚚' }));
+    if (state.sortEnabled === 'asc') items.sort((a, b) => a.name.localeCompare(b.name));
+    else if (state.sortEnabled === 'desc') items.sort((a, b) => b.name.localeCompare(a.name));
+    window.__treeViewComponent?.setItems(items, 'flat');
+    if (!sel && !skipAutoSelect && items.length > 0) {
+      showDetail(items[0].name, 'trans');
+      window.__treeViewComponent?.setSelected(items[0].name);
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
     }
   } else if (state.currentTab === 'notes') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderNotesList() + '</div>';
-    if (!state.selectedItem && state.files?.some(f => f.notes?.length > 0)) {
-      const firstItem = treeView.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        firstItem.scrollIntoView({ block: 'nearest' });
-        const name = firstItem.dataset.name;
-        if (name) showDetail(name, 'notes', true);
-      }
+    showPanel('treeViewTree');
+    let allNotes = [];
+    state.files.forEach(f => { if (f.notes) f.notes.forEach(n => { const name = typeof n === 'string' ? n : (n.name || 'Note'); allNotes.push({ name, icon: '📝' }); }); });
+    const noteSort = (a, b) => { const r = /^(.*?)(\d+)$/; const ma = a.name.match(r), mb = b.name.match(r); if (ma && mb && ma[1] === mb[1]) return parseInt(ma[2]) - parseInt(mb[2]); return a.name.localeCompare(b.name); };
+    if (state.sortEnabled === 'asc') allNotes.sort(noteSort);
+    else if (state.sortEnabled === 'desc') allNotes.sort((a, b) => noteSort(b, a));
+    window.__treeViewComponent?.setItems(allNotes, 'flat');
+    if (!sel && !skipAutoSelect && allNotes.length > 0) {
+      showDetail(allNotes[0].name, 'notes', true);
+      window.__treeViewComponent?.setSelected(allNotes[0].name);
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
     }
   } else if (state.currentTab === 'switches') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderSwitchesList() + '</div>';
-    if (!state.selectedItem && state.mergedFOM?.switches?.length > 0) {
-      const firstItem = treeView.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        firstItem.scrollIntoView({ block: 'nearest' });
-        const name = firstItem.dataset.name;
-        if (name) showDetail(name, 'switches');
-      }
+    showPanel('treeViewTree');
+    const list = state.mergedFOM?.switches || [];
+    let items = list.map(s => ({ name: s.name, icon: '🔘' }));
+    if (state.sortEnabled === 'asc') items.sort((a, b) => a.name.localeCompare(b.name));
+    else if (state.sortEnabled === 'desc') items.sort((a, b) => b.name.localeCompare(a.name));
+    window.__treeViewComponent?.setItems(items, 'flat');
+    if (!sel && !skipAutoSelect && items.length > 0) {
+      showDetail(items[0].name, 'switches');
+      window.__treeViewComponent?.setSelected(items[0].name);
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
     }
   } else if (state.currentTab === 'tags') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderTagsList() + '</div>';
-    if (!state.selectedItem && state.mergedFOM?.tags?.length > 0) {
-      const firstItem = treeView.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        firstItem.scrollIntoView({ block: 'nearest' });
-        const name = firstItem.dataset.name;
-        if (name) showDetail(name, 'tags');
-      }
+    showPanel('treeViewTree');
+    const list = state.mergedFOM?.tags || [];
+    let items = list.map(t => ({ name: t.name, icon: '🏷️' }));
+    if (state.sortEnabled === 'asc') items.sort((a, b) => a.name.localeCompare(b.name));
+    else if (state.sortEnabled === 'desc') items.sort((a, b) => b.name.localeCompare(a.name));
+    window.__treeViewComponent?.setItems(items, 'flat');
+    if (!sel && !skipAutoSelect && items.length > 0) {
+      showDetail(items[0].name, 'tags');
+      window.__treeViewComponent?.setSelected(items[0].name);
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
     }
   } else if (state.currentTab === 'time') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderTimeInfo() + '</div>';
-    if (!state.selectedItem && state.mergedFOM?.time) {
-      const firstItem = treeView.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        firstItem.scrollIntoView({ block: 'nearest' });
-        showDetail('time', 'time');
-      }
+    showPanel('treeViewTree');
+    const items = state.mergedFOM?.time ? [{ name: 'time', icon: '⏱️' }] : [];
+    window.__treeViewComponent?.setItems(items, 'flat');
+    if (!sel && !skipAutoSelect && items.length > 0) {
+      showDetail('time', 'time');
+      window.__treeViewComponent?.setSelected('time');
+    } else if (sel && sel.name) {
+      window.__treeViewComponent?.setSelected(sel.name);
     }
   } else if (state.currentTab === 'issues') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderIssuesList() + '</div>';
-    if (!state.selectedItem && state.issues.length > 0) {
-      const firstItem = treeView.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        firstItem.scrollIntoView({ block: 'nearest' });
-        const issueId = firstItem.dataset.issueId;
-        if (issueId) showIssueDetail(issueId);
-      }
+    showPanel('treeViewIssues');
+    if (!sel && !skipAutoSelect && state.issues.length > 0) {
+      const first = getFirstDisplayedIssue();
+      showIssueDetail(first.id);
+      issueStore.selectIssue(first.id);
     }
   } else {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderDataTypeList(state.currentSubTab) + '</div>';
-  }
-  treeView.querySelectorAll('.tree-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-      if (e.target.classList.contains('tree-toggle')) {
-        const isExpanded = e.target.dataset.expanded === 'true';
-        e.target.dataset.expanded = (!isExpanded).toString();
-        e.target.textContent = isExpanded ? '▶' : '▼';
-        const children = e.target.parentElement.nextElementSibling;
-        if (children) children.classList.toggle('collapsed');
-        return;
-      }
-      treeView.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
-      item.classList.add('selected');
-      const name = item.dataset.name;
-      if (state.currentTab === 'modules') { const file = state.files.find(f => f.name === name); if (file) showModuleDetails(file, true); return; }
-      if (state.currentTab === 'issues') {
-        if (state.selectedItem) {
-          state.history.push({
-            tab: state.currentTab,
-            subTab: state.issuesFilter || 'all',
-            selected: { ...state.selectedItem },
-            detail: document.getElementById('detailHeader').style.display
-          });
-          document.getElementById('backBtn').style.display = 'inline-block';
-        }
-        showIssueDetail(item.dataset.issueId);
-        return;
-      }
-      const type = item.dataset.type || (state.currentTab === 'datatypes' ? state.currentSubTab : state.currentTab === 'objects' ? 'object' : state.currentTab === 'dims' ? 'dims' : state.currentTab === 'trans' ? 'trans' : state.currentTab === 'notes' ? 'notes' : state.currentTab === 'switches' ? 'switches' : state.currentTab === 'tags' ? 'tags' : state.currentTab === 'time' ? 'time' : 'interaction');
-      showDetail(name, type, true);
-    });
-  });
-}
-// ============================================================================
-// LIST RENDERING (sidebar tree views)
-// ============================================================================
-
-function renderTransList() {
-  if (!state.mergedFOM || !state.mergedFOM.transportations || state.mergedFOM.transportations.length === 0) return '<div class="empty-state">No transportations. Load a FOM file containing HLAstandardMIM.xml or similar to see transport types (HLAreliable, HLAbestEffort).</div>';
-  let html = '';
-  const list = state.sortEnabled === 'asc' ? [...state.mergedFOM.transportations].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.mergedFOM.transportations].sort((a, b) => b.name.localeCompare(a.name)) : state.mergedFOM.transportations;
-  list.forEach(t => {
-    const name = t.name;
-    const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    html += `<div class="tree-item" data-name="${escapedName}" data-type="trans"><span class="icon">🚚</span><span class="name">${name}</span></div>`;
-  });
-  return html;
-}
-function renderIssuesList() {
-  if (!state.issues || state.issues.length === 0) {
-    return '<div class="empty-state">No issues found.</div>';
-  }
-
-  // Filter by severity based on state.issuesFilter
-  let filtered = state.issues;
-  if (state.issuesFilter === 'error') {
-    filtered = state.issues.filter(i => i.severity === 'error');
-  } else if (state.issuesFilter === 'warning') {
-    filtered = state.issues.filter(i => i.severity === 'warning');
-  }
-
-  if (filtered.length === 0) {
-    return '<div class="empty-state">No issues match the current filter.</div>';
-  }
-
-  // Group by category
-  const groups = {};
-  filtered.forEach(issue => {
-    const cat = issue.category || 'other';
-    if (!groups[cat]) groups[cat] = [];
-    groups[cat].push(issue);
-  });
-
-  let html = '';
-  for (const [category, issues] of Object.entries(groups)) {
-    const categoryLabel = category
-      .split('-')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ');
-    html += `<div class="issue-category-header">${categoryLabel} (${issues.length})</div>`;
-    issues.forEach(issue => {
-      const icon = issue.severity === 'error' ? '❗' : '⚠️';
-      const iconClass = issue.severity === 'error' ? 'issue-icon issue-error' : 'issue-icon issue-warning';
-      const sourceCount = issue.sources?.length || 0;
-      html += `<div class="tree-item" data-issue-id="${issue.id}" data-name="${issue.id}">
-        <span class="${iconClass}">${icon}</span>
-        <span class="name" title="${issue.message.replace(/"/g, '&quot;')}">${issue.message}</span>
-        ${sourceCount > 0 ? `<span class="issue-sources">${sourceCount} sources</span>` : ''}
-      </div>`;
-    });
-  }
-
-  return html;
-}
-
-function renderNotesList() {
-  if (!state.files || state.files.length === 0) return '<div class="empty-state">No FOM files loaded. Use the "Load FOM" button in the header.</div>';
-  let allNotes = [];
-  state.files.forEach(f => {
-    if (f.notes && f.notes.length > 0) {
-      f.notes.forEach(n => {
-        const name = typeof n === 'string' ? n : (n.name || 'Note');
-        allNotes.push(name);
-      });
+    showPanel('treeViewDataTypes');
+    const items = state.mergedFOM?.dataTypes[state.currentSubTab] || [];
+    const sortedItems = state.sortEnabled === 'asc' ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...items].sort((a, b) => b.name.localeCompare(a.name)) : items;
+    window.__dataTypeListComponent?.setItems(items, state.currentSubTab, state.sortEnabled);
+    if (!sel && !skipAutoSelect && sortedItems.length > 0) {
+      showDetail(sortedItems[0].name, state.currentSubTab);
+      window.__dataTypeListComponent?.setSelected(sortedItems[0].name);
+    } else if (sel && sel.name) {
+      window.__dataTypeListComponent?.setSelected(sel.name);
     }
-  });
-  // Sort with numeric-aware logic for trailing numbers
-  const noteSort = (a, b) => {
-    const regex = /^(.*?)(\d+)$/;
-    const matchA = a.match(regex);
-    const matchB = b.match(regex);
-    if (matchA && matchB && matchA[1] === matchB[1]) {
-      // Same prefix, sort by numeric suffix
-      return parseInt(matchA[2]) - parseInt(matchB[2]);
-    }
-    return a.localeCompare(b);
-  };
-  if (state.sortEnabled === 'asc') allNotes.sort(noteSort);
-  else if (state.sortEnabled === 'desc') allNotes.sort((a, b) => noteSort(b, a));
-  let html = '';
-  allNotes.forEach(name => {
-    const displayName = name.length > 30 ? name.substring(0, 30) + '...' : name;
-    const escapedName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    html += `<div class="tree-item" data-name="${escapedName}" data-type="notes"><span class="icon">📝</span><span class="name">${displayName}</span></div>`;
-  });
-  return html || '<div class="empty-state">No notes in loaded FOM files.</div>';
+  }
 }
-function renderDimensionsList() {
-  if (!state.files || state.files.length === 0) return '<div class="empty-state">No FOM files loaded. Use the "Load FOM" button in the header.</div>';
-  let allDims = [];
-  state.files.forEach(f => {
-    if (f.dimensions && f.dimensions.length > 0) {
-      f.dimensions.forEach(d => { allDims.push(d); });
-    }
-  });
-  if (state.sortEnabled === 'asc') allDims.sort((a, b) => a.name.localeCompare(b.name));
-  else if (state.sortEnabled === 'desc') allDims.sort((a, b) => b.name.localeCompare(a.name));
-  let html = '';
-  allDims.forEach(d => {
-    const escapedName = d.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    html += `<div class="tree-item" data-name="${escapedName}" data-type="dims"><span class="icon">📐</span><span class="name">${d.name}</span></div>`;
-  });
-  return html || '<div class="empty-state">No dimensions</div>';
-}
-
-function mergeSwitches(files) {
-  const map = {};
-  files.forEach(f => {
-    if (!f.switches) return;
-    f.switches.forEach(s => {
-      if (!map[s.name]) { map[s.name] = { ...s, _sources: [f.name] }; }
-      else { map[s.name]._sources.push(f.name); }
-    });
-  });
-  return Object.values(map);
-}
-
-function mergeTags(files) {
-  const map = {};
-  files.forEach(f => {
-    if (!f.tags) return;
-    f.tags.forEach(t => {
-      if (!map[t.name]) { map[t.name] = { ...t, _sources: [f.name] }; }
-      else { map[t.name]._sources.push(f.name); }
-    });
-  });
-  return Object.values(map);
-}
-
-function mergeTime(files) {
-  const result = { timeStamp: null, lookahead: null, _sources: [] };
-  files.forEach(f => {
-    if (!f.time) return;
-    result._sources.push(f.name);
-    if (!result.timeStamp && f.time.timeStamp) result.timeStamp = f.time.timeStamp;
-    if (!result.lookahead && f.time.lookahead) result.lookahead = f.time.lookahead;
-  });
-  return result;
-}
-
-function renderSwitchesList() {
-  if (!state.mergedFOM || !state.mergedFOM.switches || state.mergedFOM.switches.length === 0) return '<div class="empty-state">No switches. Switches are typically defined in RPR-Base_v3.0.xml or similar FOM files.</div>';
-  let allSwitches = [...state.mergedFOM.switches];
-  if (state.sortEnabled === 'asc') allSwitches.sort((a, b) => a.name.localeCompare(b.name));
-  else if (state.sortEnabled === 'desc') allSwitches.sort((a, b) => b.name.localeCompare(a.name));
-  let html = '';
-  allSwitches.forEach(s => {
-    const escapedName = s.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    html += `<div class="tree-item" data-name="${escapedName}" data-type="switches"><span class="icon">🔘</span><span class="name">${s.name}</span></div>`;
-  });
-  return html;
-}
-
-function renderTagsList() {
-  if (!state.mergedFOM || !state.mergedFOM.tags || state.mergedFOM.tags.length === 0) return '<div class="empty-state">No tags. Tags are typically defined in RPR-Base_v3.0.xml or similar FOM files.</div>';
-  let allTags = [...state.mergedFOM.tags];
-  if (state.sortEnabled === 'asc') allTags.sort((a, b) => a.name.localeCompare(b.name));
-  else if (state.sortEnabled === 'desc') allTags.sort((a, b) => b.name.localeCompare(a.name));
-  let html = '';
-  allTags.forEach(t => {
-    const escapedName = t.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    html += `<div class="tree-item" data-name="${escapedName}" data-type="tags"><span class="icon">🏷️</span><span class="name">${t.name}</span></div>`;
-  });
-  return html;
-}
-
-function renderTimeInfo() {
-  if (!state.mergedFOM || !state.mergedFOM.time) return '<div class="empty-state">No time configuration. Time configuration is typically defined in RPR-Base_v3.0.xml or similar FOM files.</div>';
-  return '<div class="tree-item" data-name="time" data-type="time"><span class="icon">⏱️</span><span class="name">Time Configuration</span></div>';
-}
-
 function updateTabCounts() {
-  if (!state.mergedFOM) return;
-  
-  // Update tab counts
+  // Update tab counts (works even when no FOM loaded - all counts will be 0)
   const tabs = [
     { id: 'modules', getCount: () => state.files.length },
-    { id: 'objects', getCount: () => state.mergedFOM.objectClasses?.length || 0 },
-    { id: 'interactions', getCount: () => state.mergedFOM.interactionClasses?.length || 0 },
+    { id: 'objects', getCount: () => state.mergedFOM?.objectClasses?.length || 0 },
+    { id: 'interactions', getCount: () => state.mergedFOM?.interactionClasses?.length || 0 },
     { id: 'datatypes', getCount: () => {
-      const dt = state.mergedFOM.dataTypes;
+      const dt = state.mergedFOM?.dataTypes;
+      if (!dt) return 0;
       return (dt.basic?.length || 0) + (dt.simple?.length || 0) + (dt.array?.length || 0) + (dt.fixed?.length || 0) + (dt.enum?.length || 0) + (dt.variant?.length || 0);
     }},
     { id: 'dims', getCount: () => state.files.reduce((sum, f) => sum + (f.dimensions?.length || 0), 0) },
-    { id: 'trans', getCount: () => state.mergedFOM.transportations?.length || 0 },
-    { id: 'switches', getCount: () => state.mergedFOM.switches?.length || 0 },
-    { id: 'tags', getCount: () => state.mergedFOM.tags?.length || 0 },
-    { id: 'time', getCount: () => state.mergedFOM.time ? 1 : 0 },
+    { id: 'trans', getCount: () => state.mergedFOM?.transportations?.length || 0 },
+    { id: 'switches', getCount: () => state.mergedFOM?.switches?.length || 0 },
+    { id: 'tags', getCount: () => state.mergedFOM?.tags?.length || 0 },
+    { id: 'time', getCount: () => state.mergedFOM?.time ? 1 : 0 },
     { id: 'notes', getCount: () => state.files.reduce((sum, f) => sum + (f.notes?.length || 0), 0) },
     { id: 'issues', getCount: () => state.issues.length }
   ];
@@ -2915,12 +973,12 @@ function updateTabCounts() {
     }
   });
   const subtabs = [
-    { id: 'basic', getCount: () => state.mergedFOM.dataTypes.basic?.length || 0 },
-    { id: 'simple', getCount: () => state.mergedFOM.dataTypes.simple?.length || 0 },
-    { id: 'array', getCount: () => state.mergedFOM.dataTypes.array?.length || 0 },
-    { id: 'fixed', getCount: () => state.mergedFOM.dataTypes.fixed?.length || 0 },
-    { id: 'enum', getCount: () => state.mergedFOM.dataTypes.enum?.length || 0 },
-    { id: 'variant', getCount: () => state.mergedFOM.dataTypes.variant?.length || 0 }
+    { id: 'basic', getCount: () => state.mergedFOM?.dataTypes?.basic?.length || 0 },
+    { id: 'simple', getCount: () => state.mergedFOM?.dataTypes?.simple?.length || 0 },
+    { id: 'array', getCount: () => state.mergedFOM?.dataTypes?.array?.length || 0 },
+    { id: 'fixed', getCount: () => state.mergedFOM?.dataTypes?.fixed?.length || 0 },
+    { id: 'enum', getCount: () => state.mergedFOM?.dataTypes?.enum?.length || 0 },
+    { id: 'variant', getCount: () => state.mergedFOM?.dataTypes?.variant?.length || 0 }
   ];
   subtabs.forEach(tab => {
     const tabEl = document.querySelector(`.subtab[data-subtab="${tab.id}"]`);
@@ -2967,8 +1025,7 @@ async function loadFiles(files) {
   for (const file of files) {
     try {
       const text = await file.text();
-      const parser = new FOMParser(text);
-      const fom = parser.parse();
+      const fom = await parseInWorker(text);
       state.files.push(fom);
     } catch (e) {
       failedFiles++;
@@ -2977,10 +1034,13 @@ async function loadFiles(files) {
   }
   if (state.files.length > 0) {
     const sorted = topologicalSort(state.files);
+    const dtResult = mergeDataTypes(sorted);
+    state.conflicts = state.conflicts.filter(c => c.type !== 'enum' && c.type !== 'variant');
+    state.conflicts.push(...dtResult.conflicts);
     state.mergedFOM = {
       objectClasses: mergeClasses(sorted, 'object'),
       interactionClasses: mergeClasses(sorted, 'interaction'),
-      dataTypes: mergeDataTypes(sorted),
+      dataTypes: dtResult.result,
       transportations: mergeTransportations(sorted),
       switches: mergeSwitches(sorted),
       tags: mergeTags(sorted),
@@ -2995,7 +1055,7 @@ async function loadFiles(files) {
     document.getElementById('dataTypeTabs').style.display = 'none';
     document.getElementById('issuesTabs').style.display = 'none';
     // Run validate() first (it resets state.issues), then append parse errors
-    validate();
+    validate(state, makeIssue);
     parseErrors.forEach(pe => {
       state.issues.push(makeIssue('error', 'validation', 'parse-error',
         `Failed to parse ${pe.name}`,
@@ -3003,7 +1063,8 @@ async function loadFiles(files) {
         [pe.name],
       ));
     });
-    updateIssuesTabVisibility();
+    updateIssuesTabVisibility(state);
+    state.selectedItem = null;
     saveToStorage();
     updateUI();
     if (failedFiles > 0) {
@@ -3011,16 +1072,8 @@ async function loadFiles(files) {
     } else {
       showToast(`Loaded ${totalFiles} files`);
     }
-    setTimeout(() => {
-      const firstItem = document.querySelector('.tree-item');
-      if (firstItem) {
-        const fileName = firstItem.dataset.name;
-        const file = state.files.find(f => f.name === fileName);
-        if (file) showModuleDetails(file, false);
-      }
-    }, 50);
   } else {
-    validate();
+    validate(state, makeIssue);
     parseErrors.forEach(pe => {
       state.issues.push(makeIssue('error', 'validation', 'parse-error',
         `Failed to parse ${pe.name}`,
@@ -3028,7 +1081,7 @@ async function loadFiles(files) {
         [pe.name],
       ));
     });
-    updateIssuesTabVisibility();
+    updateIssuesTabVisibility(state);
     saveToStorage();
     updateUI();
     if (failedFiles > 0) {
@@ -3043,15 +1096,17 @@ async function loadFiles(files) {
 
 // eslint-disable-next-line no-unused-vars
 function removeFile(index) {
-  document.getElementById('detailHeader').style.display = 'none';
-  document.getElementById('detailBody').innerHTML = '';
+  const dh = document.getElementById('detailHeader'); if (dh) dh.style.display = 'none';
   state.files.splice(index, 1);
   if (state.files.length > 0) { 
     const sorted = topologicalSort(state.files); 
-    state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: mergeDataTypes(sorted), transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) }; 
+    const dtResult = mergeDataTypes(sorted);
+    state.conflicts = state.conflicts.filter(c => c.type !== 'enum' && c.type !== 'variant');
+    state.conflicts.push(...dtResult.conflicts);
+    state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: dtResult.result, transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) }; 
   }
   else { state.mergedFOM = null; }
-  saveToStorage(); validate(); updateUI(); updateIssuesTabVisibility();
+  saveToStorage(); validate(state, makeIssue); updateUI(); updateIssuesTabVisibility(state);
 }
 
 document.getElementById('fileInput').addEventListener('change', e => {
@@ -3086,11 +1141,42 @@ document.getElementById('sortBtn')?.addEventListener('click', () => {
   updateUI();
 });
 
-document.getElementById('exportBtn').addEventListener('click', () => { window.print(); });
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const btn = document.getElementById('exportBtn');
+  const existing = document.getElementById('exportMenu');
+  if (existing) { existing.remove(); return; }
+  const menu = document.createElement('div');
+  menu.id = 'exportMenu';
+  menu.style.cssText = 'position:absolute;top:100%;right:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 12px rgba(0,0,0,0.15);z-index:100;min-width:180px;';
+  const items = [
+    { label: 'Print / PDF', action: () => exportPrint() },
+    { label: 'Export JSON (summary)', action: () => exportJSON(state) },
+    { label: 'Export JSON (full)', action: () => exportFullJSON(state) },
+    { label: 'Export CSV (current view)', action: () => exportCSV(state, state.currentTab, state.currentSubTab) },
+  ];
+  items.forEach((item, i) => {
+    const el = document.createElement('div');
+    el.textContent = item.label;
+    el.style.cssText = 'padding:8px 16px;cursor:pointer;font-size:13px;white-space:nowrap;';
+    el.addEventListener('mouseenter', () => el.style.background = 'var(--bg-hover)');
+    el.addEventListener('mouseleave', () => el.style.background = '');
+    el.addEventListener('click', (e) => { e.stopPropagation(); item.action(); menu.remove(); });
+    menu.appendChild(el);
+    if (i < items.length - 1) {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'height:1px;background:var(--border);margin:2px 0;';
+      menu.appendChild(sep);
+    }
+  });
+  btn.style.position = 'relative';
+  btn.appendChild(menu);
+  const close = (e) => { if (!menu.contains(e.target) && e.target !== btn) menu.remove(); };
+  setTimeout(() => document.addEventListener('click', close, { once: true }), 0);
+});
 
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
-    const prevDetailShowing = document.getElementById('detailHeader').style.display !== 'none';
+    const prevDetailShowing = (document.getElementById('detailHeader')?.style.display || 'none') !== 'none';
     const prevTab = state.currentTab;
     const prevSubTab = state.currentSubTab;
     const prevSelected = state.selectedItem;
@@ -3108,8 +1194,6 @@ document.querySelectorAll('.tab').forEach(tab => {
     const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
     const appspaceTabs = document.getElementById('appspaceTabs'); appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
     const issuesTabs = document.getElementById('issuesTabs'); issuesTabs.style.display = state.currentTab === 'issues' ? 'flex' : 'none';
-    document.getElementById('detailHeader').style.display = 'none'; document.getElementById('detailBody').innerHTML = '';
-    
     // Handle Data Types tab - ensure a subtab is selected BEFORE updateUI
     if (state.currentTab === 'datatypes') {
       const validSubTabs = ['basic', 'simple', 'array', 'fixed', 'enum', 'variant'];
@@ -3132,7 +1216,7 @@ document.querySelectorAll('.tab').forEach(tab => {
       if (activeSubtab) activeSubtab.classList.add('active');
     }
     
-    saveToStorage(); updateUI();
+    updateUI(); saveToStorage();
     
     // Handle Appspaces tab
     if (state.currentTab === 'appspaces') {
@@ -3145,57 +1229,6 @@ document.querySelectorAll('.tab').forEach(tab => {
       renderAppspacesPanel();
       return;
     }
-
-    // Auto-select first item WITHOUT pushing to history
-    setTimeout(() => {
-      const firstItem = document.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        const name = firstItem.dataset.name;
-        // Determine type based on current tab
-        let type = firstItem.dataset.type;
-        if (!type) {
-          if (state.currentTab === 'objects') type = 'object';
-          else if (state.currentTab === 'interactions') type = 'interaction';
-          else if (state.currentTab === 'modules') type = 'module';
-          else if (state.currentTab === 'datatypes') type = state.currentSubTab;
-          else if (state.currentTab === 'dims') type = 'dims';
-          else if (state.currentTab === 'trans') type = 'trans';
-          else if (state.currentTab === 'notes') type = 'notes';
-          else if (state.currentTab === 'switches') type = 'switches';
-          else if (state.currentTab === 'tags') type = 'tags';
-          else if (state.currentTab === 'time') type = 'time';
-        }
-        if (type && name) {
-          state.selectedItem = { name, type: type === 'module' ? 'module' : type };
-          let itemData, source = '';
-          if (state.currentTab === 'modules') {
-            const file = state.files.find(f => f.name === name);
-            if (file) showModuleDetails(file, false);
-            return;
-          } else if (type === 'object') { itemData = state.mergedFOM.objectClasses.find(c => c.name === name); source = itemData?._source || ''; }
-          else if (type === 'interaction') { itemData = state.mergedFOM.interactionClasses.find(c => c.name === name); source = itemData?._source || ''; }
-          else if (type === 'trans') { itemData = state.mergedFOM.transportations?.find(t => t.name.trim() === name.trim()); source = name; }
-          else if (type === 'dims') { for (const f of state.files) { if (f.dimensions) { itemData = f.dimensions.find(d => d.name === name); if (itemData) { source = f.name; break; } } } }
-          else if (type === 'notes') { for (const f of state.files) { if (f.notes) { itemData = f.notes.find(n => (typeof n === 'string' ? n : n.name) === name); if (itemData) { source = f.name; break; } } } }
-          else if (type === 'switches') { itemData = state.mergedFOM.switches?.find(s => s.name.trim() === name.trim()); source = name; }
-          else if (type === 'tags') { itemData = state.mergedFOM.tags?.find(t => t.name.trim() === name.trim()); source = name; }
-          else if (type === 'time') { itemData = state.mergedFOM.time; source = 'Time Configuration'; }
-          else { itemData = state.mergedFOM.dataTypes[type]?.find(d => d.name === name); source = itemData?._source || ''; }
-          const header = document.getElementById('detailHeader');
-          const welcome = document.getElementById('welcomeScreen');
-          const title = document.getElementById('detailTitle');
-          const meta = document.getElementById('detailMeta');
-          const body = document.getElementById('detailBody');
-          welcome.style.display = 'none';
-          header.style.display = 'block';
-          title.textContent = name;
-          meta.textContent = source;
-          body.innerHTML = renderDetail(itemData, type);
-          saveToStorage();
-        }
-      }
-    }, 50);
   });
 });
 
@@ -3203,7 +1236,7 @@ document.querySelectorAll('.subtab').forEach(tab => {
   tab.addEventListener('click', () => {
     // Skip if this subtab has its own dedicated handler
     if (tab.closest('#issuesTabs, #appspaceTabs')) return;
-    const prevDetailShowing = document.getElementById('detailHeader').style.display !== 'none';
+    const prevDetailShowing = (document.getElementById('detailHeader')?.style.display || 'none') !== 'none';
     const prevTab = state.currentTab;
     const prevSubTab = state.currentSubTab;
     const prevSelected = state.selectedItem;
@@ -3215,43 +1248,14 @@ document.querySelectorAll('.subtab').forEach(tab => {
     }
     document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentSubTab = tab.dataset.subtab;
     state.selectedItem = null;
-    document.getElementById('detailHeader').style.display = 'none';
-    document.getElementById('detailBody').innerHTML = '';
-    saveToStorage(); updateUI();
-    
-    // Auto-select first item WITHOUT pushing to history
-    setTimeout(() => {
-      const firstItem = document.querySelector('.tree-item');
-      if (firstItem) {
-        firstItem.classList.add('selected');
-        const name = firstItem.dataset.name;
-        const type = firstItem.dataset.type || state.currentSubTab;
-        if (type && name) {
-          state.selectedItem = { name, type };
-          let itemData, source = '';
-          itemData = state.mergedFOM.dataTypes[type]?.find(d => d.name === name);
-          source = itemData?._source || '';
-          const header = document.getElementById('detailHeader');
-          const welcome = document.getElementById('welcomeScreen');
-          const title = document.getElementById('detailTitle');
-          const meta = document.getElementById('detailMeta');
-          const body = document.getElementById('detailBody');
-          welcome.style.display = 'none';
-          header.style.display = 'block';
-          title.textContent = name;
-          meta.textContent = source;
-          body.innerHTML = renderDetail(itemData, type);
-          saveToStorage();
-        }
-      }
-    }, 50);
+    updateUI(); saveToStorage();
   });
 });
 
 // Appspace subtab click handler
 document.querySelectorAll('#appspaceTabs .subtab').forEach(tab => {
   tab.addEventListener('click', () => {
-    const prevDetailShowing = document.getElementById('detailHeader').style.display !== 'none';
+    const prevDetailShowing = (document.getElementById('detailHeader')?.style.display || 'none') !== 'none';
     const prevSubTab = state.appspaceSubTab;
     const prevSelected = state.selectedItem;
 
@@ -3263,8 +1267,6 @@ document.querySelectorAll('#appspaceTabs .subtab').forEach(tab => {
     document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active');
     state.appspaceSubTab = tab.dataset.subtab;
     state.selectedItem = null;
-    document.getElementById('detailHeader').style.display = 'none';
-    document.getElementById('detailBody').innerHTML = '';
     saveAppspaceToStorage();
     updateUI();
     renderAppspacesPanel();
@@ -3342,8 +1344,8 @@ function renderAppspacesPanel() {
     return;
   }
 
-  welcome.style.display = 'none';
-  header.style.display = 'block';
+  if (welcome) welcome.style.display = 'none';
+  if (header) header.style.display = 'block';
 
   const subTab = state.appspaceSubTab;
   let entries = [];
@@ -3507,181 +1509,107 @@ function makeSnippet(item, type) {
 
 function performSearch(query) {
   const q = query.toLowerCase().trim();
-  const results = [];
-  if (state.mergedFOM) {
-    state.mergedFOM.objectClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'object', snippet: makeSnippet(c, 'object') }); });
-    state.mergedFOM.interactionClasses?.forEach(c => { if (c.name.toLowerCase().includes(q)) results.push({ name: c.name, type: 'interaction', snippet: makeSnippet(c, 'interaction') }); });
-    state.mergedFOM.dataTypes.basic?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'basic', snippet: makeSnippet(d, 'basic') }); });
-    state.mergedFOM.dataTypes.simple?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'simple', snippet: makeSnippet(d, 'simple') }); });
-    state.mergedFOM.dataTypes.array?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'array', snippet: makeSnippet(d, 'array') }); });
-    state.mergedFOM.dataTypes.fixed?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'fixed', snippet: makeSnippet(d, 'fixed') }); });
-    state.mergedFOM.dataTypes.enum?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'enum', snippet: makeSnippet(d, 'enum') }); });
-    state.mergedFOM.dataTypes.variant?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'variant', snippet: makeSnippet(d, 'variant') }); });
-    state.mergedFOM.transportations?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'trans', snippet: makeSnippet(t, 'trans') }); });
-    state.mergedFOM.switches?.forEach(s => { if (s.name.toLowerCase().includes(q)) results.push({ name: s.name, type: 'switches', snippet: makeSnippet(s, 'switches') }); });
-    state.mergedFOM.tags?.forEach(t => { if (t.name.toLowerCase().includes(q)) results.push({ name: t.name, type: 'tags', snippet: makeSnippet(t, 'tags') }); });
-  }
-  state.files.forEach(f => {
-    f.dimensions?.forEach(d => { if (d.name.toLowerCase().includes(q)) results.push({ name: d.name, type: 'dims', snippet: makeSnippet(d, 'dims') }); });
-    f.notes?.forEach(n => { const nname = typeof n === 'string' ? n : n.name || ''; if (nname.toLowerCase().includes(q)) results.push({ name: nname, type: 'notes', snippet: makeSnippet(n, 'notes') }); });
-    if (f.name.toLowerCase().includes(q)) {
-      const ver = f.identification?.version ? ' | Version: ' + f.identification.version : '';
-      results.push({ name: f.name, type: 'module', snippet: (f.identification?.name || '') + ver });
-    }
-  });
-  if (state.mergedFOM?.time && 'time'.includes(q)) results.push({ name: 'Time Configuration', type: 'time', snippet: '' });
+  if (!q) return [];
+
+  const allItems = [];
+
   if (state.mergedFOM) {
     state.mergedFOM.objectClasses?.forEach(c => {
+      allItems.push({ name: c.name, type: 'object', snippet: makeSnippet(c, 'object') });
       c.attributes?.forEach(a => {
-        if (a.name.toLowerCase().includes(q)) results.push({ name: a.name, type: 'attribute', parentName: c.name, parentType: 'object', snippet: 'Class: ' + c.name + (a.dataType ? ' | Type: ' + a.dataType : '') });
+        allItems.push({ name: a.name, type: 'attribute', parentName: c.name, parentType: 'object', snippet: 'Class: ' + c.name + (a.dataType ? ' | Type: ' + a.dataType : '') });
       });
     });
     state.mergedFOM.interactionClasses?.forEach(c => {
+      allItems.push({ name: c.name, type: 'interaction', snippet: makeSnippet(c, 'interaction') });
       c.parameters?.forEach(p => {
-        if (p.name.toLowerCase().includes(q)) results.push({ name: p.name, type: 'parameter', parentName: c.name, parentType: 'interaction', snippet: 'Class: ' + c.name + (p.dataType ? ' | Type: ' + p.dataType : '') });
+        allItems.push({ name: p.name, type: 'parameter', parentName: c.name, parentType: 'interaction', snippet: 'Class: ' + c.name + (p.dataType ? ' | Type: ' + p.dataType : '') });
+      });
+    });
+    state.mergedFOM.dataTypes?.basic?.forEach(d => allItems.push({ name: d.name, type: 'basic', snippet: makeSnippet(d, 'basic') }));
+    state.mergedFOM.dataTypes?.simple?.forEach(d => allItems.push({ name: d.name, type: 'simple', snippet: makeSnippet(d, 'simple') }));
+    state.mergedFOM.dataTypes?.array?.forEach(d => allItems.push({ name: d.name, type: 'array', snippet: makeSnippet(d, 'array') }));
+    state.mergedFOM.dataTypes?.fixed?.forEach(d => {
+      allItems.push({ name: d.name, type: 'fixed', snippet: makeSnippet(d, 'fixed') });
+      d.fields?.forEach(f => {
+        allItems.push({ name: f.name, type: 'field', parentName: d.name, parentType: 'fixed', snippet: 'Record: ' + d.name + (f.dataType ? ' | Type: ' + f.dataType : '') });
       });
     });
     state.mergedFOM.dataTypes?.enum?.forEach(d => {
+      allItems.push({ name: d.name, type: 'enum', snippet: makeSnippet(d, 'enum') });
       d.enumerators?.forEach(v => {
-        if (v.name.toLowerCase().includes(q)) results.push({ name: v.name, type: 'enumerator', parentName: d.name, parentType: 'enum', snippet: 'Enum: ' + d.name + (v.value !== undefined ? ' | Value: ' + v.value : '') });
-      });
-    });
-    state.mergedFOM.dataTypes?.fixed?.forEach(d => {
-      d.fields?.forEach(f => {
-        if (f.name.toLowerCase().includes(q)) results.push({ name: f.name, type: 'field', parentName: d.name, parentType: 'fixed', snippet: 'Record: ' + d.name + (f.dataType ? ' | Type: ' + f.dataType : '') });
+        allItems.push({ name: v.name, type: 'enumerator', parentName: d.name, parentType: 'enum', snippet: 'Enum: ' + d.name + (v.value !== undefined ? ' | Value: ' + v.value : '') });
       });
     });
     state.mergedFOM.dataTypes?.variant?.forEach(d => {
+      allItems.push({ name: d.name, type: 'variant', snippet: makeSnippet(d, 'variant') });
       d.alternatives?.forEach(a => {
         const label = a.label || a.name || '';
-        if (label.toLowerCase().includes(q)) results.push({ name: label, type: 'alternative', parentName: d.name, parentType: 'variant', snippet: 'Variant: ' + d.name + (a.dataType ? ' | Type: ' + a.dataType : '') });
+        allItems.push({ name: label, type: 'alternative', parentName: d.name, parentType: 'variant', snippet: 'Variant: ' + d.name + (a.dataType ? ' | Type: ' + a.dataType : '') });
+      });
+    });
+    state.mergedFOM.transportations?.forEach(t => allItems.push({ name: t.name, type: 'trans', snippet: makeSnippet(t, 'trans') }));
+    state.mergedFOM.switches?.forEach(s => allItems.push({ name: s.name, type: 'switches', snippet: makeSnippet(s, 'switches') }));
+    state.mergedFOM.tags?.forEach(t => allItems.push({ name: t.name, type: 'tags', snippet: makeSnippet(t, 'tags') }));
+  }
+
+  state.files.forEach(f => {
+    f.dimensions?.forEach(d => allItems.push({ name: d.name, type: 'dims', snippet: makeSnippet(d, 'dims') }));
+    f.notes?.forEach(n => {
+      const nname = typeof n === 'string' ? n : n.name || '';
+      allItems.push({ name: nname, type: 'notes', snippet: makeSnippet(n, 'notes') });
+    });
+    const ver = f.identification?.version ? ' | Version: ' + f.identification.version : '';
+    allItems.push({ name: f.name, type: 'module', snippet: (f.identification?.name || '') + ver });
+  });
+
+  if (state.mergedFOM?.time) {
+    allItems.push({ name: 'Time Configuration', type: 'time', snippet: '' });
+  }
+
+  if (state.appspace) {
+    state.appspace.entries?.forEach(e => {
+      allItems.push({ name: e.className, type: 'appspace_object', snippet: makeSnippet(e, 'appspace_object') });
+      e.apps?.forEach(a => {
+        const appName = typeof a === 'string' ? a : a.name || '';
+        allItems.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_object', snippet: 'Entry: ' + e.className });
+      });
+    });
+    state.appspace.interactions?.forEach(e => {
+      allItems.push({ name: e.className, type: 'appspace_interaction', snippet: makeSnippet(e, 'appspace_interaction') });
+      e.apps?.forEach(a => {
+        const appName = typeof a === 'string' ? a : a.name || '';
+        allItems.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_interaction', snippet: 'Entry: ' + e.className });
+      });
+    });
+    state.appspace.unknown?.forEach(e => {
+      allItems.push({ name: e.className, type: 'appspace_unknown', snippet: makeSnippet(e, 'appspace_unknown') });
+      e.apps?.forEach(a => {
+        const appName = typeof a === 'string' ? a : a.name || '';
+        allItems.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_unknown', snippet: 'Entry: ' + e.className });
       });
     });
   }
-  if (state.appspace) {
-    state.appspace.entries?.forEach(e => { if (e.className.toLowerCase().includes(q)) results.push({ name: e.className, type: 'appspace_object', snippet: makeSnippet(e, 'appspace_object') }); });
-    state.appspace.interactions?.forEach(e => { if (e.className.toLowerCase().includes(q)) results.push({ name: e.className, type: 'appspace_interaction', snippet: makeSnippet(e, 'appspace_interaction') }); });
-    state.appspace.unknown?.forEach(e => { if (e.className.toLowerCase().includes(q)) results.push({ name: e.className, type: 'appspace_unknown', snippet: makeSnippet(e, 'appspace_unknown') }); });
-    state.appspace.entries?.forEach(e => { e.apps?.forEach(a => { const appName = typeof a === 'string' ? a : a.name || ''; if (appName.toLowerCase().includes(q)) results.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_object', snippet: 'Entry: ' + e.className }); }); });
-    state.appspace.interactions?.forEach(e => { e.apps?.forEach(a => { const appName = typeof a === 'string' ? a : a.name || ''; if (appName.toLowerCase().includes(q)) results.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_interaction', snippet: 'Entry: ' + e.className }); }); });
-    state.appspace.unknown?.forEach(e => { e.apps?.forEach(a => { const appName = typeof a === 'string' ? a : a.name || ''; if (appName.toLowerCase().includes(q)) results.push({ name: appName, type: 'appspace_app', parentName: e.className, parentType: 'appspace_unknown', snippet: 'Entry: ' + e.className }); }); });
-  }
-  return results;
+
+  const fuse = new Fuse(allItems, {
+    keys: ['name', 'parentName'],
+    threshold: 0.4,
+    includeScore: true
+  });
+
+  return fuse.search(q).map(r => r.item);
 }
 
 function hideSearchPanel() {
-  const panel = document.getElementById('searchPanel');
-  if (panel) panel.remove();
+  searchStore.hideSearchPanel();
+}
+
+function showSearchPanel(results, query) {
+  searchStore.showSearchPanel(results, query);
 }
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function showSearchPanel(results, query) {
-  hideSearchPanel();
-
-  const panel = document.createElement('div');
-  panel.id = 'searchPanel';
-  panel.className = 'search-panel';
-
-  let html = '<div class="search-panel-header">Results for "<strong>' + escapeHtml(query) + '</strong>" <span class="search-panel-count">' + results.length + ' match' + (results.length !== 1 ? 'es' : '') + '</span></div>';
-
-  const groups = {};
-  results.forEach(r => {
-    if (!groups[r.type]) groups[r.type] = [];
-    groups[r.type].push(r);
-  });
-
-  html += '<div class="search-panel-body">';
-  let hasContent = false;
-  GROUP_ORDER.forEach(type => {
-    if (!groups[type] || groups[type].length === 0) return;
-    hasContent = true;
-    const items = groups[type];
-    html += '<div class="search-panel-group"><div class="search-panel-group-header">' + (TYPE_ICONS[type] || '') + ' ' + (GROUP_LABELS[type] || type) + ' (' + items.length + ')</div>';
-    items.forEach(item => {
-      const snippet = item.snippet ? escapeHtml(item.snippet) : '';
-      const parentAttr = item.parentName ? ' data-parent="' + item.parentName.replace(/"/g, '&quot;') + '"' : '';
-      const parentTypeAttr = item.parentType ? ' data-parent-type="' + item.parentType + '"' : '';
-      html += '<div class="search-panel-item" data-name="' + item.name.replace(/"/g, '&quot;') + '" data-type="' + item.type + '" data-snippet="' + snippet.replace(/"/g, '&quot;') + '"' + parentAttr + parentTypeAttr + '>';
-      html += '<span class="search-panel-item-icon">' + (TYPE_ICONS[item.type] || '') + '</span>';
-      html += '<span class="search-panel-item-name">' + escapeHtml(item.name) + '</span>';
-      html += '</div>';
-    });
-    html += '</div>';
-  });
-  if (!hasContent) {
-    html += '<div class="search-panel-empty">No results found. Try a different search term.</div>';
-  }
-  html += '</div>';
-  panel.innerHTML = html;
-
-  const tabBar = document.querySelector('.tab-bar');
-  if (tabBar) {
-    const rect = tabBar.getBoundingClientRect();
-    panel.style.top = (rect.bottom + 4) + 'px';
-  } else {
-    panel.style.top = '80px';
-  }
-
-  document.body.appendChild(panel);
-
-  panel.querySelectorAll('.search-panel-item').forEach(item => {
-    item.addEventListener('mouseenter', (e) => {
-      const snippet = item.dataset.snippet;
-      if (!snippet) return;
-      showSearchTooltip(e, snippet);
-    });
-    item.addEventListener('mousemove', (e) => {
-      const tooltip = document.getElementById('searchTooltip');
-      if (tooltip) {
-        tooltip.style.left = (e.clientX + 14) + 'px';
-        tooltip.style.top = (e.clientY + 14) + 'px';
-      }
-    });
-    item.addEventListener('mouseleave', hideSearchTooltip);
-    item.addEventListener('click', () => {
-      const name = item.dataset.name;
-      const type = item.dataset.type;
-      const parentName = item.dataset.parent;
-      const parentType = item.dataset.parentType;
-      const searchInput = document.getElementById('globalSearch');
-      const currentQuery = searchInput ? searchInput.value.trim() : query;
-      hideSearchPanel();
-      hideSearchTooltip();
-      state.history.push({ mode: 'search', query: currentQuery });
-      if (type === 'module') {
-        switchToModule(name, true);
-      } else if (type === 'attribute' || type === 'parameter' || type === 'enumerator' || type === 'field' || type === 'alternative') {
-        showDetail(parentName, parentType, true);
-      } else if (type === 'appspace_app') {
-        showDetail(parentName, parentType, true);
-      } else {
-        showDetail(name, type, true);
-      }
-      document.getElementById('backBtn').style.display = 'inline-block';
-    });
-  });
-}
-
-function showSearchTooltip(e, text) {
-  let tooltip = document.getElementById('searchTooltip');
-  if (!tooltip) {
-    tooltip = document.createElement('div');
-    tooltip.id = 'searchTooltip';
-    tooltip.className = 'search-tooltip';
-    document.body.appendChild(tooltip);
-  }
-  tooltip.textContent = text;
-  tooltip.style.display = 'block';
-  tooltip.style.left = (e.clientX + 14) + 'px';
-  tooltip.style.top = (e.clientY + 14) + 'px';
-}
-
-function hideSearchTooltip() {
-  const tooltip = document.getElementById('searchTooltip');
-  if (tooltip) tooltip.style.display = 'none';
 }
 
 function checkForSearchMode() {
@@ -3697,7 +1625,6 @@ function checkForSearchMode() {
     }
   }
 }
-
 document.getElementById('globalSearch').addEventListener('input', e => {
   const query = e.target.value.trim();
   if (!query) {
@@ -3720,14 +1647,98 @@ document.getElementById('globalSearch').addEventListener('focus', () => {
 
 async function init() {
   try {
-    document.getElementById('welcomeScreen').style.display = 'none';
-    document.getElementById('detailHeader').style.display = 'none';
+    const ws = document.getElementById('welcomeScreen');
+    if (ws) ws.style.display = 'none';
+    const dh = document.getElementById('detailHeader');
+    if (dh) dh.style.display = 'none';
+
+    Object.defineProperty(window, '__mergedFOM', { get: () => state.mergedFOM });
+    window.__showDetail = function(name, type, isManualNav = false) { showDetail(name, type, isManualNav); };
+    window.__showDataType = function(name, type) { showDataType(name, type); };
+    window.__onSearchItemClick = function(item) {
+      const searchInput = document.getElementById('globalSearch');
+      const currentQuery = searchInput ? searchInput.value.trim() : item.query || '';
+      hideSearchPanel();
+      state.history.push({ mode: 'search', query: currentQuery });
+      if (item.type === 'module') {
+        switchToModule(item.name, true);
+      } else if (item.type === 'attribute' || item.type === 'parameter' || item.type === 'enumerator' || item.type === 'field' || item.type === 'alternative') {
+        showDetail(item.parentName, item.parentType, true);
+      } else if (item.type === 'appspace_app') {
+        showDetail(item.parentName, item.parentType, true);
+      } else {
+        showDetail(item.name, item.type, true);
+      }
+      document.getElementById('backBtn').style.display = 'inline-block';
+    };
+    window.__switchToModule = function(name) { const file = state.files.find(f => f.name === name); if (file) switchToModule(name, true); };
+    window.__getPreferredType = getPreferredType;
+    window.__findDimensionByName = findDimensionByName;
+    window.__findDataTypeUsages = findDataTypeUsages;
+    window.__findNoteUsages = findNoteUsages;
+    window.__selectTreeItem = function(detail) {
+      if (state.currentTab === 'modules') {
+        const file = state.files.find(f => f.name === detail.name);
+        if (file) showModuleDetails(file, true);
+        return;
+      }
+      if (state.currentTab === 'issues') {
+        if (state.selectedItem) {
+          state.history.push({
+            tab: state.currentTab,
+            subTab: state.issuesFilter || 'all',
+            selected: { ...state.selectedItem },
+            detail: document.getElementById('detailHeader').style.display
+          });
+          document.getElementById('backBtn').style.display = 'inline-block';
+        }
+        showIssueDetail(detail.issueId);
+        return;
+      }
+      const type = tabToType(state.currentTab, state.currentSubTab) || detail.type || state.currentSubTab;
+      showDetail(detail.name, type, true);
+    };
+
+    // Tree filter: re-push filtered data on input
+    const treeFilter = document.getElementById('treeFilter');
+    if (treeFilter) {
+      treeFilter.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        if (state.currentTab === 'objects' || state.currentTab === 'interactions') {
+          const classes = mergeClasses(state.files, state.currentTab === 'objects' ? 'object' : 'interaction');
+          const filtered = filterClassTree(classes, q);
+          const sorted = state.sortEnabled === 'asc' ? [...filtered].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...filtered].sort((a, b) => b.name.localeCompare(a.name)) : filtered;
+          window.__treeViewComponent?.setItems(sorted, 'tree');
+        } else if (state.currentTab === 'modules') {
+          const sortedFiles = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
+          window.__moduleListComponent?.setFiles(q ? sortedFiles.filter(f => f.name.toLowerCase().includes(q)) : sortedFiles, state.sortEnabled);
+        }
+      });
+    }
+
     updateUI();
     await loadFromStorage();
   } catch(e) {
     console.error('ERROR in init():', e);
     alert('Error in init: ' + e.message);
   }
+}
+
+function filterClassTree(classes, query) {
+  if (!query) return classes;
+  const map = {};
+  classes.forEach(c => { map[c.name] = c; });
+  const matching = new Set();
+  classes.forEach(c => {
+    if (c.name.toLowerCase().includes(query)) {
+      let current = c;
+      while (current) {
+        matching.add(current.name);
+        current = current.parent ? map[current.parent] : null;
+      }
+    }
+  });
+  return classes.filter(c => matching.has(c.name));
 }
 
 // ============================================================================
@@ -3756,17 +1767,6 @@ function showDataType(name, preferredType) {
     state.currentSubTab = foundType;
     document.querySelectorAll('.subtab').forEach(st => st.classList.remove('active'));
     document.querySelector(`.subtab[data-subtab="${foundType}"]`).classList.add('active');
-    const header = document.getElementById('detailHeader');
-    const welcome = document.getElementById('welcomeScreen');
-    const title = document.getElementById('detailTitle');
-    const meta = document.getElementById('detailMeta');
-    const body = document.getElementById('detailBody');
-    welcome.style.display = 'none';
-    header.style.display = 'block';
-    const itemData = state.mergedFOM.dataTypes[foundType]?.find(d => d.name === name);
-    title.textContent = name;
-    meta.textContent = itemData?._source || '';
-    body.innerHTML = renderDetail(itemData, foundType);
     
     // Highlight selected item in tree
     setTimeout(() => {
@@ -3926,34 +1926,8 @@ function goBack() {
   }
   
   debugBack('goBack: restoreState: tab=%s, subTab=%s, selected=%o', restoreState.tab, restoreState.subTab, restoreState.selected);
-  
-  // Rebuild tree for restoreState.tab
-  const treeView = document.getElementById('treeView');
-  if (restoreState.tab === 'modules') {
-    const files = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
-    treeView.innerHTML = '<div class="tree-wrapper">' + (files.length > 0 ? files.map(f => `<div class="tree-item" data-name="${f.name.replace(/"/g, '&quot;')}"><span class="icon">📄</span><span class="name" title="${f.name}">${f.name}</span></div>`).join('') : '<div class="empty-state">No FOM modules loaded.</div>') + '</div>';
-  } else if (restoreState.tab === 'objects') {
-    const classes = mergeClasses(state.files, 'object');
-    const tree = buildClassTree(classes, state.sortEnabled);
-    treeView.innerHTML = '<div class="tree-header"><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.remove(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'true\';el.textContent=\'▼\';});">⬇ Expand All</button><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.add(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'false\';el.textContent=\'▶\';});">⬆ Collapse All</button></div><div class="tree-wrapper">' + renderTree(tree, 'object') + '</div>';
-  } else if (restoreState.tab === 'interactions') {
-    const classes = mergeClasses(state.files, 'interaction');
-    const tree = buildClassTree(classes, state.sortEnabled);
-    treeView.innerHTML = '<div class="tree-header"><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.remove(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'true\';el.textContent=\'▼\';});">⬇ Expand All</button><button class="btn btn-small" onclick="document.querySelectorAll(\'.tree-children\').forEach(el=>el.classList.add(\'collapsed\'));document.querySelectorAll(\'.tree-toggle[data-expanded]\').forEach(el=>{el.dataset.expanded=\'false\';el.textContent=\'▶\';});">⬆ Collapse All</button></div><div class="tree-wrapper">' + renderTree(tree, 'interaction') + '</div>';
-  } else if (restoreState.tab === 'notes') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderNotesList() + '</div>';
-  } else if (restoreState.tab === 'dims') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderDimensionsList() + '</div>';
-  } else if (restoreState.tab === 'trans') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderTransList() + '</div>';
-  } else if (restoreState.tab === 'switches') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderSwitchesList() + '</div>';
-  } else if (restoreState.tab === 'tags') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderTagsList() + '</div>';
-  } else if (restoreState.tab === 'time') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderTimeInfo() + '</div>';
-  } else if (restoreState.tab === 'appspaces') {
-    // Show appspaces panel
+
+  if (restoreState.tab === 'appspaces') {
     const appspaceTabs = document.getElementById('appspaceTabs');
     appspaceTabs.style.display = 'flex';
     state.appspaceSubTab = restoreState.subTab || 'objects';
@@ -3962,139 +1936,52 @@ function goBack() {
     updateAppspaceTabCount();
     state.selectedItem = restoreState.selected || null;
     renderAppspacesPanel();
-    document.getElementById('detailHeader').style.display = 'block';
+    const dha = document.getElementById('detailHeader'); if (dha) dha.style.display = 'block';
     document.getElementById('detailTitle').textContent = 'Appspaces';
     document.getElementById('detailMeta').textContent = state.appspace?.fileName || '';
-    // Don't show tree for appspaces
-    treeView.innerHTML = '';
+    showPanel(null);
     return;
-  } else if (restoreState.tab === 'issues') {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderIssuesList() + '</div>';
-  } else {
-    treeView.innerHTML = '<div class="tree-wrapper">' + renderDataTypeList(restoreState.subTab) + '</div>';
   }
-  
-  // Add click handlers
-  treeView.querySelectorAll('.tree-item').forEach(item => {
-    item.addEventListener('click', () => {
-      treeView.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
-      item.classList.add('selected');
-      item.scrollIntoView({ block: 'nearest' });
-      // Handle issues tab specially — they use showIssueDetail, not showDetail
-      if (state.currentTab === 'issues') {
-        if (state.selectedItem) {
-          state.history.push({
-            tab: state.currentTab,
-            subTab: state.issuesFilter || 'all',
-            selected: { ...state.selectedItem },
-            detail: document.getElementById('detailHeader').style.display
-          });
-          document.getElementById('backBtn').style.display = 'inline-block';
-        }
-        showIssueDetail(item.dataset.issueId);
-        return;
-      }
-      const name = item.dataset.name;
-      const type = item.dataset.type || (state.currentTab === 'datatypes' ? state.currentSubTab : state.currentTab === 'objects' ? 'object' : state.currentTab === 'interactions' ? 'interaction' : state.currentTab);
-      showDetail(name, type, true);
-    });
-  });
-  
-  // If no item was selected (e.g., restoring to an empty Issues subtab), skip selection/detail
+
+  // Set the selection before rebuilding the tree (so updateUI doesn't auto-select first item)
+  state.selectedItem = restoreState.selected || null;
+
+  // Rebuild tree via bridge (handles all non-appspace tabs, skipAutoSelect=true since we restore manually)
+  updateUI(true);
+
+  // If no item was selected, keep detail hidden
   if (!restoreState.selected) {
-    document.getElementById('detailHeader').style.display = 'none';
-    document.getElementById('welcomeScreen').style.display = 'none';
+    const dh5 = document.getElementById('detailHeader'); if (dh5) dh5.style.display = 'none';
+    const ws2 = document.getElementById('welcomeScreen'); if (ws2) ws2.style.display = 'none';
     document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
     saveToStorage();
     return;
   }
 
-  // Select item in tree
-  const escapedName = restoreState.selected.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  const selectedItem = treeView.querySelector(`.tree-item[data-name="${escapedName}"]`);
+  // Scroll to selected item
+  setTimeout(() => {
+    window.__treeViewComponent?.scrollToItem(restoreState.selected.name);
+  }, 100);
   
-  if (selectedItem) {
-    let parent = selectedItem.parentElement;
-    while (parent && !parent.classList.contains('tree-wrapper')) {
-      if (parent.classList.contains('tree-children') && parent.classList.contains('collapsed')) {
-        parent.classList.remove('collapsed');
-        const toggle = parent.previousElementSibling?.querySelector('.tree-toggle');
-        if (toggle) { toggle.dataset.expanded = 'true'; toggle.textContent = '▼'; }
-      }
-      parent = parent.parentElement;
-    }
-    selectedItem.classList.add('selected');
-    selectedItem.scrollIntoView({ block: 'nearest' });
-  }
-  
-  // Show detail
+  // Show detail - DetailPanel will render reactively
   state.selectedItem = restoreState.selected;
   
-  document.getElementById('detailHeader').style.display = 'block';
-  
-  let itemData = null;
-  let source = '';
-  
-  debugBack('goBack: itemData lookup - restoreState.selected.type=%s', restoreState.selected.type);
-  
-  if (restoreState.tab === 'modules') {
-    const file = state.files.find(f => f.name === restoreState.selected.name);
-    itemData = file;
-    source = '';
-  } else if (restoreState.selected.type === 'issue') {
+  // For issues, show issue detail panel (not handled by DetailPanel)
+  if (restoreState.selected.type === 'issue') {
     document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
     showIssueDetail(restoreState.selected.name);
     return;
-  } else if (restoreState.selected.type === 'object') {
-    itemData = state.mergedFOM.objectClasses?.find(c => c.name === restoreState.selected.name);
-    source = itemData?._source || '';
-  } else if (restoreState.selected.type === 'interaction') {
-    itemData = state.mergedFOM.interactionClasses?.find(c => c.name === restoreState.selected.name);
-    source = itemData?._source || '';
-  } else if (restoreState.selected.type === 'notes') {
-    for (const f of state.files) {
-      if (f.notes) {
-        itemData = f.notes.find(n => (typeof n === 'string' ? n : n.name) === restoreState.selected.name);
-        if (itemData) { source = f.name; break; }
-      }
-    }
-  } else if (restoreState.selected.type === 'dims') {
-    for (const f of state.files) {
-      if (f.dimensions) {
-        itemData = f.dimensions.find(d => d.name === restoreState.selected.name);
-        if (itemData) { source = f.name; break; }
-      }
-    }
-  } else if (restoreState.selected.type === 'trans') {
-    itemData = state.mergedFOM?.transportations?.find(t => t.name.trim() === restoreState.selected.name.trim());
-    source = restoreState.selected.name;
-  } else if (restoreState.selected.type === 'switches') {
-    itemData = state.mergedFOM?.switches?.find(s => s.name.trim() === restoreState.selected.name.trim());
-    source = restoreState.selected.name;
-  } else if (restoreState.selected.type === 'tags') {
-    itemData = state.mergedFOM?.tags?.find(t => t.name.trim() === restoreState.selected.name.trim());
-    source = restoreState.selected.name;
-  } else if (restoreState.selected.type === 'time') {
-    itemData = state.mergedFOM?.time;
-    source = 'Time Configuration';
-  } else if (['basic','simple','array','fixed','enum','variant'].includes(restoreState.selected.type)) {
-    itemData = state.mergedFOM?.dataTypes?.[restoreState.selected.type]?.find(d => d.name === restoreState.selected.name);
-    source = itemData?._source || '';
   }
   
-  document.getElementById('detailTitle').textContent = restoreState.selected.name;
-  document.getElementById('detailMeta').textContent = source;
-  
-  // Handle module rendering differently - use showModuleDetails
-  debugBack('goBack: modules - itemData=%o, name=%s', itemData, restoreState.selected.name);
+  // Handle module rendering via showModuleDetails (still uses innerHTML)
   if (restoreState.tab === 'modules') {
-    if (itemData) {
-      showModuleDetails(itemData, false);
-    } else {
-      document.getElementById('detailBody').innerHTML = 'Item not found';
+    const file = state.files.find(f => f.name === restoreState.selected.name);
+    if (file) {
+      showModuleDetails(file, false);
     }
-  } else {
-    document.getElementById('detailBody').innerHTML = itemData ? renderDetail(itemData, restoreState.selected.type) : 'Item not found';
+    document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
+    saveToStorage();
+    return;
   }
   
   // Update back button visibility after popping history
@@ -4156,14 +2043,6 @@ document.addEventListener('click', (e) => {
     document.getElementById('backBtn').style.display = state.history.length > 0 ? 'inline-block' : 'none';
   }
 
-  // Close search panel on outside click
-  const panel = document.getElementById('searchPanel');
-  if (panel) {
-    const searchInput = document.getElementById('globalSearch');
-    if (!panel.contains(e.target) && searchInput !== e.target && !e.target.closest('#backBtn')) {
-      hideSearchPanel();
-    }
-  }
 });
 
 document.getElementById('backBtn').addEventListener('click', () => {
@@ -4173,32 +2052,17 @@ document.getElementById('backBtn').addEventListener('click', () => {
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    const panel = document.getElementById('searchPanel');
-    if (panel) {
-      hideSearchPanel();
-      document.getElementById('globalSearch').blur();
+    if (searchStore.searchState.visible) {
+      searchStore.hideSearchPanel();
+      document.getElementById('globalSearch')?.blur();
+      e.preventDefault();
       return;
     }
   }
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
-    const panel = document.getElementById('searchPanel');
-    if (!panel) return;
-    const items = panel.querySelectorAll('.search-panel-item');
-    if (items.length === 0) return;
-    e.preventDefault();
-    let idx = parseInt(panel.dataset.selectedIndex || '-1');
-    if (e.key === 'ArrowDown') {
-      idx = Math.min(idx + 1, items.length - 1);
-    } else if (e.key === 'ArrowUp') {
-      idx = Math.max(idx - 1, 0);
-    } else if (e.key === 'Enter' && idx >= 0) {
-      items[idx].click();
-      return;
+    if (searchStore.searchState.visible) {
+      e.preventDefault();
     }
-    panel.dataset.selectedIndex = idx.toString();
-    items.forEach(i => i.classList.remove('selected'));
-    items[idx].classList.add('selected');
-    items[idx].scrollIntoView({ block: 'nearest' });
   }
 });
 
@@ -4213,25 +2077,12 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     clearStorage();
     updateUI();
     state.issues = [];
-    updateIssuesTabVisibility();
-    document.getElementById('detailHeader').style.display = 'none';
-    document.getElementById('detailBody').innerHTML = '';
-    document.getElementById('welcomeScreen').style.display = 'flex';
+    updateIssuesTabVisibility(state);
+    const ws3 = document.getElementById('welcomeScreen'); if (ws3) ws3.style.display = 'flex';
     document.getElementById('globalSearch').value = '';
     hideSearchPanel();
   }
 });
-
-// ============================================================================
-// TAB SCROLLING
-// ============================================================================
-
-// eslint-disable-next-line no-unused-vars
-function scrollTabs(amount) {
-  const container = document.getElementById('tabScrollContainer');
-  if (container) container.scrollLeft += amount;
-}
-
 function updateTabScrollButtons() {
   const container = document.getElementById('tabScrollContainer');
   const leftBtn = document.getElementById('tabScrollLeft');
@@ -4279,41 +2130,6 @@ function parseAppspaceFile(content) {
   });
   
   return entries;
-}
-
-// Find matching appspace entries for a class
-function findAppspaceForClass(className, type) {
-  if (!state.appspace) return null;
-  // Get the appropriate entries based on type
-  const entries = type === 'object' ? state.appspace.entries : state.appspace.interactions;
-  if (!entries) return null;
-  
-  // Find the most specific match (longest right-side match)
-  let bestMatch = null;
-  let bestLength = 0;
-  
-  entries.forEach(entry => {
-    const entryParts = entry.className.split('.');
-    const classParts = className.split('.');
-    
-    // Check if entry matches the right side of className
-    if (classParts.length >= entryParts.length) {
-      const startIdx = classParts.length - entryParts.length;
-      let matches = true;
-      for (let i = 0; i < entryParts.length; i++) {
-        if (classParts[startIdx + i] !== entryParts[i]) {
-          matches = false;
-          break;
-        }
-      }
-      if (matches && entryParts.length > bestLength) {
-        bestMatch = entry;
-        bestLength = entryParts.length;
-      }
-    }
-  });
-  
-  return bestMatch ? bestMatch.apps : null;
 }
 
 // Load appspace button click handler
@@ -4650,23 +2466,13 @@ function showAppspaceSnackbar(fileName, count) {
 // Save/load appspace from IndexedDB
 async function saveAppspaceToStorage() {
   try {
-    if (!db) await initDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    store.put({ name: '__appspace__', data: state.appspace, subTab: state.appspaceSubTab });
+    await storage.saveAppspace(state.appspace, state.appspaceSubTab);
   } catch (e) { console.warn('Failed to save appspace to IndexedDB:', e); }
 }
 
 async function loadAppspaceFromStorage() {
   try {
-    if (!db) await initDB();
-    const transaction = db.transaction([STORE_NAME], 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.get('__appspace__');
-    const result = await new Promise((resolve) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-    });
+    const result = await storage.loadAppspace();
     if (result && result.data) {
       state.appspace = result.data;
       state.appspaceSubTab = result.subTab || 'objects';
@@ -4698,10 +2504,7 @@ async function loadAppspaceFromStorage() {
 
 async function clearAppspaceFromStorage() {
   try {
-    if (!db) await initDB();
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    store.delete('__appspace__');
+    await storage.clearAppspace();
     state.history = [];
   } catch (e) { console.warn('Failed to clear appspace from IndexedDB:', e); }
 }
@@ -4783,6 +2586,46 @@ document.getElementById('aboutBtn')?.addEventListener('click', () => {
 });
 
 initTheme();
+
+// ============================================================================
+// TEST HARNESS — expose module-scoped state/functions for Puppeteer evaluate()
+// ============================================================================
+
+window.state = state;
+window.showDetail = showDetail;
+window.validate = () => validate(state, makeIssue);
+window._detectCircularDependencies = () => detectCircularDependencies(state, makeIssue);
+window.removeFile = removeFile;
+window.clearStorage = clearStorage;
+window.updateUI = updateUI;
+window.showDataType = showDataType;
+window.goBack = goBack;
+const showIssueDetail = (issueId) => {
+  const issue = state.issues.find(i => i.id === issueId);
+  if (!issue) return;
+  state.selectedItem = { name: issue.id, type: 'issue', message: issue.message, severity: issue.severity, location: issue.location, detail: issue.detail, sources: issue.sources, locations: issue.locations, category: issue.category, issueType: issue.type };
+  saveToStorage();
+};
+window.showIssueDetail = showIssueDetail;
+window.updateSortButton = updateSortButton;
+window.updateTabCounts = updateTabCounts;
+window.updateIssuesTabVisibility = updateIssuesTabVisibility;
+window.updateAppspaceTabCount = updateAppspaceTabCount;
+window.navigateToLocation = navigateToLocation;
+window.saveToStorage = saveToStorage;
+window.loadFromStorage = loadFromStorage;
+window.saveAppspaceToStorage = saveAppspaceToStorage;
+window.loadAppspaceFromStorage = loadAppspaceFromStorage;
+window.clearAppspaceFromStorage = clearAppspaceFromStorage;
+window.parseAppspaceFile = parseAppspaceFile;
+window.classifyAppspaceEntries = classifyAppspaceEntries;
+window.showAppspaceSnackbar = showAppspaceSnackbar;
+window.doSetup = doSetup;
+window.initTheme = initTheme;
+window.toggleTheme = toggleTheme;
+window.loadFiles = loadFiles;
+window.renderAppspacesPanel = renderAppspacesPanel;
+window.mergeClasses = mergeClasses;
 
 // ============================================================================
 // END OF FILE

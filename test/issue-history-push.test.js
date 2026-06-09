@@ -86,7 +86,7 @@ async function test_IssueHistoryPush() {
     }
 
     // Get the first and second issues in the list
-    const issueItems = await page.$$('.tree-item');
+    const issueItems = await page.$$('.issue-item');
     if (issueItems.length < 2) {
       await captureScreenshot(page, 'test_IssueHistoryPush_not_enough_issues');
       throw new Error('Need at least 2 issue items to test history push');
@@ -206,7 +206,7 @@ async function test_IssueHistoryPush() {
       
       if (!detailBodyContentAfterBack.includes(firstIssueId)) {
         await captureScreenshot(page, 'test_IssueHistoryPush_back_did_not_restore_first');
-        throw new Error(`Expected to see issue ${firstIssueId} after back but got ${displayedIssueIdAfterBack}`);
+        throw new Error(`Expected to see issue ${firstIssueId} after back but got ${displayedIssueNameAfterBack}`);
       }
     }
     console.log('✓ Back button correctly restored first issue selection');
@@ -216,7 +216,7 @@ async function test_IssueHistoryPush() {
     console.log('Test 4: After back, clicking different issue should save state');
     
     // Re-query the second issue after back navigation (tree was re-rendered)
-    const issueItemsAfterBack = await page.$$('.tree-item');
+    const issueItemsAfterBack = await page.$$('.issue-item');
     if (issueItemsAfterBack.length < 2) {
       throw new Error('Need at least 2 issue items after back to test history push');
     }
@@ -279,7 +279,9 @@ async function test_IssueHistoryPush() {
     
     await page.waitForFunction(() => {
       const welcome = document.getElementById('welcomeScreen');
-      return welcome && welcome.style.display === 'none';
+      if (welcome) return welcome.style.display === 'none';
+      const header = document.getElementById('detailHeader');
+      return header && header.style.display !== 'none';
     }, { timeout: config.test.timeout });
   }
 
