@@ -10,12 +10,54 @@ import DataTypeList from './lib/DataTypeList.svelte';
 import IssueList from './lib/IssueList.svelte';
 import SearchPanel from './lib/SearchPanel.svelte';
 import * as issueStore from './lib/stores/issueStore.svelte.js';
+import * as uiStore from './lib/stores/uiStore.svelte.js';
 
 let allIssues = $derived(issueStore.getIssues());
 let issueAllCount = $derived(allIssues.length);
 let issueErrorCount = $derived(allIssues.filter(i => i.severity === 'error').length);
 let issueWarningCount = $derived(allIssues.filter(i => i.severity === 'warning').length);
+
+const TAB_ORDER = [
+  'modules', 'objects', 'interactions', 'datatypes',
+  'appspaces', 'dims', 'trans', 'switches', 'tags', 'time',
+  'notes', 'issues'
+];
+
+function handleKeydown(e) {
+  const tag = e.target?.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    document.getElementById('globalSearch')?.focus();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault();
+    document.getElementById('globalSearch')?.focus();
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key >= '1' && e.key <= '9') {
+    e.preventDefault();
+    const idx = parseInt(e.key) - 1;
+    if (idx < TAB_ORDER.length) {
+      const tabEl = document.querySelector(`.tab[data-tab="${TAB_ORDER[idx]}"]`);
+      if (tabEl && tabEl.style.display !== 'none') tabEl.click();
+    }
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+    e.preventDefault();
+    uiStore.setLeftRailPinned(!uiStore.ui.leftRailPinned);
+    return;
+  }
+}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div id="toast" class="toast" data-testid="toast"></div>
 <div id="app" data-testid="app">
