@@ -44,7 +44,9 @@ async function run() {
     try {
       await page.waitForFunction(() => {
         const w = document.getElementById('welcomeScreen');
-        return w && w.style.display === 'none';
+        if (w) return w.style.display === 'none';
+        const header = document.getElementById('detailHeader');
+        return header && header.style.display !== 'none';
       }, { timeout: 15000 });
     } catch(e) {
       console.log('  WARN: welcome screen did not dismiss');

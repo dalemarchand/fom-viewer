@@ -71,8 +71,8 @@ async function loadTestFomFile(filename) {
   await fileInput.uploadFile(filePath);
   
   await page.waitForFunction(() => {
-    const welcome = document.getElementById('welcomeScreen');
-    return welcome && welcome.style.display === 'none';
+    const header = document.getElementById('detailHeader');
+    return header && header.style.display === 'block';
   }, { timeout: config.test.timeout });
 }
 
@@ -292,8 +292,8 @@ async function test_FileLoading() {
     await loadTestFomFile(testFile);
     
     await page.waitForFunction(() => {
-      const welcome = document.getElementById('welcomeScreen');
-      return welcome && welcome.style.display === 'none';
+      const header = document.getElementById('detailHeader');
+      return header && header.style.display === 'block';
     }, { timeout: config.test.timeout });
     
     const treeView = await waitForSelector('#treeView');
@@ -329,8 +329,8 @@ async function test_LoadAllFiles() {
       await fileInput.uploadFile(filePath);
       
       await page.waitForFunction(() => {
-        const welcome = document.getElementById('welcomeScreen');
-        return welcome && welcome.style.display === 'none';
+        const header = document.getElementById('detailHeader');
+        return header && header.style.display === 'block';
       }, { timeout: config.test.timeout });
       
       log(`Loaded ${testFile}`, 'success');
@@ -407,7 +407,9 @@ async function test_DataTypeSelection() {
     await subtab.click();
     await sleep(500);
     
-    const treeItems = await page.$$('.tree-item');
+    // Wait for data type panel to render items (Svelte renders all panels in DOM, so scope by container)
+    await page.waitForSelector('#treeViewDataTypes .tree-item', { timeout: 3000 });
+    const treeItems = await page.$$('#treeViewDataTypes .tree-item');
     if (treeItems.length === 0) {
       await captureScreenshot('test_DataTypeSelection_failed');
       throw new Error('No data type items found in tree view');
@@ -417,37 +419,56 @@ async function test_DataTypeSelection() {
     const firstItemType = await treeItems[0].evaluate(el => el.dataset.type);
     log(`Clicking item: name=${firstItemName}, type=${firstItemType}`, 'info');
     
-    log(`About to evaluate click for name=${firstItemName}, type=${firstItemType}`, 'info');
+    log(`About to click first tree item via DOM`, 'info');
     
-    await page.evaluate((name, type) => {
-      console.log('EVALUATE: name=' + name + ', type=' + type);
-      if (typeof showDetail === 'function') {
-        console.log('EVALUATE: Calling showDetail');
-        showDetail(name, type, true);
-        console.log('EVALUATE: showDetail called');
-        console.log('EVALUATE: state.mergedFOM.dataTypes.basic first 3:', JSON.stringify(state?.mergedFOM?.dataTypes?.basic?.slice(0, 3)));
-        console.log('EVALUATE: state.mergedFOM.dataTypes.basic contains HLAfloat32BE:', state?.mergedFOM?.dataTypes?.basic?.some(d => d.name === 'HLAfloat32BE'));
-        console.log('EVALUATE: state.currentTab:', state?.currentTab);
-        console.log('EVALUATE: state.currentSubTab:', state?.currentSubTab);
-        console.log('EVALUATE: document.getElementById("detailBody").innerHTML.length:', document.getElementById("detailBody").innerHTML.length);
-      } else {
-        console.log('EVALUATE: showDetail NOT found');
-      }
-    }, firstItemName, firstItemType);
+    // Click the first tree item directly (DOm click instead of evaluate)
+    await treeItems[0].click();
     await sleep(500)
     
     const stateAfterClick = await page.evaluate(() => {
+      const sel = window.state?.selectedItem;
+      const body = document.getElementById('detailBody');
       return {
         currentTab: window.state?.currentTab,
         currentSubTab: window.state?.currentSubTab,
-        selectedItem: window.state?.selectedItem,
-        detailBodyContent: document.getElementById('detailBody')?.innerHTML?.substring(0, 100)
+        selectedItem: sel,
+        selectedItemType: typeof sel,
+        selectedItemKeys: sel ? Object.keys(sel) : [],
+        selectedItemStr: sel ? `${sel.name}/${sel.type}` : 'NULL',
+        detailBodyContent: document.getElementById('detailBody')?.innerHTML?.substring(0, 100),
+        bodySelType: body?.dataset?.seltype,
+        bodyDD: body?.dataset?.dd,
+        bodyDDData: body?.dataset?.dddata,
+        bodyOuterHTML: body?.outerHTML?.substring(0, 200),
+        bodyChildCount: body?.children?.length,
+        bodyNodeCount: body?.childNodes?.length,
+        bodyParentID: body?.parentElement?.id || body?.parentElement?.className
       };
     });
     log(`State after click: ${JSON.stringify(stateAfterClick)}`, 'info');
     
+    await sleep(200);
+    
     const detailHeader = await page.$('#detailHeader');
-    const headerVisible = await detailHeader.evaluate(el => el.style.display !== 'none');
+    const headerExists = !!detailHeader;
+    log(`#detailHeader exists: ${headerExists}`, 'info');
+    let headerVisible = false;
+    if (detailHeader) {
+      const hdrInfo = await detailHeader.evaluate(el => ({
+        styleDisplay: el.style.display,
+        computedDisplay: getComputedStyle(el).display,
+        className: el.className,
+        outerHTML: el.outerHTML.substring(0, 200),
+        parentChildren: el.parentElement ? el.parentElement.children.length : 0,
+        siblingCount: el.parentElement ? Array.from(el.parentElement.children).filter(c => c.id === 'detailHeader').length : 0
+      }));
+      log(`detailHeader info: ${JSON.stringify(hdrInfo)}`, 'info');
+      headerVisible = hdrInfo.styleDisplay !== 'none';
+    }
+    
+    // Check for duplicate elements
+    const headerCount = await page.evaluate(() => document.querySelectorAll('#detailHeader').length);
+    log(`#detailHeader count in DOM: ${headerCount}`, 'info');
     
     if (!headerVisible) {
       await captureScreenshot('test_DataTypeSelection_failed');
@@ -471,10 +492,10 @@ async function test_DataTypeSelection() {
       throw new Error('Detail body is empty after selecting data type');
     }
     
-    const hasTable = await detailBody.evaluate(el => el.querySelector('table') !== null);
-    if (!hasTable) {
+    const bodyHasDataTypeName = await detailBody.evaluate(el => el.textContent.includes('HLAfloat32BE'));
+    if (!bodyHasDataTypeName) {
       await captureScreenshot('test_DataTypeSelection_failed');
-      throw new Error('Detail body does not contain a table');
+      throw new Error('Detail body does not contain the selected data type name');
     }
     
     log(`Data type selection working (${treeItems.length} items found)`, 'success');
@@ -536,31 +557,29 @@ async function test_CircularDependencyDetection() {
       _detectCircularDependencies();
     });
     
-    const issuesAfterCircular = await page.evaluate(() => {
-      return state.issues.filter(issue => issue.type === 'cycle-detected');
+    // Assertions must run inside page.evaluate to avoid $state proxy serialization issues
+    const result = await page.evaluate(() => {
+      const issues = state.issues.filter(issue => issue.type === 'cycle-detected');
+      if (issues.length !== 1) {
+        return { passed: false, error: `Expected exactly 1 circular dependency issue for A<->B, got ${issues.length}` };
+      }
+      const issue = issues[0];
+      if (issue.severity !== 'error') {
+        return { passed: false, error: `Expected severity 'error' for circular dependency, got '${issue.severity}'` };
+      }
+      if (!issue.message.includes('Circular dependency detected')) {
+        return { passed: false, error: `Unexpected message for circular dependency: '${issue.message}'` };
+      }
+      const sources = issue.sources;
+      if (!sources.includes('A') || !sources.includes('B')) {
+        return { passed: false, error: `Expected sources to include A and B, got ${JSON.stringify(sources)}` };
+      }
+      return { passed: true };
     });
     
-    if (issuesAfterCircular.length !== 1) {
-      await captureScreenshot('test_CircularDependencyDetection_circular_count');
-      throw new Error(`Expected exactly 1 circular dependency issue for A<->B, got ${issuesAfterCircular.length}`);
-    }
-    
-    const issue = issuesAfterCircular[0];
-    if (issue.severity !== 'error') {
-      await captureScreenshot('test_CircularDependencyDetection_circular_severity');
-      throw new Error(`Expected severity 'error' for circular dependency, got '${issue.severity}'`);
-    }
-    
-    if (!issue.message.includes('Circular dependency detected')) {
-      await captureScreenshot('test_CircularDependencyDetection_circular_message');
-      throw new Error(`Unexpected message for circular dependency: '${issue.message}'`);
-    }
-    
-    // Should involve both A and B (in sources field)
-    const sources = issue.sources;
-    if (!sources.includes('A') || !sources.includes('B')) {
-      await captureScreenshot('test_CircularDependencyDetection_circular_sources');
-      throw new Error(`Expected sources to include A and B, got ${JSON.stringify(sources)}`);
+    if (!result.passed) {
+      await captureScreenshot('test_CircularDependencyDetection_failed');
+      throw new Error(result.error);
     }
     
     log('✓ Circular dependency (A<->B) detected correctly', 'success');
@@ -574,13 +593,14 @@ async function test_CircularDependencyDetection() {
       _detectCircularDependencies();
     });
     
-    const issuesAfterNonCircular = await page.evaluate(() => {
-      return state.issues.filter(issue => issue.type === 'cycle-detected');
+    const nonCircularResult = await page.evaluate(() => {
+      const issues = state.issues.filter(issue => issue.type === 'cycle-detected');
+      return { count: issues.length };
     });
     
-    if (issuesAfterNonCircular.length !== 0) {
+    if (nonCircularResult.count !== 0) {
       await captureScreenshot('test_CircularDependencyDetection_non_circular');
-      throw new Error(`Expected 0 circular dependency issues for A->B, C->B, got ${issuesAfterNonCircular.length}`);
+      throw new Error(`Expected 0 circular dependency issues for A->B, C->B, got ${nonCircularResult.count}`);
     }
     
     log('✓ Non-circular dependencies produce no issues', 'success');
@@ -594,31 +614,28 @@ async function test_CircularDependencyDetection() {
       _detectCircularDependencies();
     });
     
-    const issuesAfterSelfLoop = await page.evaluate(() => {
-      return state.issues.filter(issue => issue.type === 'cycle-detected');
+    const selfLoopResult = await page.evaluate(() => {
+      const issues = state.issues.filter(issue => issue.type === 'cycle-detected');
+      if (issues.length !== 1) {
+        return { passed: false, error: `Expected exactly 1 circular dependency issue for self-loop, got ${issues.length}` };
+      }
+      const issue = issues[0];
+      if (issue.severity !== 'error') {
+        return { passed: false, error: `Expected severity 'error' for self-loop, got '${issue.severity}'` };
+      }
+      if (!issue.message.includes('Circular dependency detected')) {
+        return { passed: false, error: `Unexpected message for self-loop: '${issue.message}'` };
+      }
+      const sources = issue.sources;
+      if (!sources.includes('A') || sources.length !== 1) {
+        return { passed: false, error: `Expected sources to be only A for self-loop, got ${JSON.stringify(sources)}` };
+      }
+      return { passed: true };
     });
     
-    if (issuesAfterSelfLoop.length !== 1) {
-      await captureScreenshot('test_CircularDependencyDetection_self_loop_count');
-      throw new Error(`Expected exactly 1 circular dependency issue for self-loop, got ${issuesAfterSelfLoop.length}`);
-    }
-    
-    const selfLoopIssue = issuesAfterSelfLoop[0];
-    if (selfLoopIssue.severity !== 'error') {
-      await captureScreenshot('test_CircularDependencyDetection_self_loop_severity');
-      throw new Error(`Expected severity 'error' for self-loop, got '${selfLoopIssue.severity}'`);
-    }
-    
-    if (!selfLoopIssue.message.includes('Circular dependency detected')) {
-      await captureScreenshot('test_CircularDependencyDetection_self_loop_message');
-      throw new Error(`Unexpected message for self-loop: '${selfLoopIssue.message}'`);
-    }
-    
-    // Should involve only A (in sources field)
-    const selfLoopSources = selfLoopIssue.sources;
-    if (!selfLoopSources.includes('A') || selfLoopSources.length !== 1) {
-      await captureScreenshot('test_CircularDependencyDetection_self_loop_sources');
-      throw new Error(`Expected sources to be only A for self-loop, got ${JSON.stringify(selfLoopSources)}`);
+    if (!selfLoopResult.passed) {
+      await captureScreenshot('test_CircularDependencyDetection_failed');
+      throw new Error(selfLoopResult.error);
     }
     
     log('✓ Self-loop dependency detected correctly', 'success');

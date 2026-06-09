@@ -1,18 +1,29 @@
 {
   "name": "fom-viewer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Single page HTML viewer for IEEE 1516 FOM files",
+  "type": "module",
   "scripts": {
     "lint": "eslint test/",
     "lint:fix": "eslint test/ --fix",
-    "build": "node scripts/build.js",
-    "build:dev": "node scripts/build.js --external",
-    "build:map": "node scripts/build.js --sourcemap",
+    "dev": "vite",
+    "build": "vite build && cp dist/index.html dist/fom-viewer.html && cp dist/fom-viewer.html fom-viewer.html && for f in dist/fom-worker-*.js; do [ -f \"$f\" ] && cp \"$f\" .; done",
+    "build:dev": "vite build --mode development",
+    "build:map": "vite build --sourcemap && cp dist/index.html dist/fom-viewer.html && cp dist/fom-viewer.html fom-viewer.html && for f in dist/fom-worker-*.js; do [ -f \"$f\" ] && cp \"$f\" .; done",
+    "preview": "vite preview",
     "test": "cd test && npm test",
-    "test:combined": "npm run build && cd test && npm run test -- --combined"
+    "test:combined": "npm run build && cd test && npm run test -- --combined",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
   },
   "devDependencies": {
-    "eslint": "^8.57.1"
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "eslint": "^8.57.1",
+    "jsdom": "^29.1.1",
+    "svelte": "^5.56.2",
+    "vite": "^8.0.16",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.8"
   },
   "keywords": [
     "fom",
@@ -20,5 +31,9 @@
     "viewer"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "comlink": "^4.4.2",
+    "fuse.js": "^7.4.2"
+  }
 }

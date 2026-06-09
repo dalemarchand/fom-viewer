@@ -104,8 +104,10 @@ async function test_BackButtonFixes() {
     console.log('Active subtab after clicking Error:', activeSubtabAfterError);
     
     // Check that detail is hidden (should show empty state)
-    const detailHeader = await page.$('#detailHeader');
-    const detailVisible = await detailHeader.evaluate(el => el.style.display !== 'none');
+    const detailVisible = await page.evaluate(() => {
+      const h = document.getElementById('detailHeader');
+      return h && h.style.display !== 'none';
+    });
     console.log('Detail visible after Error subtab:', detailVisible);
     
     // Now click DataTypes tab
@@ -215,8 +217,10 @@ async function test_BackButtonFixes() {
       await sleep(300);
       
       // Verify detail is showing
-      const detailHeader = await page.$('#detailHeader');
-      const detailVisible = await detailHeader.evaluate(el => el.style.display !== 'none');
+      const detailVisible = await page.evaluate(() => {
+        const h = document.getElementById('detailHeader');
+        return h && h.style.display !== 'none';
+      });
       console.log('Detail visible after selecting item:', detailVisible);
       
       if (detailVisible) {
@@ -230,8 +234,10 @@ async function test_BackButtonFixes() {
         await sleep(300);
         
         // Verify detail is now hidden
-        const detailHeaderAfterError = await page.$('#detailHeader');
-        const detailVisibleAfterError = await detailHeaderAfterError.evaluate(el => el.style.display !== 'none');
+        const detailVisibleAfterError = await page.evaluate(() => {
+          const h = document.getElementById('detailHeader');
+          return h && h.style.display !== 'none';
+        });
         console.log('Detail visible after switching to Error subtab:', detailVisibleAfterError);
         
         // Now click DataTypes tab (this should trigger history push due to the fix)
@@ -276,14 +282,15 @@ async function test_BackButtonFixes() {
       await page.evaluate(() => {
         // Simulate having selected an item
         state.selectedItem = { name: 'TestIssue', type: 'objectClass' };
-        // Show detail header
-        document.getElementById('detailHeader').style.display = 'block';
-        document.getElementById('detailBody').innerHTML = '<div>Test detail content</div>';
+        // Wait for Svelte to render the detail header
       });
+      await sleep(300);
       
       // Verify detail is showing
-      const detailHeader = await page.$('#detailHeader');
-      const detailVisible = await detailHeader.evaluate(el => el.style.display !== 'none');
+      const detailVisible = await page.evaluate(() => {
+        const h = document.getElementById('detailHeader');
+        return h && h.style.display !== 'none';
+      });
       console.log('Detail visible after simulated selection:', detailVisible);
       
       if (detailVisible) {
@@ -297,8 +304,10 @@ async function test_BackButtonFixes() {
         await sleep(300);
         
         // Verify detail is now hidden
-        const detailHeaderAfterError = await page.$('#detailHeader');
-        const detailVisibleAfterError = await detailHeaderAfterError.evaluate(el => el.style.display !== 'none');
+        const detailVisibleAfterError = await page.evaluate(() => {
+          const h = document.getElementById('detailHeader');
+          return h && h.style.display !== 'none';
+        });
         console.log('Detail visible after switching to Error subtab:', detailVisibleAfterError);
         
         // Now click DataTypes tab (this should trigger history push due to the fix)
@@ -346,7 +355,9 @@ async function loadTestFomFile(page, filename) {
   
   await page.waitForFunction(() => {
     const welcome = document.getElementById('welcomeScreen');
-    return welcome && welcome.style.display === 'none';
+    if (welcome) return welcome.style.display === 'none';
+    const header = document.getElementById('detailHeader');
+    return header && header.style.display !== 'none';
   }, { timeout: config.test.timeout });
 }
 

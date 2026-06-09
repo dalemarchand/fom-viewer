@@ -39,9 +39,15 @@ jobs:
         run: |
           CURRENT="${{ steps.latest_tag.outputs.semver }}"
           CURRENT=${CURRENT#v}
-          IFS='.' read -r major minor patch <<< "$CURRENT"
-          PATCH=$((patch + 1))
-          NEXT="v$major.$minor.$PATCH"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          HIGHEST=$(printf '%s\n' "$PKG_VERSION" "$CURRENT" | sort -V | tail -1)
+          if [ "$HIGHEST" = "$PKG_VERSION" ] && [ "$PKG_VERSION" != "$CURRENT" ]; then
+            NEXT="v$PKG_VERSION"
+          else
+            IFS='.' read -r major minor patch <<< "$CURRENT"
+            PATCH=$((patch + 1))
+            NEXT="v$major.$minor.$PATCH"
+          fi
           echo "version=$NEXT" >> $GITHUB_OUTPUT
 
       - name: Configure git user
