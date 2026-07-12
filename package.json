@@ -1,6 +1,6 @@
 {
   "name": "fom-viewer",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Single page HTML viewer for IEEE 1516 FOM files",
   "type": "module",
   "scripts": {
