@@ -24,8 +24,12 @@
   let hasConflictTable = $derived(issue?.type === 'object-attributes' || issue?.type === 'interaction-parameters');
 
   function locationClick(loc) {
+    if (loc.exists === false) return;
     window.__showDataType?.(loc.itemName, loc.subTab || loc.tab);
   }
+
+  let existingLocations = $derived(issue?.locations?.filter(l => l.exists !== false) || []);
+  let missingLocations = $derived(issue?.locations?.filter(l => l.exists === false) || []);
 </script>
 
 {#if issue}
@@ -42,7 +46,7 @@
           {@const match = di.visibleText.match(/^(.+?):\s*(\d+)\s*(?:attribute|parameter)s?/)}
           {#if match}
             <tr class="conflict-row" onclick={() => di.tooltipText && toggleRow(i)}>
-              <td>{match[1]}</td>
+              <td><span class="clickable-item" onclick={() => window.__switchToModule?.(match[1])}>{match[1]}</span></td>
               <td>
                 <span class="count-badge" class:same={match[2] === '0'} class:different={match[2] !== '0'}>{match[2]}</span>
               </td>
@@ -62,16 +66,14 @@
     {:else if issue.detail}
       <div class="detail-list">
         {#each detailItems as di}
-          <div class="detail-list-item" title={di.tooltipText}>{di.visibleText}</div>
-        {/each}
-      </div>
-    {/if}
-
-    {#if issue.sources?.length}
-      <div class="source-module-list">
-        <p class="source-module-heading"><strong>Source Modules:</strong></p>
-        {#each issue.sources as s}
-          <div class="source-module-item" data-source={s}>{s}</div>
+          {@const colonIdx = di.visibleText.indexOf(': ')}
+          <div class="detail-list-item" title={di.tooltipText}>
+            {#if colonIdx > 0}
+              <span class="clickable-item" onclick={() => window.__switchToModule?.(di.visibleText.substring(0, colonIdx))}>{di.visibleText.substring(0, colonIdx)}</span>{di.visibleText.substring(colonIdx)}
+            {:else}
+              {di.visibleText}
+            {/if}
+          </div>
         {/each}
       </div>
     {/if}
@@ -80,10 +82,10 @@
       <p class="issue-meta"><strong>Category:</strong> {issue.category} / {issue.type}</p>
     {/if}
 
-    {#if issue.locations?.length}
+    {#if existingLocations.length > 0}
       <div class="locations-section">
         <h4>Navigation Targets</h4>
-        {#each issue.locations as loc}
+        {#each existingLocations as loc}
           {@const targetTab = loc.subTab ? `${loc.tab}:${loc.subTab}` : loc.tab}
           <div
             class="location-item"
@@ -95,6 +97,18 @@
             <span class="location-icon">📍</span>
             <span class="location-name">{loc.itemName}</span>
             <span class="location-tab">{targetTab}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    {#if missingLocations.length > 0}
+      <div class="missing-refs-section">
+        <h4>Missing References</h4>
+        {#each missingLocations as loc}
+          <div class="missing-ref-item">
+            <span class="missing-ref-name">{loc.itemName}</span>
+            <span class="missing-ref-tab">{loc.tab}</span>
           </div>
         {/each}
       </div>
@@ -137,24 +151,6 @@
     border-radius: 4px;
     font-size: 13px;
     border: 1px solid var(--border, #e5e7eb);
-  }
-  .source-module-list {
-    margin-top: 12px;
-  }
-  .source-module-heading {
-    margin-bottom: 4px;
-    font-size: 13px;
-  }
-  .source-module-item {
-    padding: 4px 8px;
-    margin: 2px 0;
-    background: var(--bg-secondary, #f3f4f6);
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-  }
-  .source-module-item:hover {
-    background: var(--accent-bg, #e0e7ff);
   }
   .conflict-table {
     width: 100%;
@@ -239,6 +235,35 @@
   }
   .location-tab {
     color: var(--text-muted, #6b7280);
+    font-size: 11px;
+  }
+  .missing-refs-section {
+    margin-top: 16px;
+  }
+  .missing-refs-section h4 {
+    margin-bottom: 8px;
+    color: var(--error, #dc2626);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .missing-ref-item {
+    padding: 6px 10px;
+    margin: 2px 0;
+    background: rgba(220, 38, 38, 0.06);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .missing-ref-name {
+    flex: 1;
+    color: var(--error, #dc2626);
+    font-weight: 500;
+  }
+  .missing-ref-tab {
+    color: rgba(220, 38, 38, 0.6);
     font-size: 11px;
   }
 </style>

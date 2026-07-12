@@ -166,6 +166,9 @@ onMount(() => {
             >
               <span class="icon">{item.icon || '📄'}</span>
               <span class="name" title={item.fullName || item.name}>{item.name.split('.').pop()}</span>
+              {#if item.usageCount !== undefined && item.usageCount > 0}
+                <span class="usages">{item.usageCount} refs</span>
+              {/if}
             </div>
           {/each}
         {/snippet}
@@ -226,6 +229,15 @@ onMount(() => {
   .name {
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .usages {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted, #888);
+    background: var(--bg-tertiary, #f0f0f0);
+    padding: 1px 6px;
+    border-radius: 8px;
+    flex-shrink: 0;
   }
   .empty-state {
     padding: 16px 8px;

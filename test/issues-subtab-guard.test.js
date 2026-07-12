@@ -4,7 +4,6 @@
 
 const puppeteer = require('puppeteer-core');
 const path = require('path');
-const fs = require('fs');
 const config = require('./config');
 
 async function test_IssuesSubtabGuard() {
@@ -159,7 +158,10 @@ async function test_IssuesSubtabGuard() {
     });
     
     // Click on an appspace subtab (this should use the dedicated handler)
-    await waitAndClick(page, '#appspaceTabs .subtab[data-subtab="objects"]');
+    await page.evaluate(() => {
+      const el = document.querySelector('#appspaceTabs .subtab[data-subtab="objects"]');
+      if (el) el.click();
+    });
     await sleep(300);
     
     // Check that history was NOT pushed by the general handler

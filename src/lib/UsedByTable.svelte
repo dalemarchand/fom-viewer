@@ -9,7 +9,7 @@
 </script>
 
 {#if usages.length > 0}
-  <h4 style="margin:12px 0 8px">Used By</h4>
+  <h4 style="margin:12px 0 8px">Used By <span class="badge">{usages.length}</span></h4>
   <table class="property-table">
     <tbody>
     <tr><th>Name</th><th>Type</th><th>Location</th></tr>

@@ -1,4 +1,5 @@
 <script>
+  import CollapsibleSection from '../CollapsibleSection.svelte';
   import UsedByTable from '../UsedByTable.svelte';
   import RelatedIssues from '../RelatedIssues.svelte';
 
@@ -23,5 +24,9 @@
   </table>
 </div>
 
+<CollapsibleSection title="Used By" count={usages.length} threshold={0}>
 <UsedByTable usages={usages} />
+</CollapsibleSection>
+<CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
+</CollapsibleSection>

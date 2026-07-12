@@ -22,13 +22,15 @@ export function parseObjectClasses(doc) {
         const attrNotes = node.getAttribute('notes') || '';
         const dt = node.querySelector('dataType')?.textContent || '';
         const updateType = node.querySelector('updateType')?.textContent || '';
-        const updateCondition = node.querySelector('updateCondition')?.textContent || '';
+        const ucEl = node.querySelector('updateCondition');
+        const updateCondition = ucEl?.textContent || '';
+        const updateConditionNotes = ucEl?.getAttribute('notes') || '';
         const ownership = node.querySelector('ownership')?.textContent || '';
         const transportation = node.querySelector('transportation')?.textContent || '';
         const order = node.querySelector('order')?.textContent || '';
         const dimensionEls = node.querySelectorAll('dimensions > dimension');
         const dimensions = Array.from(dimensionEls).map(d => d.textContent.trim()).filter(d => d);
-        if (attrName) attributes.push({ name: attrName, sharing: attrSharing, semantics: attrSemantics, notes: attrNotes, dataType: dt, updateType, updateCondition, ownership, transportation, order, dimensions });
+        if (attrName) attributes.push({ name: attrName, sharing: attrSharing, semantics: attrSemantics, notes: attrNotes, dataType: dt, updateType, updateCondition, updateConditionNotes, ownership, transportation, order, dimensions });
       }
     });
     classes.push({ name: fullName, sharing, semantics, notes: classNotes, attributes, parent: fullParentName, _source: getSource(doc) });

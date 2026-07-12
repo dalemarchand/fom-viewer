@@ -1,4 +1,5 @@
 <script>
+  import CollapsibleSection from '../CollapsibleSection.svelte';
   import RelatedIssues from '../RelatedIssues.svelte';
 
   let { item, issues = [] } = $props();
@@ -9,6 +10,18 @@
   <table class="property-table">
     <tbody>
     <tr><th>Name</th><td>{item.name}</td></tr>
+    {#if item.notes}
+      <tr>
+        <th>Notes</th>
+        <td>
+          <ul style="list-style:none;margin:0;padding:0;">
+            {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
+              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+            {/each}
+          </ul>
+        </td>
+      </tr>
+    {/if}
     {#if item.isComplex && item.rows && item.rows.length > 0}
       {#each item.rows as r}
         <tr>
@@ -27,4 +40,6 @@
   </table>
 </div>
 
+<CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
+</CollapsibleSection>

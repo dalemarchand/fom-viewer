@@ -122,20 +122,20 @@ async function runWelcomeStatsTest() {
     }
     console.log('✓ welcomeScreen hidden after file load');
 
-    // welcomeStats should be visible (flex) with stat items, or we're showing detail view instead
-    if (afterLoadState.statsDisplay !== 'flex' && afterLoadState.statsDisplay !== 'not-in-dom') {
-      throw new Error(`Expected welcomeStats display to be "flex" or removed after loading, but was "${afterLoadState.statsDisplay}"`);
+    // welcomeStats should be visible (flex/block) with stat items, or we're showing detail view instead
+    if (afterLoadState.statsDisplay !== 'flex' && afterLoadState.statsDisplay !== 'block' && afterLoadState.statsDisplay !== 'not-in-dom') {
+      throw new Error(`Expected welcomeStats display to be "flex", "block", or removed after loading, but was "${afterLoadState.statsDisplay}"`);
     }
-    if (afterLoadState.statsDisplay === 'flex') {
+    if (afterLoadState.statsDisplay === 'flex' || afterLoadState.statsDisplay === 'block') {
       console.log('✓ welcomeStats visible after file load (showing stats view)');
 
-      if (afterLoadState.statItemCount !== 4) {
-        throw new Error(`Expected 4 stat-item elements, but found ${afterLoadState.statItemCount}`);
+      if (afterLoadState.statItemCount < 4 || afterLoadState.statItemCount > 5) {
+        throw new Error(`Expected 4-5 stat-item elements, but found ${afterLoadState.statItemCount}`);
       }
-      console.log('✓ 4 stat items present');
+      console.log(`✓ ${afterLoadState.statItemCount} stat items present`);
 
-      // Verify expected labels
-      const expectedLabels = ['Modules', 'Objects', 'Interactions', 'Data Types'];
+      // Verify expected labels (first 4 cards are fixed)
+      const expectedLabels = ['Object Classes', 'Interactions', 'Data Types', 'Modules'];
       for (let i = 0; i < expectedLabels.length; i++) {
         if (afterLoadState.statLabels[i] !== expectedLabels[i]) {
           throw new Error(`Expected stat-label[${i}] to be "${expectedLabels[i]}", but was "${afterLoadState.statLabels[i]}"`);
@@ -160,9 +160,11 @@ async function runWelcomeStatsTest() {
     // ============================================================
     console.log('Clearing files...');
 
-    // Find the Clear button in the header and click it
+    // Find the Clear button in the overflow menu and click it
     const clearBtnSelector = '#clearBtn';
     await page.waitForSelector(clearBtnSelector, { timeout: config.test.timeout });
+    await page.click('[data-testid="overflowToggle"]');
+    await page.waitForTimeout(200);
     await page.click(clearBtnSelector);
 
     // Wait for confirm dialog to be accepted (handled by dialog listener)

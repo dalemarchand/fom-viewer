@@ -1,8 +1,8 @@
 <script>
-  import UsedByTable from '../UsedByTable.svelte';
+  import CollapsibleSection from '../CollapsibleSection.svelte';
   import RelatedIssues from '../RelatedIssues.svelte';
 
-  let { item, parents = [], usages = [], issues = [] } = $props();
+  let { item, parents = [], issues = [], widgetBadges = {}, appspaceName = '' } = $props();
   let safeParams = $derived(item?.parameters?.filter(p => p && typeof p === 'object') || []);
 
   function transportLink(transportation) {
@@ -35,11 +35,11 @@
   {#if parents.length > 0}
     <div class="breadcrumb">
       {#each parents as p, idx}
-        <span class="breadcrumb-item clickable-item" onclick={() => window.__showDetail(p.name, 'interaction', true)}>{p.name.split('.').pop()}</span>
+        <span class="breadcrumb-item clickable-item" onclick={() => window.__showDetail(p.name, 'interaction', true)}>{p.name.split('.').pop()}<span class="widget-badge">{widgetBadges[p.name] ?? '?'}</span></span>
         {#if idx < parents.length - 1}<span class="breadcrumb-sep"> &gt; </span>{/if}
       {/each}
       <span class="breadcrumb-sep"> &gt; </span>
-      <span class="breadcrumb-current">{item.name.split('.').pop()}</span>
+      <span class="breadcrumb-current">{item.name.split('.').pop()}<span class="widget-badge">{widgetBadges[item.name] ?? safeParams.length}</span></span>
     </div>
   {/if}
 
@@ -49,6 +49,18 @@
     <tr><th>Name</th><td>{item.name.split('.').pop()}</td></tr>
     {#if item.sharing}<tr><th>Sharing</th><td>{item.sharing}</td></tr>{/if}
     {#if item.semantics}<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">{item.semantics}</td></tr>{/if}
+    {#if item.notes}
+      <tr>
+        <th>Notes</th>
+        <td>
+          <ul style="list-style:none;margin:0;padding:0;">
+            {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
+              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+            {/each}
+          </ul>
+        </td>
+      </tr>
+    {/if}
     {#if item.parent}
       <tr><th>Parent</th><td><span class="clickable-item" onclick={() => window.__showDetail(item.parent, 'interaction', true)}>{item.parent.split('.').pop()}</span></td></tr>
     {/if}
@@ -73,17 +85,23 @@
         </td>
       </tr>
     {/if}
+    {#if appspaceName}
+      <tr>
+        <th>Appspace</th>
+        <td><span class="clickable-item" onclick={() => window.__showDetail(item.name, 'appspace_interaction', true)}>{appspaceName}</span></td>
+      </tr>
+    {/if}
     </tbody>
   </table>
 </div>
 
 {#if safeParams.length > 0}
-  <h4 style="margin:12px 0 8px">Parameters</h4>
-  <table class="property-table">
+  <CollapsibleSection title="Parameters" count={safeParams.length} threshold={0}>
+  <table class="attr-table">
     <tbody>
     <tr>
       <th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th>
-      <th>Order</th>
+      <th>Order</th><th>Notes</th>
     </tr>
     {#each safeParams as p}
       <tr>
@@ -92,11 +110,22 @@
         <td>{p?.sharing ?? ''}</td>
         <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
         <td>{p?.order ?? ''}</td>
+        <td>
+          {#if p?.notes}
+            <ul style="list-style:none;margin:0;padding:0;">
+              {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
+                <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              {/each}
+            </ul>
+          {/if}
+        </td>
       </tr>
     {/each}
     </tbody>
   </table>
+  </CollapsibleSection>
 {/if}
 
-<UsedByTable usages={usages} />
+<CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
+</CollapsibleSection>

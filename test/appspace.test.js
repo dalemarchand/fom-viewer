@@ -360,9 +360,8 @@ async function test_AppspaceFeature() {
       state.history.push({ tab: 'appspaces', subTab: 'objects', selected: null, detail: 'block' });
       document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
       document.querySelector('#appspaceTabs .subtab[data-subtab="interactions"]')?.classList.add('active');
-      state.selectedItem = null;
       document.getElementById('detailHeader').style.display = 'none';
-      document.getElementById('detailBody').innerHTML = '';
+      state.selectedItem = null;
       updateUI();
       renderAppspacesPanel();
     });
@@ -420,9 +419,8 @@ async function test_AppspaceFeature() {
       state.history.push({ tab: 'appspaces', subTab: 'interactions', selected: null, detail: 'block' });
       document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
       document.querySelector('#appspaceTabs .subtab[data-subtab="unknown"]')?.classList.add('active');
-      state.selectedItem = null;
       document.getElementById('detailHeader').style.display = 'none';
-      document.getElementById('detailBody').innerHTML = '';
+      state.selectedItem = null;
       updateUI();
       renderAppspacesPanel();
     });
@@ -569,9 +567,8 @@ async function test_AppspaceFeature() {
       state.appspaceSubTab = 'objects';
       document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
       document.querySelector('#appspaceTabs .subtab[data-subtab="objects"]')?.classList.add('active');
-      state.selectedItem = null;
       document.getElementById('detailHeader').style.display = 'none';
-      document.getElementById('detailBody').innerHTML = '';
+      state.selectedItem = null;
       updateUI();
       renderAppspacesPanel();
     });
@@ -591,9 +588,8 @@ async function test_AppspaceFeature() {
       state.appspaceSubTab = 'interactions';
       document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
       document.querySelector('#appspaceTabs .subtab[data-subtab="interactions"]')?.classList.add('active');
-      state.selectedItem = null;
       document.getElementById('detailHeader').style.display = 'none';
-      document.getElementById('detailBody').innerHTML = '';
+      state.selectedItem = null;
       updateUI();
       renderAppspacesPanel();
     });
@@ -615,7 +611,9 @@ async function test_AppspaceFeature() {
     // =========================================================================
     console.log('Test 5: Clearing appspace...');
 
-    // Click clear button
+    // Click clear button (inside overflow menu)
+    await page.click('[data-testid="overflowToggle"]');
+    await sleep(200);
     await waitAndClick(page, '#clearAppspaceBtn');
     await sleep(500);
 
@@ -635,17 +633,14 @@ async function test_AppspaceFeature() {
     if (afterClear.appspaceExists) {
       throw new Error('Appspace should be null after clear');
     }
-    if (afterClear.appspaceTabDisplay !== 'none') {
-      throw new Error(`Appspaces tab should be hidden (display: none), got "${afterClear.appspaceTabDisplay}"`);
-    }
     if (afterClear.clearBtnDisplay !== 'none') {
       throw new Error('Clear button should be hidden after clear');
     }
     if (afterClear.loadBtnText !== 'Load Appspace') {
       throw new Error(`Load button text should revert to "Load Appspace", got "${afterClear.loadBtnText}"`);
     }
-    if (afterClear.currentTab !== 'modules') {
-      throw new Error(`Current tab should be 'modules' after clear, got '${afterClear.currentTab}'`);
+    if (afterClear.currentTab !== 'appspaces') {
+      throw new Error(`Current tab should stay on 'appspaces' after clear, got '${afterClear.currentTab}'`);
     }
 
     console.log('  ✓ Test 5 passed: Appspace cleared successfully');
@@ -779,7 +774,8 @@ async function test_AppspaceFeature() {
       state.appspaceSubTab = 'unknown';
       document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
       document.querySelector('#appspaceTabs .subtab[data-subtab="unknown"]')?.classList.add('active');
-      saveAppspaceToStorage();
+      document.getElementById('detailHeader').style.display = 'none';
+      state.selectedItem = null;
       updateUI();
       renderAppspacesPanel();
     });

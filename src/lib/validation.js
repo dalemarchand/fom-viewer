@@ -241,7 +241,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
           `Interaction "${int.name}" references unknown dimension "${dim}"`,
           `The dimension "${dim}" is not defined in any loaded FOM module.`,
           intSources,
-          [{ tab: 'interactions', itemName: int.name }]
+          [{ tab: 'interactions', itemName: int.name, exists: true },
+           { tab: 'dims', itemName: dim.trim(), exists: false }]
         ));
       }
     });
@@ -250,7 +251,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
         `Interaction "${int.name}" references unknown transportation "${int.transportation}"`,
         `The transportation "${int.transportation}" is not defined in any loaded FOM module.`,
         intSources,
-        [{ tab: 'interactions', itemName: int.name }]
+        [{ tab: 'interactions', itemName: int.name, exists: true },
+         { tab: 'trans', itemName: int.transportation.trim(), exists: false }]
       ));
     }
     (int.parameters || []).forEach(param => {
@@ -259,7 +261,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
           `Parameter "${param.name}" of interaction "${int.name}" references unknown data type "${param.dataType}"`,
           `The data type "${param.dataType}" is not defined in any loaded FOM module.`,
           intSources,
-          [{ tab: 'interactions', itemName: int.name }]
+          [{ tab: 'interactions', itemName: int.name, exists: true },
+           { tab: 'datatypes', itemName: param.dataType, exists: false }]
         ));
       }
     });
@@ -274,7 +277,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
             `Attribute "${attr.name}" of object "${obj.name}" references unknown dimension "${dim}"`,
             `The dimension "${dim}" is not defined in any loaded FOM module.`,
             objSources,
-            [{ tab: 'objects', itemName: obj.name }]
+            [{ tab: 'objects', itemName: obj.name, exists: true },
+             { tab: 'dims', itemName: dim.trim(), exists: false }]
           ));
         }
       });
@@ -283,7 +287,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
           `Attribute "${attr.name}" of object "${obj.name}" references unknown transportation "${attr.transportation}"`,
           `The transportation "${attr.transportation}" is not defined in any loaded FOM module.`,
           objSources,
-          [{ tab: 'objects', itemName: obj.name }]
+          [{ tab: 'objects', itemName: obj.name, exists: true },
+           { tab: 'trans', itemName: attr.transportation.trim(), exists: false }]
         ));
       }
       if (attr.dataType && !dataTypeNames.has(attr.dataType)) {
@@ -291,7 +296,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
           `Attribute "${attr.name}" of object "${obj.name}" references unknown data type "${attr.dataType}"`,
           `The data type "${attr.dataType}" is not defined in any loaded FOM module.`,
           objSources,
-          [{ tab: 'objects', itemName: obj.name }]
+          [{ tab: 'objects', itemName: obj.name, exists: true },
+           { tab: 'datatypes', itemName: attr.dataType, exists: false }]
         ));
       }
     });
@@ -307,7 +313,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
               `Dimension "${dimName}" references unknown data type "${row.value}"`,
               `The data type "${row.value}" is not defined in any loaded FOM module.`,
               [f.name],
-              [{ tab: 'dims', itemName: dimName }]
+              [{ tab: 'dims', itemName: dimName, exists: true },
+               { tab: 'datatypes', itemName: row.value, exists: false }]
             ));
           }
         });
@@ -322,7 +329,8 @@ function checkCrossReferences(files, merged, state, makeIssue) {
           `Module "${file.name}" depends on missing module "${dep}"`,
           `The module "${dep}" is required by "${file.name}" but is not loaded.`,
           [file.name],
-          []
+          [{ tab: 'modules', itemName: file.name, exists: true },
+           { tab: 'modules', itemName: dep, exists: false }]
         ));
       }
     });

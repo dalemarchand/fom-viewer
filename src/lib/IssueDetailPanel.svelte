@@ -5,10 +5,14 @@
   let severityIcon = $derived(severityLabel === 'error' ? '\u26A0\uFE0F' : severityLabel === 'warning' ? '\u26A0\uFE0F' : '\u2139\uFE0F');
 
   function navigateToLocation(loc) {
+    if (loc.exists === false) return;
     if (window.navigateToLocation) {
       window.navigateToLocation(loc);
     }
   }
+
+  let existingLocations = $derived(item?.locations?.filter(l => l.exists !== false) || []);
+  let missingLocations = $derived(item?.locations?.filter(l => l.exists === false) || []);
 </script>
 
 <div class="detail-section">
@@ -51,11 +55,11 @@
     </table>
   {/if}
 
-  {#if item?.locations?.length}
-    <h4>Locations</h4>
+  {#if existingLocations.length > 0}
+    <h4>Navigation Targets</h4>
     <table class="property-table">
       <tbody>
-        {#each item.locations as loc}
+        {#each existingLocations as loc}
           <tr>
             <td>
               {#if loc.tab && loc.itemName}
@@ -65,6 +69,22 @@
               {:else}
                 <span>{loc.file || ''}{#if loc.tab} &mdash; {loc.tab}{/if}{#if loc.item}: {loc.item}{/if}</span>
               {/if}
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
+
+  {#if missingLocations.length > 0}
+    <h4 style="color: var(--error, #dc2626);">Missing References</h4>
+    <table class="property-table">
+      <tbody>
+        {#each missingLocations as loc}
+          <tr>
+            <td style="color: var(--error, #dc2626);">
+              {loc.itemName}
+              {#if loc.tab}<span style="color: var(--text-muted, #6b7280); font-size: 11px;"> &mdash; {loc.tab}</span>{/if}
             </td>
           </tr>
         {/each}

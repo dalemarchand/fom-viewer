@@ -1,4 +1,5 @@
 <script>
+  import CollapsibleSection from '../CollapsibleSection.svelte';
   import RelatedIssues from '../RelatedIssues.svelte';
 
   let { item, issues = [] } = $props();
@@ -15,4 +16,6 @@
   </table>
 </div>
 
+<CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
+</CollapsibleSection>
