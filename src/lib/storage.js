@@ -84,7 +84,7 @@ export async function loadAllFiles() {
   return new Promise((resolve) => {
     request.onsuccess = () => {
       const all = request.result || [];
-      resolve(all.filter(f => f.name !== '__uiState__' && f.name !== '__appspace__'));
+      resolve(all.filter(f => f.name && !f.name.startsWith('__')));
     };
     request.onerror = () => resolve([]);
   });
@@ -116,11 +116,20 @@ export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
   await initDB();
   const transaction = db.transaction([STORE_NAME], 'readwrite');
   const store = transaction.objectStore(STORE_NAME);
+  // Preserve __recentFiles__ before clearing
+  const recentFilesReq = store.get('__recentFiles__');
+  const recentFiles = await new Promise((resolve) => {
+    recentFilesReq.onsuccess = () => resolve(recentFilesReq.result || null);
+    recentFilesReq.onerror = () => resolve(null);
+  });
   store.clear();
   for (const file of files) {
     store.put({ name: file.name, xml: file.xml });
   }
   store.put({ name: '__uiState__', uiState });
+  if (recentFiles) {
+    store.put(recentFiles);
+  }
   if (appspaceData) {
     store.put({ name: '__appspace__', data: appspaceData, subTab: appspaceSubTab });
   }

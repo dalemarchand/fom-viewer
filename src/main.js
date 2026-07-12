@@ -62,6 +62,8 @@ import * as historyStore from './lib/stores/historyStore.svelte.js';
 import * as issueStore from './lib/stores/issueStore.svelte.js';
 import * as storage from './lib/storage.js';
 import * as searchStore from './lib/stores/searchStore.svelte.js';
+import { initRecentFiles, addRecentFile } from './lib/stores/recentFilesStore.svelte.js';
+import * as appspaceStore from './lib/stores/appspaceStore.svelte.js';
 
 // ============================================================================
 // CONSTANTS & STATE
@@ -94,6 +96,7 @@ const state = {
   conflicts: [],
   errors: [],
   appspace: null,
+  subspaceDimensions: [],
   uiState: {
     currentTab: 'modules',
     currentSubTab: 'basic',
@@ -199,15 +202,21 @@ async function loadFromStorage() {
       if (loadBtn) { loadBtn.textContent = 'Change Appspace'; loadBtn.style.display = 'inline-block'; }
       if (clearBtn) clearBtn.style.display = 'inline-block';
       if (separator) separator.style.display = 'block';
-      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
-      if (appspaceTab) appspaceTab.style.display = 'block';
       updateAppspaceTabCount();
     }
     // Load FOM files
     const fileData = await storage.loadAllFiles();
     if (Array.isArray(fileData) && fileData.length > 0) {
       for (const f of fileData) {
-        try { const fom = await parseInWorker(f.xml); state.files.push(fom); }
+        try {
+          const fom = await parseInWorker(f.xml);
+          state.files.push(fom);
+          await addRecentFile(f.name, {
+            objects: fom.objectClasses?.length || 0,
+            interactions: fom.interactionClasses?.length || 0,
+            dataTypes: Object.values(fom.dataTypes || {}).reduce((s, a) => s + (Array.isArray(a) ? a.length : 0), 0)
+          });
+        }
         catch (e) { console.error('Failed to parse stored file', f.name, e); }
       }
       if (state.files.length > 0) {
@@ -216,6 +225,7 @@ async function loadFromStorage() {
         state.conflicts = state.conflicts.filter(c => c.type !== 'enum' && c.type !== 'variant');
         state.conflicts.push(...dtResult.conflicts);
         state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: dtResult.result, transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
+        detectSubspaceDimensions(); enrichAppspaceApps();
         validate(state, makeIssue); updateUI(); updateTabCounts(); updateIssuesTabVisibility(state);
         if (state.selectedItem) {
           const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -232,7 +242,7 @@ async function loadFromStorage() {
               showDetail(state.selectedItem.name, state.selectedItem.type);
             }
           }, 50);
-        } else {
+        } else if (state.currentTab !== 'overview') {
           setTimeout(() => {
             const firstItem = document.querySelector('.tree-item');
             if (firstItem) {
@@ -332,55 +342,72 @@ function findDimensionByName(dimName) {
   return false;
 }
 
+function notesMatch(notes, noteName) {
+  return (notes || '').split(/\s+/).filter(Boolean).includes(noteName);
+}
+
 function findNoteUsages(noteName) {
   if (!noteName || !state.mergedFOM) return [];
   const usages = [];
   
   // Check Object classes
   state.mergedFOM.objectClasses?.forEach(obj => {
-    if (obj.notes === noteName) {
+    if (notesMatch(obj.notes, noteName)) {
       usages.push({ name: obj.name, type: 'object', location: 'Class' });
     }
     obj.attributes?.forEach(attr => {
-      if (attr.notes === noteName) {
+      if (notesMatch(attr.notes, noteName)) {
         usages.push({ name: obj.name, type: 'object', location: `Attribute: ${attr.name}` });
+      }
+      if (notesMatch(attr.updateConditionNotes, noteName)) {
+        usages.push({ name: obj.name, type: 'object', location: `Update Condition of ${attr.name}` });
       }
     });
   });
   
   // Check Interaction classes
   state.mergedFOM.interactionClasses?.forEach(int => {
-    if (int.notes === noteName) {
+    if (notesMatch(int.notes, noteName)) {
       usages.push({ name: int.name, type: 'interaction', location: 'Class' });
     }
     int.parameters?.forEach(param => {
-      if (param.notes === noteName) {
+      if (notesMatch(param.notes, noteName)) {
         usages.push({ name: int.name, type: 'interaction', location: `Parameter: ${param.name}` });
       }
     });
   });
   
+  // Check Basic data types
+  state.mergedFOM.dataTypes?.basic?.forEach(s => {
+    if (notesMatch(s.notes, noteName)) {
+      usages.push({ name: s.name, type: 'basic', location: 'Basic Data Type' });
+    }
+  });
+  
   // Check Simple data types
   state.mergedFOM.dataTypes?.simple?.forEach(s => {
-    if (s.notes === noteName) {
+    if (notesMatch(s.notes, noteName)) {
       usages.push({ name: s.name, type: 'simple', location: 'Simple Data Type' });
+    }
+    if (notesMatch(s.representationNotes, noteName)) {
+      usages.push({ name: s.name, type: 'simple', location: 'Representation of Simple Data Type' });
     }
   });
   
   // Check Array data types
   state.mergedFOM.dataTypes?.array?.forEach(a => {
-    if (a.notes === noteName) {
+    if (notesMatch(a.notes, noteName)) {
       usages.push({ name: a.name, type: 'array', location: 'Array Data Type' });
     }
   });
   
   // Check Fixed data types
   state.mergedFOM.dataTypes?.fixed?.forEach(f => {
-    if (f.notes === noteName) {
+    if (notesMatch(f.notes, noteName)) {
       usages.push({ name: f.name, type: 'fixed', location: 'Fixed Record Data Type' });
     }
     f.fields?.forEach(field => {
-      if (field.notes === noteName) {
+      if (notesMatch(field.notes, noteName)) {
         usages.push({ name: f.name, type: 'fixed', location: `Field: ${field.name}` });
       }
     });
@@ -388,11 +415,14 @@ function findNoteUsages(noteName) {
   
   // Check Enumeration data types
   state.mergedFOM.dataTypes?.enum?.forEach(e => {
-    if (e.notes === noteName) {
+    if (notesMatch(e.notes, noteName)) {
       usages.push({ name: e.name, type: 'enum', location: 'Enumerated Data Type' });
     }
+    if (notesMatch(e.representationNotes, noteName)) {
+      usages.push({ name: e.name, type: 'enum', location: 'Representation of Enumerated Data Type' });
+    }
     e.values?.forEach(v => {
-      if (v.notes === noteName) {
+      if (notesMatch(v.notes, noteName)) {
         usages.push({ name: e.name, type: 'enum', location: `Enumerator: ${v.name}` });
       }
     });
@@ -400,12 +430,21 @@ function findNoteUsages(noteName) {
   
   // Check Variant data types
   state.mergedFOM.dataTypes?.variant?.forEach(v => {
-    if (v.notes === noteName) {
+    if (notesMatch(v.notes, noteName)) {
       usages.push({ name: v.name, type: 'variant', location: 'Variant Record Data Type' });
     }
     v.alternatives?.forEach(alt => {
-      if (alt.notes === noteName) {
+      if (notesMatch(alt.notes, noteName)) {
         usages.push({ name: v.name, type: 'variant', location: `Alternative: ${alt.label}` });
+      }
+    });
+  });
+  
+  // Check Dimensions
+  state.files.forEach(f => {
+    (f.dimensions || []).forEach(dim => {
+      if (notesMatch(dim.notes, noteName)) {
+        usages.push({ name: dim.name, type: 'dims', location: 'Dimension' });
       }
     });
   });
@@ -477,6 +516,39 @@ function findDataTypeUsages(typeName) {
     }
   });
   
+  // Appspace subspace linkage: if this enum type is referenced by a subspace dimension,
+  // show which appspace entries map to it
+  if (state.subspaceDimensions && state.subspaceDimensions.length > 0 && state.appspace) {
+    const matchingSubspace = state.subspaceDimensions.find(sd => sd.enumName === typeName);
+    if (matchingSubspace) {
+      const enumNames = new Set(matchingSubspace.enumerators.map(e => e.name));
+      (state.appspace.entries || []).forEach(entry => {
+        (entry.apps || []).forEach(app => {
+          const appStr = typeof app === 'string' ? app : app.name || '';
+          if (enumNames.has(appStr)) {
+            usages.push({
+              name: entry.matchedClass || entry.className,
+              type: state.mergedFOM.objectClasses?.some(c => c.name === (entry.matchedClass || entry.className)) ? 'object' : 'interaction',
+              location: 'Appspace: ' + appStr
+            });
+          }
+        });
+      });
+      (state.appspace.interactions || []).forEach(entry => {
+        (entry.apps || []).forEach(app => {
+          const appStr = typeof app === 'string' ? app : app.name || '';
+          if (enumNames.has(appStr)) {
+            usages.push({
+              name: entry.matchedClass || entry.className,
+              type: state.mergedFOM.objectClasses?.some(c => c.name === (entry.matchedClass || entry.className)) ? 'object' : 'interaction',
+              location: 'Appspace: ' + appStr
+            });
+          }
+        });
+      });
+    }
+  }
+  
   return usages;
 }
 
@@ -504,6 +576,7 @@ function tabToType(tab, subTab) {
 // Navigate from issue detail to a specific location
 function navigateToLocation(loc) {
   if (!loc || !loc.tab || !loc.itemName) return;
+  if (loc.exists === false) return;
   const type = tabToType(loc.tab, loc.subTab);
   showDetail(loc.itemName, type, true);
 }
@@ -537,13 +610,13 @@ function showDetail(name, type, isManualNav = false) {
     const tabEl = document.querySelector(`.tab[data-tab="${targetTab}"]`);
     if (tabEl) tabEl.classList.add('active');
     if (targetTab === 'datatypes') {
-      document.getElementById('dataTypeTabs').style.display = 'flex';
+      const dtTabs2 = document.getElementById('dataTypeTabs'); if (dtTabs2) dtTabs2.style.display = 'flex';
       document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
       const subTabEl = document.querySelector(`.subtab[data-subtab="${type}"]`);
       if (subTabEl) subTabEl.classList.add('active');
       state.currentSubTab = type;
     } else {
-      document.getElementById('dataTypeTabs').style.display = 'none';
+      const dtTabs2 = document.getElementById('dataTypeTabs'); if (dtTabs2) dtTabs2.style.display = 'none';
     }
     updateUI();
   }
@@ -560,16 +633,7 @@ function showDetail(name, type, isManualNav = false) {
     }
     state.history.push({ tab: prevTab, subTab: prevSubTab, selected: currentSelected, detail: document.getElementById('detailHeader')?.style.display || 'none' });
   }
-  state.selectedItem = { name, type };
-  
-  // Ensure detail panel is visible (tab/subtab click handlers hide it)
-  const detailHdr = document.getElementById('detailHeader');
-  if (detailHdr && detailHdr.style.display !== 'block') detailHdr.style.display = 'block';
-  
-  const backBtn = document.getElementById('backBtn');
-  backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
-  
-  // Appspace search result - render the panel and scroll to entry
+  // Appspace search result - render the panel first, then set selectedItem
   if (type === 'appspace_object' || type === 'appspace_interaction' || type === 'appspace_unknown') {
     const subTab = type === 'appspace_object' ? 'objects' : type === 'appspace_interaction' ? 'interactions' : 'unknown';
     state.appspaceSubTab = subTab;
@@ -578,6 +642,11 @@ function showDetail(name, type, isManualNav = false) {
     document.querySelector(`#appspaceTabs .subtab[data-subtab="${subTab}"]`)?.classList.add('active');
     updateAppspaceTabCount();
     renderAppspacesPanel();
+    state.selectedItem = { name, type };
+    const detailHdr3 = document.getElementById('detailHeader');
+    if (detailHdr3 && detailHdr3.style.display !== 'block') detailHdr3.style.display = 'block';
+    const backBtn3 = document.getElementById('backBtn');
+    backBtn3.style.display = state.history.length > 0 ? 'inline-block' : 'none';
     setTimeout(() => {
       const rows = document.querySelectorAll('.appspace-table tr');
       for (const row of rows) {
@@ -589,47 +658,16 @@ function showDetail(name, type, isManualNav = false) {
     }, 100);
     return;
   }
+
+  state.selectedItem = { name, type };
   
-  // Highlight search query text within detail body (deferred for Svelte render)
-  setTimeout(() => {
-    const body = document.getElementById('detailBody');
-    if (!body) return;
-    const searchInput = document.getElementById('globalSearch');
-    const searchQuery = searchInput ? searchInput.value.trim() : '';
-    if (!searchQuery || !body.textContent) return;
-    const q = searchQuery.toLowerCase();
-    try {
-      const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null, false);
-      const nodesToReplace = [];
-      while (walker.nextNode()) {
-        const node = walker.currentNode;
-        if (!node.textContent || !node.parentElement) continue;
-        const lower = node.textContent.toLowerCase();
-        let idx = lower.indexOf(q);
-        if (idx === -1) continue;
-        nodesToReplace.push(node);
-        const fragment = document.createDocumentFragment();
-        let remaining = node.textContent;
-        while (idx !== -1) {
-          const before = remaining.substring(0, idx);
-          const match = remaining.substring(idx, idx + searchQuery.length);
-          remaining = remaining.substring(idx + searchQuery.length);
-          if (before) fragment.appendChild(document.createTextNode(before));
-          const mark = document.createElement('mark');
-          mark.className = 'search-highlight';
-          mark.textContent = match;
-          fragment.appendChild(mark);
-          idx = remaining.toLowerCase().indexOf(q);
-        }
-        if (remaining) fragment.appendChild(document.createTextNode(remaining));
-        node.parentNode.replaceChild(fragment, node);
-      }
-      const firstHighlight = body.querySelector('.search-highlight');
-      if (firstHighlight) {
-        firstHighlight.scrollIntoView({ block: 'center' });
-      }
-    } catch(e) { /* silently ignore highlight errors */ }
-  }, 100);
+  // Ensure detail panel is visible (tab/subtab click handlers hide it)
+  const detailHdr = document.getElementById('detailHeader');
+  if (detailHdr && detailHdr.style.display !== 'block') detailHdr.style.display = 'block';
+  
+  const backBtn = document.getElementById('backBtn');
+  backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
+  
   
   // Highlight selected item in tree after tree is rebuilt
   const escapeCss = (s) => s.replace(/"/g, '\\"').replace(/\n/g, '\\n');
@@ -676,9 +714,9 @@ function switchToModule(moduleName, addToHistory = true) {
     state.currentTab = 'modules';
     state.selectedItem = { name: file.name, type: 'module' };
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelector('.tab[data-tab="modules"]').classList.add('active');
-    document.getElementById('dataTypeTabs').style.display = 'none';
-    document.getElementById('issuesTabs').style.display = 'none';
+    const modTab = document.querySelector('.tab[data-tab="modules"]'); if (modTab) modTab.classList.add('active');
+    const dtTab = document.getElementById('dataTypeTabs'); if (dtTab) dtTab.style.display = 'none';
+    const isTab = document.getElementById('issuesTabs'); if (isTab) isTab.style.display = 'none';
     updateUI();
     showModuleDetails(file, addToHistory);
   }
@@ -692,8 +730,8 @@ function showModuleDetails(file, addToHistory = true) {
     const prevDetail = document.getElementById('detailHeader')?.style.display || 'none';
     state.history.push({ tab: prevTab, subTab: prevSubTab, selected: prevSelected, detail: prevDetail });
   }
-  state.selectedItem = { name: file.name, type: 'module' };
   window.__moduleBodyHtml = renderModuleBody(file);
+  state.selectedItem = { name: file.name, type: 'module' };
   saveToStorage();
 }
 
@@ -770,6 +808,9 @@ function showPanel(panelId) {
   });
   const treeControls = document.getElementById('treeControls');
   if (treeControls) treeControls.style.display = panelId ? '' : 'none';
+  if (window.__setSortBtnVisible) {
+    window.__setSortBtnVisible(panelId && ['treeViewTree', 'treeViewDataTypes', 'treeViewModules'].includes(panelId));
+  }
 }
 
 function getFirstDisplayedIssue() {
@@ -787,26 +828,34 @@ function updateUI(skipAutoSelect) {
   const treeView = document.getElementById('treeView');
   const exportBtn = document.getElementById('exportBtn');
   const backBtn = document.getElementById('backBtn');
-  const sidebar = document.querySelector('.sidebar');
   const hasData = state.files.length > 0;
   exportBtn.style.display = hasData ? 'inline-block' : 'none';
   backBtn.style.display = state.history.length > 0 ? 'inline-block' : 'none';
 
-  // Hide tree/sidebar for Appspaces tab (uses main panel, not sidebar)
-  if (state.currentTab === 'appspaces') {
+  // Overview tab shows the dashboard, hides sidebar tree
+  if (state.currentTab === 'overview') {
     showPanel(null);
-    if (sidebar) sidebar.style.display = 'none';
-    const dh = document.getElementById('detailHeader'); if (dh) dh.style.display = 'block';
-    const ws = document.getElementById('welcomeScreen'); if (ws) ws.style.display = 'none';
-    const dt = document.getElementById('detailTitle'); if (dt) dt.textContent = 'Appspaces';
-    const dm = document.getElementById('detailMeta'); if (dm) dm.textContent = 'Loaded from ' + (state.appspace?.fileName || 'file');
-    renderAppspacesPanel();
+    const dh = document.getElementById('detailHeader'); if (dh) dh.style.display = 'none';
+    const ws = document.getElementById('welcomeScreen'); if (ws) ws.style.display = '';
     return;
-  } else {
-    if (sidebar) sidebar.style.display = '';
   }
 
-  if (!state.mergedFOM && state.currentTab !== 'modules') {
+  // Hide sidebar for Appspaces tab (uses main panel, not sidebar)
+  if (state.currentTab === 'appspaces') {
+    showPanel(null);
+    const dh = document.getElementById('detailHeader'); if (dh) dh.style.display = 'block';
+    const ws = document.getElementById('welcomeScreen'); if (ws) ws.style.display = 'none';
+    renderAppspacesPanel();
+    state.selectedItem = { name: 'Appspaces', type: 'appspace' };
+    return;
+  }
+
+  if (hasData && state.currentTab !== 'overview') {
+    const ws = document.getElementById('welcomeScreen');
+    if (ws) ws.style.display = 'none';
+  }
+
+  if (!state.mergedFOM && state.currentTab !== 'modules' && state.currentTab !== 'overview') {
     showPanel(null);
     treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>';
     return;
@@ -831,6 +880,7 @@ function updateUI(skipAutoSelect) {
     showPanel('treeViewTree');
     const classes = mergeClasses(state.files, 'object');
     const sorted = state.sortEnabled === 'asc' ? [...classes].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...classes].sort((a, b) => b.name.localeCompare(a.name)) : classes;
+    sorted.forEach(c => { c.usageCount = findDataTypeUsages(c.name).length; });
     window.__treeViewComponent?.setItems(sorted, 'tree');
     if (!sel && !skipAutoSelect && classes.length > 0) {
       showDetail(classes[0].name, 'object', true);
@@ -842,6 +892,7 @@ function updateUI(skipAutoSelect) {
     showPanel('treeViewTree');
     const classes = mergeClasses(state.files, 'interaction');
     const sorted = state.sortEnabled === 'asc' ? [...classes].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...classes].sort((a, b) => b.name.localeCompare(a.name)) : classes;
+    sorted.forEach(c => { c.usageCount = findDataTypeUsages(c.name).length; });
     window.__treeViewComponent?.setItems(sorted, 'tree');
     if (!sel && !skipAutoSelect && classes.length > 0) {
       showDetail(classes[0].name, 'interaction', true);
@@ -852,7 +903,7 @@ function updateUI(skipAutoSelect) {
   } else if (state.currentTab === 'dims') {
     showPanel('treeViewTree');
     let allDims = [];
-    state.files.forEach(f => { if (f.dimensions) f.dimensions.forEach(d => { const n = d.name || d; allDims.push({ name: n, icon: '📐', fullName: n }); }); });
+    state.files.forEach(f => { if (f.dimensions) f.dimensions.forEach(d => { const n = d.name || d; allDims.push({ name: n, icon: '📐', fullName: n, usageCount: findDataTypeUsages(n).length }); }); });
     if (state.sortEnabled === 'asc') allDims.sort((a, b) => a.name.localeCompare(b.name));
     else if (state.sortEnabled === 'desc') allDims.sort((a, b) => b.name.localeCompare(a.name));
     window.__treeViewComponent?.setItems(allDims, 'flat');
@@ -865,7 +916,7 @@ function updateUI(skipAutoSelect) {
   } else if (state.currentTab === 'trans') {
     showPanel('treeViewTree');
     const list = state.mergedFOM?.transportations || [];
-    let items = list.map(t => ({ name: t.name, icon: '🚚' }));
+    let items = list.map(t => ({ name: t.name, icon: '🚚', usageCount: findDataTypeUsages(t.name).length }));
     if (state.sortEnabled === 'asc') items.sort((a, b) => a.name.localeCompare(b.name));
     else if (state.sortEnabled === 'desc') items.sort((a, b) => b.name.localeCompare(a.name));
     window.__treeViewComponent?.setItems(items, 'flat');
@@ -892,7 +943,7 @@ function updateUI(skipAutoSelect) {
   } else if (state.currentTab === 'switches') {
     showPanel('treeViewTree');
     const list = state.mergedFOM?.switches || [];
-    let items = list.map(s => ({ name: s.name, icon: '🔘' }));
+    let items = list.map(s => ({ name: s.name, icon: '🔘', usageCount: findDataTypeUsages(s.name).length }));
     if (state.sortEnabled === 'asc') items.sort((a, b) => a.name.localeCompare(b.name));
     else if (state.sortEnabled === 'desc') items.sort((a, b) => b.name.localeCompare(a.name));
     window.__treeViewComponent?.setItems(items, 'flat');
@@ -905,7 +956,7 @@ function updateUI(skipAutoSelect) {
   } else if (state.currentTab === 'tags') {
     showPanel('treeViewTree');
     const list = state.mergedFOM?.tags || [];
-    let items = list.map(t => ({ name: t.name, icon: '🏷️' }));
+    let items = list.map(t => ({ name: t.name, icon: '🏷️', usageCount: findDataTypeUsages(t.name).length }));
     if (state.sortEnabled === 'asc') items.sort((a, b) => a.name.localeCompare(b.name));
     else if (state.sortEnabled === 'desc') items.sort((a, b) => b.name.localeCompare(a.name));
     window.__treeViewComponent?.setItems(items, 'flat');
@@ -946,75 +997,7 @@ function updateUI(skipAutoSelect) {
   }
 }
 function updateTabCounts() {
-  // Update tab counts (works even when no FOM loaded - all counts will be 0)
-  const tabs = [
-    { id: 'modules', getCount: () => state.files.length },
-    { id: 'objects', getCount: () => state.mergedFOM?.objectClasses?.length || 0 },
-    { id: 'interactions', getCount: () => state.mergedFOM?.interactionClasses?.length || 0 },
-    { id: 'datatypes', getCount: () => {
-      const dt = state.mergedFOM?.dataTypes;
-      if (!dt) return 0;
-      return (dt.basic?.length || 0) + (dt.simple?.length || 0) + (dt.array?.length || 0) + (dt.fixed?.length || 0) + (dt.enum?.length || 0) + (dt.variant?.length || 0);
-    }},
-    { id: 'dims', getCount: () => state.files.reduce((sum, f) => sum + (f.dimensions?.length || 0), 0) },
-    { id: 'trans', getCount: () => state.mergedFOM?.transportations?.length || 0 },
-    { id: 'switches', getCount: () => state.mergedFOM?.switches?.length || 0 },
-    { id: 'tags', getCount: () => state.mergedFOM?.tags?.length || 0 },
-    { id: 'time', getCount: () => state.mergedFOM?.time ? 1 : 0 },
-    { id: 'notes', getCount: () => state.files.reduce((sum, f) => sum + (f.notes?.length || 0), 0) },
-    { id: 'issues', getCount: () => state.issues.length }
-  ];
-  tabs.forEach(tab => {
-    const tabEl = document.querySelector(`.tab[data-tab="${tab.id}"]`);
-    if (tabEl) {
-      const count = tab.getCount();
-      const label = tabEl.textContent.split(' (')[0];
-      tabEl.textContent = count > 0 ? `${label} (${count})` : label;
-    }
-  });
-  const subtabs = [
-    { id: 'basic', getCount: () => state.mergedFOM?.dataTypes?.basic?.length || 0 },
-    { id: 'simple', getCount: () => state.mergedFOM?.dataTypes?.simple?.length || 0 },
-    { id: 'array', getCount: () => state.mergedFOM?.dataTypes?.array?.length || 0 },
-    { id: 'fixed', getCount: () => state.mergedFOM?.dataTypes?.fixed?.length || 0 },
-    { id: 'enum', getCount: () => state.mergedFOM?.dataTypes?.enum?.length || 0 },
-    { id: 'variant', getCount: () => state.mergedFOM?.dataTypes?.variant?.length || 0 }
-  ];
-  subtabs.forEach(tab => {
-    const tabEl = document.querySelector(`.subtab[data-subtab="${tab.id}"]`);
-    if (tabEl) {
-      const count = tab.getCount();
-      const label = tabEl.textContent.split(' (')[0];
-      tabEl.textContent = count > 0 ? `${label} (${count})` : label;
-    }
-  });
-  
-  // Update welcome screen stats
-  updateWelcomeStats();
-}
-
-function updateWelcomeStats() {
-  const statsEl = document.getElementById('welcomeStats');
-  if (!statsEl || !state.mergedFOM) return;
-  
-  const dt = state.mergedFOM.dataTypes;
-  const totalBasic = dt.basic?.length || 0;
-  const totalSimple = dt.simple?.length || 0;
-  const totalArray = dt.array?.length || 0;
-  const totalFixed = dt.fixed?.length || 0;
-  const totalEnum = dt.enum?.length || 0;
-  const totalVariant = dt.variant?.length || 0;
-  const totalObjects = state.mergedFOM.objectClasses?.length || 0;
-  const totalInteractions = state.mergedFOM.interactionClasses?.length || 0;
-  const totalModules = state.files.length;
-  
-  statsEl.innerHTML = `
-    <div class="stat-item"><span class="stat-value">${totalModules}</span><span class="stat-label">Modules</span></div>
-    <div class="stat-item"><span class="stat-value">${totalObjects}</span><span class="stat-label">Objects</span></div>
-    <div class="stat-item"><span class="stat-value">${totalInteractions}</span><span class="stat-label">Interactions</span></div>
-    <div class="stat-item"><span class="stat-value">${totalBasic + totalSimple + totalArray + totalFixed + totalEnum + totalVariant}</span><span class="stat-label">Data Types</span></div>
-  `;
-  statsEl.style.display = 'flex';
+  // Tab counts handled reactively by LeftRail.svelte and FilterChips.svelte via fomStore
 }
 
 async function loadFiles(files) {
@@ -1027,6 +1010,11 @@ async function loadFiles(files) {
       const text = await file.text();
       const fom = await parseInWorker(text);
       state.files.push(fom);
+      await addRecentFile(file.name, {
+        objects: fom.objectClasses?.length || 0,
+        interactions: fom.interactionClasses?.length || 0,
+        dataTypes: Object.values(fom.dataTypes || {}).reduce((s, a) => s + (Array.isArray(a) ? a.length : 0), 0)
+      });
     } catch (e) {
       failedFiles++;
       parseErrors.push({ name: file.name, message: e.message });
@@ -1046,14 +1034,15 @@ async function loadFiles(files) {
       tags: mergeTags(sorted),
       time: mergeTime(sorted)
     };
+    detectSubspaceDimensions(); enrichAppspaceApps();
     state.history = [];
     state.currentTab = 'modules';
     document.getElementById('globalSearch').value = '';
     hideSearchPanel();
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelector('.tab[data-tab="modules"]').classList.add('active');
-    document.getElementById('dataTypeTabs').style.display = 'none';
-    document.getElementById('issuesTabs').style.display = 'none';
+    const modTab2 = document.querySelector('.tab[data-tab="modules"]'); if (modTab2) modTab2.classList.add('active');
+    const dtTab2 = document.getElementById('dataTypeTabs'); if (dtTab2) dtTab2.style.display = 'none';
+    const isTab2 = document.getElementById('issuesTabs'); if (isTab2) isTab2.style.display = 'none';
     // Run validate() first (it resets state.issues), then append parse errors
     validate(state, makeIssue);
     parseErrors.forEach(pe => {
@@ -1064,6 +1053,7 @@ async function loadFiles(files) {
       ));
     });
     updateIssuesTabVisibility(state);
+    generateAppspaceWarnings(state, makeIssue);
     state.selectedItem = null;
     saveToStorage();
     updateUI();
@@ -1082,6 +1072,7 @@ async function loadFiles(files) {
       ));
     });
     updateIssuesTabVisibility(state);
+    generateAppspaceWarnings(state, makeIssue);
     saveToStorage();
     updateUI();
     if (failedFiles > 0) {
@@ -1103,9 +1094,10 @@ function removeFile(index) {
     const dtResult = mergeDataTypes(sorted);
     state.conflicts = state.conflicts.filter(c => c.type !== 'enum' && c.type !== 'variant');
     state.conflicts.push(...dtResult.conflicts);
-    state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: dtResult.result, transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) }; 
+    state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: dtResult.result, transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
+    detectSubspaceDimensions(); enrichAppspaceApps();
   }
-  else { state.mergedFOM = null; }
+  else { state.mergedFOM = null; state.subspaceDimensions = []; }
   saveToStorage(); validate(state, makeIssue); updateUI(); updateIssuesTabVisibility(state);
 }
 
@@ -1191,9 +1183,9 @@ document.querySelectorAll('.tab').forEach(tab => {
       }
     }
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentTab = tab.dataset.tab; state.selectedItem = null;
-    const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
-    const appspaceTabs = document.getElementById('appspaceTabs'); appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
-    const issuesTabs = document.getElementById('issuesTabs'); issuesTabs.style.display = state.currentTab === 'issues' ? 'flex' : 'none';
+    const dtTabs = document.getElementById('dataTypeTabs'); if (dtTabs) dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
+    const appspaceTabs = document.getElementById('appspaceTabs'); if (appspaceTabs) appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
+    const issuesTabs = document.getElementById('issuesTabs'); if (issuesTabs) issuesTabs.style.display = state.currentTab === 'issues' ? 'flex' : 'none';
     // Handle Data Types tab - ensure a subtab is selected BEFORE updateUI
     if (state.currentTab === 'datatypes') {
       const validSubTabs = ['basic', 'simple', 'array', 'fixed', 'enum', 'variant'];
@@ -1218,6 +1210,19 @@ document.querySelectorAll('.tab').forEach(tab => {
     
     updateUI(); saveToStorage();
     
+    // When switching from overview to any other tab, Svelte needs to create
+    // the {:else} DOM before showPanel can find tree panels. Re-run after render.
+    requestAnimationFrame(() => {
+      if (state.currentTab !== 'overview') updateUI();
+    });
+    
+    // Handle Overview tab
+    if (state.currentTab === 'overview') {
+      const dh = document.getElementById('detailHeader'); if (dh) dh.style.display = 'none';
+      updateUI(); saveToStorage();
+      return;
+    }
+
     // Handle Appspaces tab
     if (state.currentTab === 'appspaces') {
       // Ensure a subtab is selected
@@ -1227,108 +1232,108 @@ document.querySelectorAll('.tab').forEach(tab => {
       if (activeSubtab) activeSubtab.classList.add('active');
       updateAppspaceTabCount();
       renderAppspacesPanel();
+      state.selectedItem = { name: 'Appspaces', type: 'appspace' };
       return;
     }
   });
 });
 
-document.querySelectorAll('.subtab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    // Skip if this subtab has its own dedicated handler
-    if (tab.closest('#issuesTabs, #appspaceTabs')) return;
-    const prevDetailShowing = (document.getElementById('detailHeader')?.style.display || 'none') !== 'none';
-    const prevTab = state.currentTab;
-    const prevSubTab = state.currentSubTab;
-    const prevSelected = state.selectedItem;
-    
-    if (state.currentSubTab !== tab.dataset.subtab) { 
-      if (prevDetailShowing) {
-        state.history.push({ tab: prevTab, subTab: prevSubTab, selected: prevSelected, detail: 'block' });
-      }
+// Data type subtab click handler (document-level delegation — survives Svelte re-renders)
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('#dataTypeTabs .subtab');
+  if (!tab) return;
+  const prevDetailShowing = (document.getElementById('detailHeader')?.style.display || 'none') !== 'none';
+  const prevTab = state.currentTab;
+  const prevSubTab = state.currentSubTab;
+  const prevSelected = state.selectedItem;
+  
+  if (state.currentSubTab !== tab.dataset.subtab) { 
+    if (prevDetailShowing) {
+      state.history.push({ tab: prevTab, subTab: prevSubTab, selected: prevSelected, detail: 'block' });
     }
-    document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentSubTab = tab.dataset.subtab;
-    state.selectedItem = null;
-    updateUI(); saveToStorage();
-  });
+  }
+  document.querySelectorAll('#dataTypeTabs .subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active'); state.currentSubTab = tab.dataset.subtab;
+  state.selectedItem = null;
+  updateUI(); saveToStorage();
 });
 
-// Appspace subtab click handler
-document.querySelectorAll('#appspaceTabs .subtab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const prevDetailShowing = (document.getElementById('detailHeader')?.style.display || 'none') !== 'none';
-    const prevSubTab = state.appspaceSubTab;
-    const prevSelected = state.selectedItem;
+// Appspace subtab click handler (document-level delegation)
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('#appspaceTabs .subtab');
+  if (!tab) return;
+  const prevDetailShowing = (document.getElementById('detailHeader')?.style.display || 'none') !== 'none';
+  const prevSubTab = state.appspaceSubTab;
+  const prevSelected = state.selectedItem;
 
-    if (state.appspaceSubTab !== tab.dataset.subtab) { 
-      if (prevDetailShowing) {
-        state.history.push({ tab: 'appspaces', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
-      }
+  if (state.appspaceSubTab !== tab.dataset.subtab) { 
+    if (prevDetailShowing) {
+      state.history.push({ tab: 'appspaces', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
     }
-    document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active');
-    state.appspaceSubTab = tab.dataset.subtab;
-    state.selectedItem = null;
-    saveAppspaceToStorage();
-    updateUI();
-    renderAppspacesPanel();
-  });
+  }
+  document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active')); tab.classList.add('active');
+  state.appspaceSubTab = tab.dataset.subtab;
+  state.selectedItem = null;
+  saveAppspaceToStorage();
+  updateUI();
+  renderAppspacesPanel();
 });
 
-// Issues subtab click handler
-document.querySelectorAll('#issuesTabs .subtab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    // Push to history when switching subtab
-    const prevSubTab = state.issuesFilter;
-    const prevSelected = state.selectedItem;
+// Issues subtab click handler (document-level delegation — survives Svelte re-renders)
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('#issuesTabs .subtab');
+  if (!tab) return;
+  // Push to history when switching subtab
+  const prevSubTab = state.issuesFilter;
+  const prevSelected = state.selectedItem;
 
-    document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    state.issuesFilter = tab.dataset.subtab;
+  document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  state.issuesFilter = tab.dataset.subtab;
 
-    if (prevSubTab !== tab.dataset.subtab) {
-      state.history.push({ tab: 'issues', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+  if (prevSubTab !== tab.dataset.subtab) {
+    state.history.push({ tab: 'issues', subTab: prevSubTab, selected: prevSelected, detail: 'block' });
+  }
+
+  state.selectedItem = null;
+  const header = document.getElementById('detailHeader');
+  const welcome = document.getElementById('welcomeScreen');
+  const body = document.getElementById('detailBody');
+  if (state.files && state.files.length > 0) {
+    // Files loaded: hide header and welcome screen
+    if (header) header.style.display = 'none';
+    if (welcome) welcome.style.display = 'none';
+
+    // Count issues matching the current filter
+    let filteredCount = 0;
+    if (state.issues && state.issues.length > 0) {
+      if (state.issuesFilter === 'error') {
+        filteredCount = state.issues.filter(i => i.severity === 'error').length;
+      } else if (state.issuesFilter === 'warning') {
+        filteredCount = state.issues.filter(i => i.severity === 'warning').length;
+      } else {
+        filteredCount = state.issues.length;
+      }
     }
 
-    state.selectedItem = null;
-    const header = document.getElementById('detailHeader');
-    const welcome = document.getElementById('welcomeScreen');
-    const body = document.getElementById('detailBody');
-    if (state.files && state.files.length > 0) {
-      // Files loaded: hide header and welcome screen
-      if (header) header.style.display = 'none';
-      if (welcome) welcome.style.display = 'none';
-
-      // Count issues matching the current filter
-      let filteredCount = 0;
-      if (state.issues && state.issues.length > 0) {
-        if (state.issuesFilter === 'error') {
-          filteredCount = state.issues.filter(i => i.severity === 'error').length;
-        } else if (state.issuesFilter === 'warning') {
-          filteredCount = state.issues.filter(i => i.severity === 'warning').length;
-        } else {
-          filteredCount = state.issues.length;
-        }
-      }
-
-      // Only show empty-state when zero issues match the filter;
-      // updateUI() will fill the detail body when there are matches.
-      if (body && filteredCount === 0) {
-        let msg = 'No issues found.';
-        if (state.issuesFilter === 'error') msg = 'No errors found.';
-        else if (state.issuesFilter === 'warning') msg = 'No warnings found.';
-        body.textContent = '';
-        const emptyState = document.createElement('div');
-        emptyState.className = 'empty-state';
-        emptyState.textContent = msg;
-        body.appendChild(emptyState);
-      }
-    } else {
-      // No files loaded: show welcome screen
-      if (header) header.style.display = 'none';
-      if (welcome) welcome.style.display = 'flex';
+    // Only show empty-state when zero issues match the filter;
+    // updateUI() will fill the detail body when there are matches.
+    if (body && filteredCount === 0) {
+      let msg = 'No issues found.';
+      if (state.issuesFilter === 'error') msg = 'No errors found.';
+      else if (state.issuesFilter === 'warning') msg = 'No warnings found.';
+      body.textContent = '';
+      const emptyState = document.createElement('div');
+      emptyState.className = 'empty-state';
+      emptyState.textContent = msg;
+      body.appendChild(emptyState);
     }
-    updateUI();
-    saveToStorage();
-  });
+  } else {
+    // No files loaded: show welcome screen
+    if (header) header.style.display = 'none';
+    if (welcome) welcome.style.display = 'flex';
+  }
+  updateUI();
+  saveToStorage();
 });
 
 // Render Appspaces panel
@@ -1340,7 +1345,23 @@ function renderAppspacesPanel() {
   const welcome = document.getElementById('welcomeScreen');
 
   if (!state.appspace) {
-    body.innerHTML = '<div class="empty-state">No appspace file loaded. Use the "Load Appspace" button to load an appspace file.</div>';
+    if (welcome) welcome.style.display = 'none';
+    if (header) header.style.display = 'block';
+    if (meta) meta.textContent = '';
+    window.__appspaceBodyHtml = `
+      <div class="empty-state" style="max-width:500px;margin:40px auto;text-align:center;line-height:1.6;">
+        <p style="margin-bottom:12px;font-size:15px;">
+          Appspaces let you classify object and interaction classes across FOM modules
+          by assigning them to application spaces. This helps visualize which classes
+          belong to which application domains.
+        </p>
+        <p style="margin-bottom:20px;font-size:14px;color:var(--text-secondary);">
+          To get started, load an appspace file (.appspace, .csv, or .txt).
+        </p>
+        <button class="btn" onclick="document.getElementById('loadAppspaceBtn').click()">
+          Load Appspace
+        </button>
+      </div>`;
     return;
   }
 
@@ -1361,9 +1382,7 @@ function renderAppspacesPanel() {
     entries = state.appspace.unknown || [];
   }
 
-  const searchInput = document.getElementById('globalSearch');
-  const searchQuery = searchInput ? searchInput.value.trim() : '';
-  const q = searchQuery ? searchQuery.toLowerCase() : '';
+  let q = searchStore.searchState.query ? searchStore.searchState.query.toLowerCase() : '';
 
   function markText(text) {
     if (!q || !text) return escapeHtml(text);
@@ -1372,7 +1391,7 @@ function renderAppspacesPanel() {
     let last = 0;
     let idx = lower.indexOf(q);
     while (idx !== -1) {
-      result += escapeHtml(text.slice(last, idx)) + '<mark class="search-highlight">' + escapeHtml(text.slice(idx, idx + q.length)) + '</mark>';
+      result += escapeHtml(text.slice(last, idx)) + '<mark class="highlight">' + escapeHtml(text.slice(idx, idx + q.length)) + '</mark>';
       last = idx + q.length;
       idx = lower.indexOf(q, last);
     }
@@ -1418,13 +1437,35 @@ function renderAppspacesPanel() {
         }
       });
       html += '</td><td><ul class="apps-list">';
-      entry.apps.forEach(app => { html += `<li>${markText(app)}</li>`; });
+      entry.apps.forEach(app => {
+        const appStr = typeof app === 'string' ? app : app.name || '';
+        const subspaceMatches = (entry._subspace || []).filter(m => m.appName === appStr);
+        html += '<li class="app-item">';
+        if (subspaceMatches.length > 0) {
+          const firstMatch = subspaceMatches[0];
+          const escEnum = firstMatch.enumName.replace(/'/g, "\\'");
+          const escApp = appStr.replace(/'/g, "\\'");
+          html += `<span class="app-name appspace-link" onclick="showDataType('${escEnum}', 'enum'); window.__setVariantHighlight && window.__setVariantHighlight('${escEnum}', '${escApp}')">${markText(appStr)}</span>`;
+        } else {
+          html += `<span class="app-name unmatched">${markText(appStr)}</span>`;
+        }
+        if (subspaceMatches.length > 0) {
+          html += '<span class="subspace-tags">';
+          subspaceMatches.forEach(m => {
+            const escEnum = m.enumName.replace(/'/g, "\\'");
+            const escDim = m.dimensionName.replace(/'/g, "\\'");
+            html += `<span class="subspace-tag" onclick="showDataType('${escEnum}', 'enum')" title="Dimension: ${escDim}, Enum value: ${m.enumeratorValue !== undefined ? m.enumeratorValue : ''}">${m.dimensionName}</span>`;
+          });
+          html += '</span>';
+        }
+        html += '</li>';
+      });
       html += '</ul></td></tr>';
     });
     html += '</table>';
   }
 
-  body.innerHTML = html;
+  window.__appspaceBodyHtml = html;
 
   // Scroll to selected appspace entry if navigated
   if (state.selectedItem && state.selectedItem.type && state.selectedItem.type.startsWith('appspace_')) {
@@ -1488,7 +1529,7 @@ function makeSnippet(item, type) {
   if (type === 'simple') return 'Representation: ' + (item.representation || '?') + (item.units ? ' | Units: ' + item.units : '');
   if (type === 'array') return 'Type: ' + (item.type || '?') + (item.cardinality ? ' | Cardinality: ' + item.cardinality : '');
   if (type === 'fixed') return (item.fields && item.fields.length ? item.fields.length + ' field(s)' : '');
-  if (type === 'enum') return (item.enumerators && item.enumerators.length ? item.enumerators.length + ' enumerator(s)' : '') + (item.representation ? ' | Repr: ' + item.representation : '');
+  if (type === 'enum') return (item.values && item.values.length ? item.values.length + ' enumerator(s)' : '') + (item.representation ? ' | Repr: ' + item.representation : '');
   if (type === 'variant') return (item.discriminant ? 'Discriminant: ' + item.discriminant : '') + (item.alternatives && item.alternatives.length ? ' | ' + item.alternatives.length + ' alternative(s)' : '');
   if (type === 'trans') return 'Type: ' + (item.transportationType || item.kind || '?');
   if (type === 'switches') return (item.values && item.values.length ? item.values.length + ' value(s)' : '');
@@ -1502,6 +1543,10 @@ function makeSnippet(item, type) {
     const parts = [];
     if (item.matchedClass) parts.push('Class: ' + item.matchedClass);
     if (item.apps && item.apps.length) parts.push(item.apps.length + ' app(s)');
+    if (item._subspace && item._subspace.length > 0) {
+      const dims = [...new Set(item._subspace.map(m => m.dimensionName))];
+      parts.push('Subspace: ' + dims.join(', '));
+    }
     return parts.join(' | ');
   }
   return '';
@@ -1537,7 +1582,7 @@ function performSearch(query) {
     });
     state.mergedFOM.dataTypes?.enum?.forEach(d => {
       allItems.push({ name: d.name, type: 'enum', snippet: makeSnippet(d, 'enum') });
-      d.enumerators?.forEach(v => {
+      d.values?.forEach(v => {
         allItems.push({ name: v.name, type: 'enumerator', parentName: d.name, parentType: 'enum', snippet: 'Enum: ' + d.name + (v.value !== undefined ? ' | Value: ' + v.value : '') });
       });
     });
@@ -1591,13 +1636,26 @@ function performSearch(query) {
     });
   }
 
+  // Phase 1: Fuse.js fuzzy search (whole-string Levenshtein distance)
   const fuse = new Fuse(allItems, {
     keys: ['name', 'parentName'],
     threshold: 0.4,
     includeScore: true
   });
 
-  return fuse.search(q).map(r => r.item);
+  const fuseResults = fuse.search(q).map(r => r.item);
+
+  // Phase 2: Substring/containment matching — catches names that Fuse
+  // misses due to compound/dotted paths (e.g. searching "Physical"
+  // should find "HLAobjectRoot.RPRPhysical.PhysicalEntity").
+  const seen = new Set(fuseResults.map(i => i.name + '|' + i.type + '|' + (i.parentName || '')));
+  const substringResults = allItems.filter(i => {
+    const key = i.name + '|' + i.type + '|' + (i.parentName || '');
+    if (seen.has(key)) return false;
+    return i.name.toLowerCase().includes(q) || (i.parentName && i.parentName.toLowerCase().includes(q));
+  });
+
+  return [...fuseResults, ...substringResults];
 }
 
 function hideSearchPanel() {
@@ -1647,11 +1705,6 @@ document.getElementById('globalSearch').addEventListener('focus', () => {
 
 async function init() {
   try {
-    const ws = document.getElementById('welcomeScreen');
-    if (ws) ws.style.display = 'none';
-    const dh = document.getElementById('detailHeader');
-    if (dh) dh.style.display = 'none';
-
     Object.defineProperty(window, '__mergedFOM', { get: () => state.mergedFOM });
     window.__showDetail = function(name, type, isManualNav = false) { showDetail(name, type, isManualNav); };
     window.__showDataType = function(name, type) { showDataType(name, type); };
@@ -1673,6 +1726,8 @@ async function init() {
     };
     window.__switchToModule = function(name) { const file = state.files.find(f => f.name === name); if (file) switchToModule(name, true); };
     window.__getPreferredType = getPreferredType;
+    window.__detectSubspaceDimensions = detectSubspaceDimensions;
+    window.__enrichAppspaceApps = enrichAppspaceApps;
     window.__findDimensionByName = findDimensionByName;
     window.__findDataTypeUsages = findDataTypeUsages;
     window.__findNoteUsages = findNoteUsages;
@@ -1718,6 +1773,7 @@ async function init() {
 
     updateUI();
     await loadFromStorage();
+    await initRecentFiles();
   } catch(e) {
     console.error('ERROR in init():', e);
     alert('Error in init: ' + e.message);
@@ -1756,8 +1812,8 @@ function showDataType(name, preferredType) {
   // Now load the new data type
   state.currentTab = 'datatypes'; state.currentSubTab = preferredType; state.selectedItem = { name, type: preferredType };
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('.tab[data-tab="datatypes"]').classList.add('active');
-  const dtTabs = document.getElementById('dataTypeTabs'); dtTabs.style.display = 'flex';
+  const dtTab3 = document.querySelector('.tab[data-tab="datatypes"]'); if (dtTab3) dtTab3.classList.add('active');
+  const dtTabs3 = document.getElementById('dataTypeTabs'); if (dtTabs3) dtTabs3.style.display = 'flex';
   document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.subtab[data-subtab="${preferredType}"]`).classList.add('active');
   saveToStorage(); updateUI();
@@ -1893,43 +1949,39 @@ function goBack() {
   
   // For datatype tab, also update the sub-tab UI
   if (restoreState.tab === 'datatypes') {
-    const dtTabs = document.getElementById('dataTypeTabs');
-    dtTabs.style.display = 'flex';
+    const dtTabs4 = document.getElementById('dataTypeTabs'); if (dtTabs4) dtTabs4.style.display = 'flex';
     state.currentSubTab = restoreState.subTab;
     document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
     document.querySelector(`.subtab[data-subtab="${restoreState.subTab}"]`)?.classList.add('active');
   } else {
-    document.getElementById('dataTypeTabs').style.display = 'none';
+    const dtTabs4 = document.getElementById('dataTypeTabs'); if (dtTabs4) dtTabs4.style.display = 'none';
   }
   
   // For appspaces tab, update the sub-tab UI
   if (restoreState.tab === 'appspaces') {
-    const appspaceTabs = document.getElementById('appspaceTabs');
-    appspaceTabs.style.display = 'flex';
+    const appTabs4 = document.getElementById('appspaceTabs'); if (appTabs4) appTabs4.style.display = 'flex';
     state.appspaceSubTab = restoreState.subTab || 'objects';
     document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
     document.querySelector(`#appspaceTabs .subtab[data-subtab="${restoreState.subTab}"]`)?.classList.add('active');
     updateAppspaceTabCount();
   } else {
-    document.getElementById('appspaceTabs').style.display = 'none';
+    const appTabs4 = document.getElementById('appspaceTabs'); if (appTabs4) appTabs4.style.display = 'none';
   }
   
   // For issues tab, update the sub-tab UI
   if (restoreState.tab === 'issues') {
-    const issuesTabs = document.getElementById('issuesTabs');
-    issuesTabs.style.display = 'flex';
+    const isTabs4 = document.getElementById('issuesTabs'); if (isTabs4) isTabs4.style.display = 'flex';
     state.issuesFilter = ['all','error','warning'].includes(restoreState.subTab) ? restoreState.subTab : 'all';
     document.querySelectorAll('#issuesTabs .subtab').forEach(t => t.classList.remove('active'));
     document.querySelector(`#issuesTabs .subtab[data-subtab="${state.issuesFilter}"]`)?.classList.add('active');
   } else {
-    document.getElementById('issuesTabs').style.display = 'none';
+    const isTabs4 = document.getElementById('issuesTabs'); if (isTabs4) isTabs4.style.display = 'none';
   }
   
   debugBack('goBack: restoreState: tab=%s, subTab=%s, selected=%o', restoreState.tab, restoreState.subTab, restoreState.selected);
 
   if (restoreState.tab === 'appspaces') {
-    const appspaceTabs = document.getElementById('appspaceTabs');
-    appspaceTabs.style.display = 'flex';
+    const appTabs5 = document.getElementById('appspaceTabs'); if (appTabs5) appTabs5.style.display = 'flex';
     state.appspaceSubTab = restoreState.subTab || 'objects';
     document.querySelectorAll('#appspaceTabs .subtab').forEach(t => t.classList.remove('active'));
     document.querySelector(`#appspaceTabs .subtab[data-subtab="${state.appspaceSubTab}"]`)?.classList.add('active');
@@ -1937,7 +1989,6 @@ function goBack() {
     state.selectedItem = restoreState.selected || null;
     renderAppspacesPanel();
     const dha = document.getElementById('detailHeader'); if (dha) dha.style.display = 'block';
-    document.getElementById('detailTitle').textContent = 'Appspaces';
     document.getElementById('detailMeta').textContent = state.appspace?.fileName || '';
     showPanel(null);
     return;
@@ -1992,17 +2043,6 @@ function goBack() {
 
 // Issue location click delegation
 document.addEventListener('click', (e) => {
-  // Source module click → navigate to module detail
-  const sourceEl = e.target.closest('.source-module-item');
-  if (sourceEl) {
-    const moduleName = sourceEl.dataset.source;
-    const file = state.files.find(f => f.name === moduleName);
-    if (file) {
-      showModuleDetails(file, true);
-    }
-    return;
-  }
-
   const loc = e.target.closest('.location-item');
   if (loc) {
     navigateToLocation({
@@ -2023,9 +2063,9 @@ document.addEventListener('click', (e) => {
     });
     state.currentTab = 'issues';
     // Show issues subtab bar and hide DataTypes/Appspace subtab bars
-    document.getElementById('issuesTabs').style.display = 'flex';
-    document.getElementById('dataTypeTabs').style.display = 'none';
-    document.getElementById('appspaceTabs').style.display = 'none';
+    const isTabs6 = document.getElementById('issuesTabs'); if (isTabs6) isTabs6.style.display = 'flex';
+    const dtTabs6 = document.getElementById('dataTypeTabs'); if (dtTabs6) dtTabs6.style.display = 'none';
+    const appTabs6 = document.getElementById('appspaceTabs'); if (appTabs6) appTabs6.style.display = 'none';
     // Set subtab active state
     const validFilters = ['all', 'error', 'warning'];
     if (!state.issuesFilter || !validFilters.includes(state.issuesFilter)) {
@@ -2070,6 +2110,7 @@ document.getElementById('clearBtn').addEventListener('click', () => {
   if (confirm('Clear all loaded FOM files?')) {
     state.files = [];
     state.mergedFOM = null;
+    state.subspaceDimensions = [];
     state.selectedItem = null;
     state.history = [];
     state.currentTab = 'modules';
@@ -2141,33 +2182,6 @@ function setupAppspaceButtons() {
   // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
   if (loadBtn) loadBtn.style.display = 'inline-block';
   if (clearBtn) clearBtn.style.display = 'none';
-  // exportAppspaceSeparator is always visible (spacer between Export and Load)
-  // appspaceSep is always visible as spacer (between Load and Theme)
-  
-  // Add info button next to Theme toggle (before About button)
-  if (!document.getElementById('appspaceInfoBtn')) {
-    const themeBtn = document.getElementById('themeToggle');
-    const aboutBtn = document.getElementById('aboutBtn');
-    if (themeBtn && aboutBtn) {
-      const infoBtn = document.createElement('button');
-      infoBtn.id = 'appspaceInfoBtn';
-      infoBtn.className = 'theme-toggle';
-      infoBtn.textContent = 'ℹ️';
-      infoBtn.title = 'Appspace file format help';
-      infoBtn.style.cssText = 'font-size: 16px; padding: 8px 10px;';
-      themeBtn.parentNode.insertBefore(infoBtn, aboutBtn);
-      infoBtn.addEventListener('click', showAppspaceFormatModal);
-    }
-  }
-  
-  // Move appspaceSeparator to be between Load Appspace and Theme button (spacer, not separator)
-  if (appspaceSep && loadBtn) {
-    const themeBtn = document.getElementById('themeToggle');
-    if (themeBtn) {
-      // Insert before theme button (will be after clearBtn when it's shown)
-      loadBtn.parentNode.insertBefore(appspaceSep, themeBtn);
-    }
-  }
   
   if (loadBtn) {
     loadBtn.addEventListener('click', () => {
@@ -2208,16 +2222,13 @@ function setupAppspaceButtons() {
         };
         state.appspaceSubTab = 'objects';
         state.history = [];
+        detectSubspaceDimensions(); enrichAppspaceApps();
         
         // Update UI
         loadBtn.textContent = 'Change Appspace';
         loadBtn.style.display = 'inline-block';
         clearBtn.style.display = 'inline-block';
         // exportSep and appspaceSep are spacers - always visible
-        
-        // Show Appspaces tab
-        const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
-        if (appspaceTab) appspaceTab.style.display = 'block';
         
         // Update tab count
         updateAppspaceTabCount();
@@ -2226,10 +2237,12 @@ function setupAppspaceButtons() {
         
         // Switch to Appspaces tab
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
         if (appspaceTab) appspaceTab.classList.add('active');
         state.currentTab = 'appspaces';
         state.selectedItem = null;
         
+        generateAppspaceWarnings(state, makeIssue);
         updateUI();
 
         // Show appspace subtab bar and activate the correct subtab
@@ -2259,16 +2272,9 @@ function setupAppspaceButtons() {
       clearBtn.style.display = 'none';
       // exportSep and appspaceSep are spacers - always visible
       
-      // Hide Appspaces tab
-      const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
-      if (appspaceTab) appspaceTab.style.display = 'none';
-      
-      // If currently on appspaces tab, switch to modules
-      if (state.currentTab === 'appspaces') {
-        document.querySelector('.tab[data-tab="modules"]').click();
-      }
-      
+      updateAppspaceTabCount();
       clearAppspaceFromStorage();
+      generateAppspaceWarnings(state, makeIssue);
       updateUI();
     });
   }
@@ -2426,14 +2432,12 @@ function classifyAppspaceEntries(entries, objectClasses, interactionClasses) {
 
 // Update Appspaces tab count
 function updateAppspaceTabCount() {
-  const tab = document.querySelector('.tab[data-tab="appspaces"]');
-  if (!tab || !state.appspace) return;
-  const total = (state.appspace.entries?.length || 0) + 
-                (state.appspace.interactions?.length || 0) + 
-                (state.appspace.unknown?.length || 0);
-  tab.textContent = `Appspaces (${total})`;
+  // Sync appspace data to reactive store for LeftRail
+  appspaceStore.setAppspace(state.appspace);
   
-  // Update subtab counts
+  if (!state.appspace) return;
+  
+  // Update subtab chip labels (FilterChips has static labels)
   const objCount = state.appspace.entries?.length || 0;
   const intCount = state.appspace.interactions?.length || 0;
   const unkCount = state.appspace.unknown?.length || 0;
@@ -2445,6 +2449,105 @@ function updateAppspaceTabCount() {
   if (objTab) objTab.textContent = `Objects (${objCount})`;
   if (intTab) intTab.textContent = `Interactions (${intCount})`;
   if (unkTab) unkTab.textContent = `Unknown (${unkCount})`;
+}
+
+// Generate warnings for FOM classes that have no appspace mapping
+function generateAppspaceWarnings(state, makeIssue) {
+  state.issues = state.issues.filter(i => i.category !== 'appspace');
+  if (!state.appspace || !state.mergedFOM) return;
+  
+  const matchedObjectClasses = new Set();
+  const matchedInteractionClasses = new Set();
+  
+  state.appspace.entries?.forEach(e => {
+    if (e.matchedClass) matchedObjectClasses.add(e.matchedClass);
+  });
+  state.appspace.interactions?.forEach(e => {
+    if (e.matchedClass) matchedInteractionClasses.add(e.matchedClass);
+  });
+  
+  state.mergedFOM.objectClasses?.forEach(cls => {
+    if (cls.name === 'HLAobjectRoot' || cls.name === 'HLAinteractionRoot') return;
+    if (!matchedObjectClasses.has(cls.name)) {
+      state.issues.push(makeIssue('warning', 'appspace', 'unmapped-class',
+        `Object class "${cls.name}" has no appspace mapping`,
+        '',
+        [...(cls._sources || [])],
+        [{ tab: 'objects', itemName: cls.name }]
+      ));
+    }
+  });
+  
+  state.mergedFOM.interactionClasses?.forEach(cls => {
+    if (cls.name === 'HLAobjectRoot' || cls.name === 'HLAinteractionRoot') return;
+    if (!matchedInteractionClasses.has(cls.name)) {
+      state.issues.push(makeIssue('warning', 'appspace', 'unmapped-class',
+        `Interaction class "${cls.name}" has no appspace mapping`,
+        '',
+        [...(cls._sources || [])],
+        [{ tab: 'interactions', itemName: cls.name }]
+      ));
+    }
+  });
+}
+
+// Detect subspace dimensions: dimensions whose dataType references an enum
+function detectSubspaceDimensions() {
+  if (!state.mergedFOM || state.files.length === 0) {
+    state.subspaceDimensions = [];
+    return;
+  }
+  const dimMap = {};
+  state.files.forEach(f => {
+    (f.dimensions || []).forEach(d => {
+      if (!dimMap[d.name]) dimMap[d.name] = { ...d };
+    });
+  });
+  const mergedDims = Object.values(dimMap);
+  const enumTypes = state.mergedFOM.dataTypes?.enum || [];
+  const enumMap = {};
+  enumTypes.forEach(e => { enumMap[e.name] = e; });
+  const result = [];
+  mergedDims.forEach(dim => {
+    if (dim.isComplex && dim.rows) {
+      const dtRow = dim.rows.find(r => r.key.toLowerCase() === 'datatype');
+      if (dtRow && enumMap[dtRow.value]) {
+        result.push({
+          dimensionName: dim.name,
+          enumName: dtRow.value,
+          enumerators: enumMap[dtRow.value].values || [],
+        });
+      }
+    }
+  });
+  state.subspaceDimensions = result;
+}
+
+// Enrich appspace entries with subspace dimension info
+function enrichAppspaceApps() {
+  if (!state.appspace || !state.subspaceDimensions || state.subspaceDimensions.length === 0) return;
+  const doEnrich = (entries) => {
+    entries.forEach(entry => {
+      entry._subspace = [];
+      entry.apps.forEach(app => {
+        const appStr = typeof app === 'string' ? app : app.name || '';
+        state.subspaceDimensions.forEach(sd => {
+          const match = sd.enumerators.find(e => e.name === appStr);
+          if (match) {
+            entry._subspace.push({
+              appName: appStr,
+              dimensionName: sd.dimensionName,
+              enumName: sd.enumName,
+              enumeratorValue: match.value,
+            });
+          }
+        });
+      });
+    });
+  };
+  doEnrich(state.appspace.entries || []);
+  doEnrich(state.appspace.interactions || []);
+  doEnrich(state.appspace.unknown || []);
 }
 
 // Show snackbar notification
@@ -2477,6 +2580,7 @@ async function loadAppspaceFromStorage() {
       state.appspace = result.data;
       state.appspaceSubTab = result.subTab || 'objects';
       state.history = [];
+      detectSubspaceDimensions(); enrichAppspaceApps();
       
       // Update UI - use setTimeout to ensure DOM is ready
       setTimeout(() => {
@@ -2491,10 +2595,6 @@ async function loadAppspaceFromStorage() {
         if (clearBtn) clearBtn.style.display = 'inline-block';
         if (exportSep) exportSep.style.display = 'block';
         if (appspaceSep) appspaceSep.style.display = 'block';
-        
-        // Show Appspaces tab
-        const appspaceTab = document.querySelector('.tab[data-tab="appspaces"]');
-        if (appspaceTab) appspaceTab.style.display = 'block';
         
         updateAppspaceTabCount();
       }, 0);
@@ -2540,31 +2640,35 @@ try {
 }
 
 // ============================================================================
-// THEME TOGGLE
+// THEME SELECT
 // ============================================================================
 
+window.applyTheme = applyTheme;
+window.showAppspaceFormatModal = showAppspaceFormatModal;
+
 function initTheme() {
-  const savedTheme = localStorage.getItem('fomViewerTheme') || 'light';
-  document.documentElement.setAttribute('data-theme', savedTheme);
-  const toggle = document.getElementById('themeToggle');
-  if (toggle) {
-    toggle.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
-  }
+  const savedTheme = localStorage.getItem('fomViewerTheme') || 'system';
+  applyTheme(savedTheme);
+  const sel = document.getElementById('overflowThemeSelect');
+  if (sel) sel.value = savedTheme;
 }
 
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('fomViewerTheme', next);
-  const toggle = document.getElementById('themeToggle');
-  if (toggle) {
-    toggle.textContent = next === 'dark' ? '🌙' : '☀️';
+function applyTheme(theme) {
+  let resolved;
+  if (theme === 'system') {
+    resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  } else {
+    resolved = theme;
   }
+  document.documentElement.setAttribute('data-theme', resolved);
+  localStorage.setItem('fomViewerTheme', theme);
 }
 
-// Theme toggle button handler
-document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+// Listen for system preference changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+  const savedTheme = localStorage.getItem('fomViewerTheme') || 'system';
+  if (savedTheme === 'system') applyTheme('system');
+});
 
 // About button handler
 document.getElementById('aboutBtn')?.addEventListener('click', () => {
@@ -2584,6 +2688,9 @@ document.getElementById('aboutBtn')?.addEventListener('click', () => {
     }, 300);
   }, 4000);
 });
+
+// Appspace info button handler (overflow menu)
+document.getElementById('appspaceInfoItem')?.addEventListener('click', showAppspaceFormatModal);
 
 initTheme();
 
@@ -2617,12 +2724,14 @@ window.loadFromStorage = loadFromStorage;
 window.saveAppspaceToStorage = saveAppspaceToStorage;
 window.loadAppspaceFromStorage = loadAppspaceFromStorage;
 window.clearAppspaceFromStorage = clearAppspaceFromStorage;
+window.makeIssue = makeIssue;
+window.generateAppspaceWarnings = generateAppspaceWarnings;
 window.parseAppspaceFile = parseAppspaceFile;
 window.classifyAppspaceEntries = classifyAppspaceEntries;
 window.showAppspaceSnackbar = showAppspaceSnackbar;
 window.doSetup = doSetup;
 window.initTheme = initTheme;
-window.toggleTheme = toggleTheme;
+
 window.loadFiles = loadFiles;
 window.renderAppspacesPanel = renderAppspacesPanel;
 window.mergeClasses = mergeClasses;

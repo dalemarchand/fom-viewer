@@ -1,4 +1,5 @@
 <script>
+  import CollapsibleSection from '../CollapsibleSection.svelte';
   import UsedByTable from '../UsedByTable.svelte';
   import RelatedIssues from '../RelatedIssues.svelte';
   import * as uiStore from '../stores/uiStore.svelte.js';
@@ -50,6 +51,18 @@
     {/if}
     {#if item.encoding}<tr><th>Encoding</th><td>{item.encoding}</td></tr>{/if}
     {#if item.semantics}<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">{item.semantics}</td></tr>{/if}
+    {#if item.notes}
+      <tr>
+        <th>Notes</th>
+        <td>
+          <ul style="list-style:none;margin:0;padding:0;">
+            {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
+              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+            {/each}
+          </ul>
+        </td>
+      </tr>
+    {/if}
     {#if item._sources || item._source}
       <tr>
         <th>Module{(item._sources?.length || 1) > 1 ? 's' : ''}</th>
@@ -67,10 +80,10 @@
 </div>
 
 {#if item.alternatives && item.alternatives.length > 0}
-  <h4 style="margin:12px 0 8px">Alternatives</h4>
-  <table class="property-table">
+  <CollapsibleSection title="Alternatives" count={item.alternatives.length} threshold={0}>
+  <table class="attr-table">
     <tbody>
-    <tr><th>Name</th><th>Enumerator</th><th>Data Type</th><th>Semantics</th></tr>
+    <tr><th>Name</th><th>Enumerator</th><th>Data Type</th><th>Semantics</th><th>Notes</th></tr>
     {#each item.alternatives as a}
       <tr>
         <td>{a.label}</td>
@@ -88,11 +101,25 @@
         </td>
         <td>{#if a.dataType}<span class="clickable-item" onclick={() => window.__showDataType(a.dataType, window.__getPreferredType(a.dataType))}>{a.dataType}</span>{/if}</td>
         <td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">{a.semantics || ''}</td>
+        <td>
+          {#if a.notes}
+            <ul style="list-style:none;margin:0;padding:0;">
+              {#each (a.notes || '').split(/\s+/).filter(Boolean) as note}
+                <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              {/each}
+            </ul>
+          {/if}
+        </td>
       </tr>
     {/each}
     </tbody>
   </table>
+  </CollapsibleSection>
 {/if}
 
+<CollapsibleSection title="Used By" count={usages.length} threshold={0}>
 <UsedByTable usages={usages} />
+</CollapsibleSection>
+<CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
+</CollapsibleSection>

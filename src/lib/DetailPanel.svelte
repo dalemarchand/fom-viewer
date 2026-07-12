@@ -2,7 +2,8 @@
 import * as fomStore from './stores/fomStore.svelte.js';
 import * as uiStore from './stores/uiStore.svelte.js';
 import * as issueStore from './stores/issueStore.svelte.js';
-import WelcomeScreen from './WelcomeScreen.svelte';
+import * as appspaceStore from './stores/appspaceStore.svelte.js';
+import OverviewDashboard from './OverviewDashboard.svelte';
 import ObjectClassRenderer from './TypeRenderer/ObjectClass.svelte';
 import InteractionClassRenderer from './TypeRenderer/InteractionClass.svelte';
 import BasicTypeRenderer from './TypeRenderer/BasicType.svelte';
@@ -20,16 +21,26 @@ import NoteRenderer from './TypeRenderer/Note.svelte';
 import IssueRenderer from './TypeRenderer/Issue.svelte';
 
   let selectedItem = $derived(uiStore.ui.selectedItem);
+  let currentTab = $derived(uiStore.ui.currentTab);
   let mergedFOM = $derived(fomStore.getMergedFOM());
   let allFiles = $derived(fomStore.getFiles());
   let detailData = $derived(computeDetailData(selectedItem, mergedFOM, allFiles));
   let moduleHtml = $state('');
+  let appspaceHtml = $state('');
 
   $effect(() => {
     if (selectedItem?.type === 'module') {
       moduleHtml = window.__moduleBodyHtml || '';
     } else {
       moduleHtml = '';
+    }
+  });
+
+  $effect(() => {
+    if (selectedItem?.type === 'appspace' || selectedItem?.type?.startsWith('appspace_')) {
+      appspaceHtml = window.__appspaceBodyHtml || '';
+    } else {
+      appspaceHtml = '';
     }
   });
 
@@ -147,20 +158,117 @@ import IssueRenderer from './TypeRenderer/Issue.svelte';
   let parents = $derived(getParents(selectedItem?.type));
   let usages = $derived(getUsages(selectedItem?.type));
   let issues = $derived(getIssues(selectedItem?.type));
+  let classAppspaceName = $derived.by(() => {
+    if (!detailData?.data?.name) return null;
+    const apps = appspaceStore.getAppsForClass(detailData.data.name);
+    if (apps.length === 0) return null;
+    return apps.map(a => a.appName).join(', ');
+  });
+  let widgetBadges = $derived.by(() => {
+    if (!mergedFOM || selectedItem?.type === 'object') {
+      const map = {};
+      const classes = mergedFOM?.objectClasses || [];
+      for (const p of parents) {
+        map[p.name] = p.attributes?.filter(a => a && typeof a === 'object')?.length || 0;
+      }
+      if (detailData?.data) {
+        map[detailData.data.name] = detailData.data.attributes?.filter(a => a && typeof a === 'object')?.length || 0;
+      }
+      return map;
+    }
+    if (selectedItem?.type === 'interaction') {
+      const map = {};
+      const classes = mergedFOM?.interactionClasses || [];
+      for (const p of parents) {
+        map[p.name] = p.parameters?.filter(a => a && typeof a === 'object')?.length || 0;
+      }
+      if (detailData?.data) {
+        map[detailData.data.name] = detailData.data.parameters?.filter(a => a && typeof a === 'object')?.length || 0;
+      }
+      return map;
+    }
+    return {};
+  });
+
+  let typeLabel = $derived.by(() => {
+    const map = {
+      object: 'Object Class', interaction: 'Interaction Class',
+      basic: 'Basic Data Type', simple: 'Simple Data Type',
+      array: 'Array Data Type', fixed: 'Fixed Record Data Type',
+      enum: 'Enumerated Data Type', variant: 'Variant Record Data Type',
+      dims: 'Dimension', trans: 'Transportation',
+      switches: 'Switch', tags: 'Tag',
+      time: 'Time Configuration', notes: 'Note', module: 'Module',
+      ident: 'Module Identification',
+    };
+    return map[selectedItem?.type] || '';
+  });
+
+  let subDetail = $derived.by(() => {
+    if (selectedItem?.type === 'object') {
+      const n = detailData?.data?.attributes?.filter(a => a && typeof a === 'object')?.length ?? 0;
+      return `${n} attribute${n !== 1 ? 's' : ''}`;
+    }
+    if (selectedItem?.type === 'interaction') {
+      const n = detailData?.data?.parameters?.filter(a => a && typeof a === 'object')?.length ?? 0;
+      return `${n} parameter${n !== 1 ? 's' : ''}`;
+    }
+    if (selectedItem?.type === 'basic') return 'Basic type';
+    if (selectedItem?.type === 'simple') return 'Simple type';
+    if (selectedItem?.type === 'array') {
+      const dt = detailData?.data?.dataType || '';
+      return `Array of ${dt}`;
+    }
+    if (selectedItem?.type === 'fixed') {
+      const n = detailData?.data?.fields?.length ?? 0;
+      return `${n} field${n !== 1 ? 's' : ''}`;
+    }
+    if (selectedItem?.type === 'enum') {
+      const n = detailData?.data?.values?.length ?? 0;
+      return `${n} enumerator${n !== 1 ? 's' : ''}`;
+    }
+    if (selectedItem?.type === 'variant') {
+      const n = detailData?.data?.alternatives?.length ?? 0;
+      return `${n} alternative${n !== 1 ? 's' : ''}`;
+    }
+    return '';
+  });
 </script>
 
-<div class="detail-header" id="detailHeader" style:display={!selectedItem || (!detailData && selectedItem?.type !== 'issue') ? 'none' : 'block'}>
-  <h2 id="detailTitle">{selectedItem?.type === 'issue' ? selectedItem?.message ?? selectedItem?.name ?? '' : selectedItem?.name ?? ''}</h2>
-  <div class="meta" id="detailMeta">{selectedItem?.type === 'issue' ? selectedItem?.severity?.toUpperCase() ?? '' : detailData?.source ?? ''}</div>
+<div class="detail-header" id="detailHeader" style:display={!selectedItem || (!detailData && selectedItem?.type !== 'issue' && selectedItem?.type !== 'appspace' && !selectedItem?.type?.startsWith('appspace_')) ? 'none' : 'block'}>
+  <h2 class="detail-title" id="detailTitle"><span>{selectedItem?.type === 'issue' ? selectedItem?.message ?? selectedItem?.name ?? '' : selectedItem?.name ?? ''}</span></h2>
+  {#if selectedItem?.type !== 'issue'}
+    <div class="detail-subtitle" id="detailMeta">
+      <span class="detail-type">{typeLabel}</span>
+      {#if subDetail}
+        <span class="detail-sep">·</span>
+        <span class="detail-sub-detail">{subDetail}</span>
+      {/if}
+      {#if detailData?.source}
+        <span class="module-badge">{detailData.source}</span>
+      {/if}
+      {#if usages.length > 0}
+        <span class="usage-badge">Referenced by {usages.length}</span>
+      {/if}
+    </div>
+  {:else}
+    <div class="detail-subtitle" id="detailMeta">
+      <span class="detail-type">Issue</span>
+      <span class="detail-sep">·</span>
+      <span class="detail-sub-detail">{selectedItem?.severity?.toUpperCase() ?? ''}</span>
+    </div>
+  {/if}
 </div>
 <div class="detail-body" id="detailBody" data-seltype={selectedItem?.type} data-dd={typeof detailData} data-dddata={String(!!detailData?.data)}>
   {#if selectedItem?.type === 'module'}
     {@html moduleHtml}
+  {:else if selectedItem?.type === 'appspace' || selectedItem?.type?.startsWith('appspace_')}
+    {@html appspaceHtml}
   {:else if detailData?.data}
     {#if selectedItem?.type === 'object'}
-      <ObjectClassRenderer item={detailData.data} parents={parents} usages={usages} issues={issues} mergedFOM={mergedFOM} />
+      <ObjectClassRenderer item={detailData.data} parents={parents} usages={usages} issues={issues} mergedFOM={mergedFOM} widgetBadges={widgetBadges} appspaceName={classAppspaceName} />
     {:else if selectedItem?.type === 'interaction'}
-      <InteractionClassRenderer item={detailData.data} parents={parents} usages={usages} issues={issues} mergedFOM={mergedFOM} />
+      <InteractionClassRenderer item={detailData.data} parents={parents} usages={usages} issues={issues} mergedFOM={mergedFOM} widgetBadges={widgetBadges} appspaceName={classAppspaceName} />
     {:else if selectedItem?.type === 'basic'}
       <BasicTypeRenderer item={detailData.data} usages={usages} issues={issues} />
     {:else if selectedItem?.type === 'simple'}
@@ -198,10 +306,10 @@ import IssueRenderer from './TypeRenderer/Issue.svelte';
     {/if}
   {:else if selectedItem?.type === 'issue'}
     <IssueRenderer item={selectedItem} issues={issues} />
-  {:else}
+  {:else if selectedItem}
     <p>No data available for this selection.</p>
   {/if}
 </div>
-<div style:display={selectedItem?.type === 'issue' ? 'none' : (!selectedItem || !detailData ? '' : 'none')}>
-  <WelcomeScreen />
+<div style:display={selectedItem?.type === 'issue' || currentTab === 'appspaces' ? 'none' : (!selectedItem || !detailData ? '' : 'none')}>
+  <OverviewDashboard />
 </div>

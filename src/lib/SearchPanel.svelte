@@ -1,5 +1,6 @@
 <script>
 import { searchState } from './stores/searchStore.svelte.js';
+import HighlightedText from './HighlightedText.svelte';
 import { onMount } from 'svelte';
 
 const TYPE_ICONS = {
@@ -38,14 +39,6 @@ let panelEl = $state(null);
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function highlightText(text, query) {
-  if (!query || !text) return escapeHtml(text || '');
-  const escaped = escapeHtml(text);
-  const q = escapeHtml(query);
-  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-  return escaped.replace(re, '<mark>$1</mark>');
 }
 
 function handleMouseEnter(e, snippet) {
@@ -183,7 +176,10 @@ function closePanel() {
                 onclick={() => handleItemClick(item)}
               >
                 <span class="search-panel-item-icon">{TYPE_ICONS[item.type] || ''}</span>
-                <span class="search-panel-item-name">{@html highlightText(item.name, searchState.query)}</span>
+                <span class="search-panel-item-name"><HighlightedText text={item.name} /></span>
+                {#if item.parentName}
+                  <span class="search-panel-item-parent"><HighlightedText text={item.parentName} /></span>
+                {/if}
               </div>
             {/each}
           </div>
@@ -196,3 +192,12 @@ function closePanel() {
 {#if tooltipVisible}
   <div class="search-tooltip" style="left: {tooltipX}px; top: {tooltipY}px">{tooltipText}</div>
 {/if}
+
+<style>
+  .search-panel-item-parent {
+    font-size: 0.8em;
+    opacity: 0.65;
+    margin-top: 1px;
+    display: block;
+  }
+</style>

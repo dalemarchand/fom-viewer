@@ -5,7 +5,7 @@
     <div class="tab tab-data-model" data-tab="objects" data-testid="tab-objects" title="Object classes with attributes and hierarchy">Object Classes</div>
     <div class="tab tab-data-model" data-tab="interactions" data-testid="tab-interactions" title="Interaction classes with parameters and hierarchy">Interaction Classes</div>
     <div class="tab tab-data-model" data-tab="datatypes" data-testid="tab-datatypes" title="Basic, Simple, Array, Fixed, Enumerated, and Variant data types">Data Types</div>
-    <div class="tab tab-data-model" data-tab="appspaces" data-testid="tab-appspaces" title="View appspace assignments for object and interaction classes" style="display:none">Appspaces</div>
+    <div class="tab tab-data-model" data-tab="appspaces" data-testid="tab-appspaces" title="View appspace assignments for object and interaction classes">Appspaces</div>
     <div class="tab-section-header">Infrastructure</div>
     <div class="tab tab-infrastructure" data-tab="dims" data-testid="tab-dims" title="Dimension definitions used for attribute ownership and subscription">Dimensions</div>
     <div class="tab tab-infrastructure" data-tab="trans" data-testid="tab-trans" title="HLAreliable and HLAbestEffort transportation types">Transportations</div>

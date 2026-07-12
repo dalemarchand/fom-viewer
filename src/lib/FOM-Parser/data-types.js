@@ -10,19 +10,22 @@ export function parseDataTypes(doc) {
     const endian = el.querySelector('endian')?.textContent || '';
     const interpretation = el.querySelector('interpretation')?.textContent || '';
     const semantics = el.querySelector('semantics')?.textContent || '';
-    if (name) basic.push({ name, size, encoding, endian, interpretation, semantics, _source: getSource(doc) });
+    const basicNotes = el.getAttribute('notes') || '';
+    if (name) basic.push({ name, size, encoding, endian, interpretation, semantics, notes: basicNotes, _source: getSource(doc) });
   });
   const simple = [];
   const simpleEls = doc.querySelectorAll('simpleData');
   simpleEls.forEach(el => {
     const name = el.querySelector('name')?.textContent || '';
-    const representation = el.querySelector('representation')?.textContent || '';
+    const repEl = el.querySelector('representation');
+    const representation = repEl?.textContent || '';
+    const representationNotes = repEl?.getAttribute('notes') || '';
     const units = el.querySelector('units')?.textContent || '';
     const resolution = el.querySelector('resolution')?.textContent || '';
     const accuracy = el.querySelector('accuracy')?.textContent || '';
     const semantics = el.querySelector('semantics')?.textContent || '';
     const simpleNotes = el.getAttribute('notes') || '';
-    if (name) simple.push({ name, representation, units, resolution, accuracy, semantics, notes: simpleNotes, _source: getSource(doc) });
+    if (name) simple.push({ name, representation, representationNotes, units, resolution, accuracy, semantics, notes: simpleNotes, _source: getSource(doc) });
   });
   const array = [];
   const arrayEls = doc.querySelectorAll('arrayData');
@@ -58,7 +61,9 @@ export function parseDataTypes(doc) {
   const enumEls = doc.querySelectorAll('enumeratedData');
   enumEls.forEach(el => {
     const name = el.querySelector('name')?.textContent || '';
-    const representation = el.querySelector('representation')?.textContent || '';
+    const repEl = el.querySelector('representation');
+    const representation = repEl?.textContent || '';
+    const representationNotes = repEl?.getAttribute('notes') || '';
     const semantics = el.querySelector('semantics')?.textContent || '';
     const enumNotes = el.getAttribute('notes') || '';
     const values = [];
@@ -69,7 +74,7 @@ export function parseDataTypes(doc) {
       const vNotes = v.getAttribute('notes') || '';
       if (vName) values.push({ name: vName, value: parseInt(vValue) || 0, notes: vNotes });
     });
-    enumTypes.push({ name, representation, semantics, notes: enumNotes, values, _source: getSource(doc) });
+    enumTypes.push({ name, representation, representationNotes, semantics, notes: enumNotes, values, _source: getSource(doc) });
   });
   const variant = [];
   const variantEls = doc.querySelectorAll('variantRecordData');

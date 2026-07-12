@@ -12,8 +12,14 @@ const { test_IssuesSubtabHistory } = require('./issues-subtab-history.test.js');
 const { test_IssuesCallOrderFix } = require('./issues-call-order-fix.test.js');
 const { test_BackButtonFixes } = require('./back-button-fixes.test.js');
 const { test_AppspaceFeature } = require('./appspace.test.js');
+const { test_AppspaceWarnings } = require('./appspace-warnings.test.js');
 const { run: test_MergeClassesRun } = require('./merge-classes.test.js');
-
+const { runThemeBarRemovalTest } = require('./theme-bar-removal.test.js');
+const { test_OverviewDashboard } = require('./overview-dashboard.test.js');
+const { test_DomSvelteBaseline } = require('./dom-svelte-baseline.test.js');
+const { test_ScrollIntoView } = require('./scroll-into-view.test.js');
+const { test_HistoryReset } = require('./history-reset.test.js');
+const { test_SubspaceFeature } = require('./subspace.test.js');
 
 const args = process.argv.slice(2);
 const opts = {
@@ -137,7 +143,6 @@ async function test_LoadPage() {
     await openApp();
     await waitForSelector('#app');
     await waitForSelector('header');
-    await waitForSelector('.tab-bar');
     await waitForSelector('#backBtn');
     await waitForSelector('#globalSearch');
     await waitForSelector('#clearBtn');
@@ -160,19 +165,30 @@ async function test_TabNavigation() {
   try {
     await openApp();
     
+    // All tabs that are unconditionally visible.
+    // appspaces: hidden until an appspace is loaded.
+    // issues: hidden until issues exist (hidden: true in LeftRail).
     const tabs = [
-      { selector: '[data-tab="modules"]', expectedIndex: 0 },
-      { selector: '[data-tab="objects"]', expectedIndex: 1 },
-      { selector: '[data-tab="interactions"]', expectedIndex: 2 },
-      { selector: '[data-tab="datatypes"]', expectedIndex: 3 },
-      { selector: '[data-tab="dims"]', expectedIndex: 5 },
-      { selector: '[data-tab="notes"]', expectedIndex: 11 }
+      { selector: '[data-tab="modules"]' },
+      { selector: '[data-tab="objects"]' },
+      { selector: '[data-tab="interactions"]' },
+      { selector: '[data-tab="datatypes"]' },
+      { selector: '[data-tab="dims"]' },
+      { selector: '[data-tab="trans"]' },
+      { selector: '[data-tab="switches"]' },
+      { selector: '[data-tab="tags"]' },
+      { selector: '[data-tab="time"]' },
+      { selector: '[data-tab="notes"]' },
     ];
     
     for (const tab of tabs) {
       await waitAndClick(tab.selector);
       await sleep(200);
     }
+    
+    // Verify overview tab separately — it's always visible
+    await waitAndClick('[data-tab="overview"]');
+    await sleep(200);
     
     await waitAndClick('[data-tab="modules"]');
     await sleep(200);
@@ -203,7 +219,10 @@ async function test_AboutVersion_MetaTag() {
       }
       meta.setAttribute('content', '9.8.7');
     });
+    await page.click('[data-testid="overflowToggle"]');
+    await sleep(200);
     await page.click('#aboutBtn');
+    await sleep(200);
     // Wait for the toast to be shown
     await page.waitForFunction(() => {
       const t = document.getElementById('toast');
@@ -231,7 +250,10 @@ async function test_AboutVersion_MetaMissing() {
       const m = document.querySelector('meta[name="version"]');
       if (m) m.remove();
     });
+    await page.click('[data-testid="overflowToggle"]');
+    await sleep(200);
     await page.click('#aboutBtn');
+    await sleep(200);
     await page.waitForFunction(() => {
       const t = document.getElementById('toast');
       return t && t.classList.contains('show');
@@ -263,7 +285,10 @@ async function test_AboutVersion_MetaPlaceholder() {
       }
       meta.setAttribute('content', '__VERSION__');
     });
+    await page.click('[data-testid="overflowToggle"]');
+    await sleep(200);
     await page.click('#aboutBtn');
+    await sleep(200);
     await page.waitForFunction(() => {
       const t = document.getElementById('toast');
       return t && t.classList.contains('show');
@@ -1314,8 +1339,6 @@ async function test_SortToggle() {
           continue;
         }
         
-        const currentSort = await sortBtn.evaluate(e => e.textContent);
-        
         // Test ascending (Off → A→Z)
         await sortBtn.click();
         await sleep(300);
@@ -1419,6 +1442,8 @@ async function test_ExportFunctionality() {
     await loadTestFomFile(config.testFiles[0]);
     await sleep(500);
     
+    await page.click('[data-testid="overflowToggle"]');
+    await sleep(200);
     const exportBtn = await page.$('#exportBtn');
     if (!exportBtn) {
       await captureScreenshot('test_ExportFunctionality_failed');
@@ -1636,7 +1661,14 @@ async function runAllTests() {
         { name: 'IssuesSubtabHistory', fn: test_IssuesSubtabHistory },
         { name: 'IssuesCallOrderFix', fn: test_IssuesCallOrderFix },
         { name: 'AppspaceFeature', fn: test_AppspaceFeature },
+        { name: 'AppspaceWarnings', fn: test_AppspaceWarnings },
+        { name: 'SubspaceFeature', fn: test_SubspaceFeature },
         { name: 'MergeClasses', fn: test_MergeClasses },
+        { name: 'ThemeBarRemoval', fn: runThemeBarRemovalTest },
+        { name: 'OverviewDashboard', fn: test_OverviewDashboard },
+        { name: 'DomSvelteBaseline', fn: test_DomSvelteBaseline },
+        { name: 'ScrollIntoView', fn: test_ScrollIntoView },
+        { name: 'HistoryReset', fn: test_HistoryReset },
       ];
   
   for (const test of tests) {

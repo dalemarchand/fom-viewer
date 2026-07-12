@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<objectModel xmlns="http://standards.ieee.org/IEEE1516-2010"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelIdentification>
+    <name>Subspace Test FOM Module</name>
+    <type>FOM</type>
+    <version>1.0</version>
+    <modificationDate>2026-06-26</modificationDate>
+    <securityClassification>Unclassified</securityClassification>
+    <purpose>Test module for subspace dimension detection</purpose>
+  </modelIdentification>
+  <dataTypes>
+    <enumeratedData>
+      <name>AppSpaceEnum</name>
+      <representation>HLAinteger32BE</representation>
+      <semantics>Application space names for subspace dimension</semantics>
+      <enumerator>
+        <name>ViewerApp</name>
+        <value>1</value>
+      </enumerator>
+      <enumerator>
+        <name>TrackerApp</name>
+        <value>2</value>
+      </enumerator>
+      <enumerator>
+        <name>MonitorApp</name>
+        <value>3</value>
+      </enumerator>
+      <enumerator>
+        <name>RadarDisplay</name>
+        <value>4</value>
+      </enumerator>
+      <enumerator>
+        <name>WeaponSystem</name>
+        <value>5</value>
+      </enumerator>
+    </enumeratedData>
+  </dataTypes>
+  <dimensions>
+    <dimension>
+      <name>subspace</name>
+      <dataType>AppSpaceEnum</dataType>
+    </dimension>
+  </dimensions>
+</objectModel>

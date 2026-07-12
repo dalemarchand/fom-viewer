@@ -17,6 +17,7 @@ export function parseDimensions(doc) {
         if (dim.tagName && dim.tagName.includes('dimension')) {
           const nameEl = dim.querySelector('name');
           const name = nameEl ? nameEl.textContent?.trim() : dim.textContent?.trim() || '';
+          const notes = dim.getAttribute('notes') || '';
           if (name && !seen[name]) {
             seen[name] = true;
             const childEls = Array.from(dim.children).filter(c => c.nodeType === 1);
@@ -27,9 +28,9 @@ export function parseDimensions(doc) {
                 const text = child.textContent?.trim();
                 if (tag && text && tag !== 'name') rows.push({ key: tag, value: text });
               });
-              result.push({ name, isComplex: true, rows });
+              result.push({ name, isComplex: true, rows, notes });
             } else {
-              result.push({ name, isComplex: false });
+              result.push({ name, isComplex: false, notes });
             }
           }
         }

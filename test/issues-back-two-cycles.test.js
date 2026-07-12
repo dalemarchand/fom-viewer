@@ -2,8 +2,6 @@
 // User scenario: After exhausting history in one cycle, second cycle
 // should properly track history through subtab switches + item clicks
 
-const { setupBrowser, teardownBrowser } = require('./run');
-
 async function runTest(browser, config) {
   const page = await browser.newPage();
   page.on('console', msg => {

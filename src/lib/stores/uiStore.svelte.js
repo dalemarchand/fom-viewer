@@ -5,7 +5,11 @@ export const ui = $state({
   currentSubTab: 'basic',
   selectedItem: null,
   sortEnabled: 'asc',
-  appspaceSubTab: 'objects'
+  appspaceSubTab: 'objects',
+  leftRailPinned: false,
+  sidebarWidth: 300,
+  activeTheme: 'system',
+  sortBtnVisible: true
 });
 
 export const variantHighlight = $state({
@@ -23,7 +27,17 @@ export function getSortEnabled() { return ui.sortEnabled; }
 export function setSortEnabled(v) { ui.sortEnabled = v; }
 export function getAppspaceSubTab() { return ui.appspaceSubTab; }
 export function setAppspaceSubTab(v) { ui.appspaceSubTab = v; }
+export function getLeftRailPinned() { return ui.leftRailPinned; }
+export function setLeftRailPinned(v) { ui.leftRailPinned = v; }
+export function getSidebarWidth() { return ui.sidebarWidth; }
+export function setSidebarWidth(v) { ui.sidebarWidth = v; }
+export function getActiveTheme() { return ui.activeTheme; }
+export function setActiveTheme(v) { ui.activeTheme = v; }
+export function getSortBtnVisible() { return ui.sortBtnVisible; }
+export function setSortBtnVisible(v) { ui.sortBtnVisible = v; }
 export function resetUI() {
   ui.currentTab = 'modules'; ui.currentSubTab = 'basic';
   ui.selectedItem = null; ui.sortEnabled = 'asc'; ui.appspaceSubTab = 'objects';
+  ui.leftRailPinned = false; ui.sidebarWidth = 300; ui.activeTheme = 'system';
+  ui.sortBtnVisible = true;
 }

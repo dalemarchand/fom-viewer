@@ -4,11 +4,12 @@ import * as issueStore from './stores/issueStore.svelte.js';
 let issues = $derived(issueStore.getFilteredIssues());
 let selectedIssueId = $derived(issueStore.getSelectedIssueId());
 
-const CATEGORY_ORDER = ['cross-reference', 'load-conflict', 'validation', 'circular-dependency'];
+const CATEGORY_ORDER = ['cross-reference', 'load-conflict', 'appspace', 'validation', 'circular-dependency'];
 
 const CATEGORY_LABELS = {
   'cross-reference': 'Cross-Reference Issues',
   'load-conflict': 'Load Conflicts',
+  'appspace': 'Appspace Warnings',
   'validation': 'Validation Issues',
   'circular-dependency': 'Circular Dependencies'
 };
@@ -16,6 +17,7 @@ const CATEGORY_LABELS = {
 const CATEGORY_SEVERITY = {
   'cross-reference': 'warning',
   'load-conflict': 'warning',
+  'appspace': 'warning',
   'validation': 'error',
   'circular-dependency': 'error'
 };
