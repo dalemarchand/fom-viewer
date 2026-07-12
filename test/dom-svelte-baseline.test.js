@@ -236,7 +236,12 @@ async function runBaselineTests() {
 
       const items = await page.$$('#treeViewTree .tree-item');
       if (items.length >= 2) {
-        await items[0].click();
+        const nameEl0 = await items[0].$('.name');
+        if (nameEl0) {
+          await nameEl0.click();
+        } else {
+          await items[0].click();
+        }
         await page.waitForTimeout(200);
         const firstSelected = await page.evaluate(() => {
           const sel = document.querySelector('.tree-item.selected');
@@ -245,7 +250,12 @@ async function runBaselineTests() {
         assert(firstSelected !== null, 'First item becomes selected after click');
         assert(firstSelected && firstSelected.length > 0, 'Selected item has text');
 
-        await items[1].click();
+        const nameEl1 = await items[1].$('.name');
+        if (nameEl1) {
+          await nameEl1.click();
+        } else {
+          await items[1].click();
+        }
         await page.waitForTimeout(200);
         const secondSelected = await page.evaluate(() => {
           const sel = document.querySelector('.tree-item.selected');

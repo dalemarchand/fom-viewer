@@ -88,7 +88,9 @@ async function runScrollIntoViewTest() {
       assert(firstItem !== null, 'Tree item exists on objects tab');
 
       if (firstItem) {
-        await firstItem.click();
+        const nameEl = await firstItem.$('.name');
+        if (nameEl) await nameEl.click();
+        else await firstItem.click();
         await page.waitForTimeout(300);
 
         const calls = await getScrollCalls();
@@ -105,7 +107,9 @@ async function runScrollIntoViewTest() {
 
       const items = await page.$$('#treeViewTree .tree-item');
       if (items.length >= 3) {
-        await items[2].click();
+        const nameEl = await items[2].$('.name');
+        if (nameEl) await nameEl.click();
+        else await items[2].click();
         await page.waitForTimeout(300);
 
         const calls = await getScrollCalls();
@@ -220,7 +224,9 @@ async function runScrollIntoViewTest() {
 
       const anItem = await page.$('#treeViewTree .tree-item:first-child');
       if (anItem) {
-        await anItem.click();
+        const nameEl = await anItem.$('.name');
+        if (nameEl) await nameEl.click();
+        else await anItem.click();
         await page.waitForTimeout(300);
 
         const calls = await getScrollCalls();
