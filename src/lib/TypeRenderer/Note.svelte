@@ -6,6 +6,7 @@
   let { item, usages = [], issues = [] } = $props();
 </script>
 
+{#if item}
 <div class="detail-section">
   <h3>Note</h3>
   <table class="property-table">
@@ -30,3 +31,4 @@
 <CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
 </CollapsibleSection>
+{/if}

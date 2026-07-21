@@ -4,6 +4,7 @@
   import StatsGrid from './StatsGrid.svelte';
   import IssueBreakdown from './IssueBreakdown.svelte';
   import RecentFilesList from './RecentFilesList.svelte';
+  import customConfig from '../custom-config.json';
 
   let files = $derived(fomStore.getFiles());
   let merged = $derived(fomStore.getMergedFOM());
@@ -51,8 +52,12 @@
     <h2>Welcome back</h2>
     <p class="welcome-sub"><span class="highlight">{modCount} module{modCount > 1 ? 's' : ''}</span> loaded &middot; Last session shows in recent files</p>
   {:else}
-    <h2>FOM Viewer</h2>
-    <p class="welcome-sub">Load FOM XML files to explore your federation object models</p>
+    <h2>{customConfig.title || 'FOM Viewer'}</h2>
+    {#if customConfig.mode === 'strict'}
+      <p class="welcome-sub">Explore the preloaded simulation object models</p>
+    {:else}
+      <p class="welcome-sub">Load FOM XML files to explore your federation object models</p>
+    {/if}
   {/if}
 
   {#if hasData}
@@ -83,27 +88,30 @@
     <div id="welcomeStats" style="display:none" data-testid="welcomeStats"></div>
   {/if}
 
-  <!-- Quick Actions -->
-  <div class="quick-actions">
-    <button class="quick-action primary" onclick={handleLoadFOM}>
-      <div class="qa-icon">📂</div>
-      <div class="qa-label">Open FOM File</div>
-      <div class="qa-sub">Load XML files to get started</div>
-    </button>
-    <button class="quick-action" onclick={handleLoadRecent} disabled={!hasData}>
-      <div class="qa-icon">🔄</div>
-      <div class="qa-label">Load Last Session</div>
-      <div class="qa-sub">Restore previously loaded modules</div>
-    </button>
-    <button class="quick-action" onclick={handleLoadAppspace}>
-      <div class="qa-icon">📋</div>
-      <div class="qa-label">Load Appspace</div>
-      <div class="qa-sub">Load appspace classification data</div>
-    </button>
-  </div>
+  {#if customConfig.mode !== 'strict'}
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <button class="quick-action primary" onclick={handleLoadFOM}>
+        <div class="qa-icon">📂</div>
+        <div class="qa-label">Open FOM File</div>
+        <div class="qa-sub">Load XML files to get started</div>
+      </button>
+      <button class="quick-action" onclick={handleLoadRecent} disabled={!hasData}>
+        <div class="qa-icon">🔄</div>
+        <div class="qa-label">Load Last Session</div>
+        <div class="qa-sub">Restore previously loaded modules</div>
+      </button>
+      <button class="quick-action" onclick={handleLoadAppspace}>
+        <div class="qa-icon">📋</div>
+        <div class="qa-label">Load Appspace</div>
+        <div class="qa-sub">Load appspace classification data</div>
+      </button>
+    </div>
 
-  <!-- Drop Zone — click to open file dialog -->
-  <div id="dropZone" data-testid="dropZone" onclick={handleLoadFOM} role="button" tabindex="0" onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleLoadFOM())}>
-    Drop FOM files here or click to browse
-  </div>
+    <!-- Drop Zone — click to open file dialog -->
+    <div id="dropZone" data-testid="dropZone" onclick={handleLoadFOM} role="button" tabindex="0" onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleLoadFOM())}>
+      Drop FOM files here or click to browse
+    </div>
+  {/if}
 </div>
+

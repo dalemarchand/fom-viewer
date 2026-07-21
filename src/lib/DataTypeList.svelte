@@ -39,6 +39,7 @@ function handleSelect(name) {
 
 onMount(() => {
   window.__dataTypeListComponent = { setItems, setSelected };
+  if (typeof window.updateUI === 'function') window.updateUI();
   if (containerEl) {
     const ro = new ResizeObserver(entries => {
       for (const entry of entries) {

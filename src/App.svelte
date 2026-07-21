@@ -1,4 +1,5 @@
 <script>
+import { onMount } from 'svelte';
 import Header from './lib/Header.svelte';
 import LeftRail from './lib/LeftRail.svelte';
 import FilterChips from './lib/FilterChips.svelte';
@@ -201,9 +202,21 @@ if (typeof localStorage !== 'undefined') {
     }
   }
 }
-</script>
 
-<svelte:window onkeydown={handleKeydown} />
+function handleTreeFilterInput(e) {
+  const q = e.target.value;
+  if (typeof window.__handleTreeFilter === 'function') {
+    window.__handleTreeFilter(q);
+  }
+}
+
+onMount(() => {
+  window.addEventListener('keydown', handleKeydown);
+  return () => {
+    window.removeEventListener('keydown', handleKeydown);
+  };
+});
+</script>
 
 <div id="toast" class="toast" data-testid="toast"></div>
 <div id="app" data-testid="app">
@@ -230,9 +243,12 @@ if (typeof localStorage !== 'undefined') {
           </div>
           <FilterChips />
           <div id="treeControls" class="tree-controls" style="display:none">
-            <input type="text" id="treeFilter" class="tree-filter" placeholder="Filter items..." />
+            <input type="text" id="treeFilter" class="tree-filter" placeholder="Filter items..." oninput={handleTreeFilterInput} />
           </div>
           <div class="tree-wrapper" id="treeView">
+            {#if !mergedFOM && currentTab !== 'modules' && currentTab !== 'overview'}
+              <div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>
+            {/if}
             <div id="treeViewTree" class="tree-view-panel" style="display:none"><TreeView /></div>
             <div id="treeViewModules" class="tree-view-panel" style="display:none"><ModuleList /></div>
             <div id="treeViewDataTypes" class="tree-view-panel" style="display:none"><DataTypeList /></div>

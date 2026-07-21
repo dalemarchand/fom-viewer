@@ -34,7 +34,6 @@ let tooltipText = $state('');
 let tooltipX = $state(0);
 let tooltipY = $state(0);
 let tooltipVisible = $state(false);
-let selectedIndex = $state(-1);
 let panelEl = $state(null);
 
 function escapeHtml(str) {
@@ -67,34 +66,33 @@ function handleItemClick(item) {
 }
 
 function handleKeyDown(e) {
-  if (!searchState.visible) return;
   const count = searchState.results.length;
-  if (count === 0) return;
   if (e.key === 'Escape') {
     searchState.visible = false;
     document.getElementById('globalSearch')?.blur();
     e.preventDefault();
     return;
   }
+  if (count === 0) return;
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    selectedIndex = Math.min(selectedIndex + 1, count - 1);
+    searchState.selectedIndex = Math.min(searchState.selectedIndex + 1, count - 1);
     scrollSelectedIntoView();
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    selectedIndex = Math.max(selectedIndex - 1, 0);
+    searchState.selectedIndex = Math.max(searchState.selectedIndex - 1, 0);
     scrollSelectedIntoView();
-  } else if (e.key === 'Enter' && selectedIndex >= 0 && selectedIndex < count) {
+  } else if (e.key === 'Enter' && searchState.selectedIndex >= 0 && searchState.selectedIndex < count) {
     e.preventDefault();
-    handleItemClick(searchState.results[selectedIndex]);
+    handleItemClick(searchState.results[searchState.selectedIndex]);
   }
 }
 
 function scrollSelectedIntoView() {
   if (!panelEl) return;
   const items = panelEl.querySelectorAll('.search-panel-item');
-  if (items[selectedIndex]) {
-    items[selectedIndex].scrollIntoView({ block: 'nearest' });
+  if (items[searchState.selectedIndex]) {
+    items[searchState.selectedIndex].scrollIntoView({ block: 'nearest' });
   }
 }
 
@@ -132,14 +130,6 @@ let groups = $derived.by(() => {
   return ordered;
 });
 
-let flatItems = $derived(searchState.results);
-
-$effect(() => {
-  if (searchState.visible) {
-    selectedIndex = -1;
-  }
-});
-
 function closePanel() {
   searchState.visible = false;
 }
@@ -161,14 +151,14 @@ function closePanel() {
             {#each group.items as item, i}
               <div
                 class="search-panel-item"
-                class:selected={flatItems.indexOf(item) === selectedIndex}
+                class:selected={item.globalIndex === searchState.selectedIndex}
                 data-name={item.name}
                 data-type={item.type}
                 data-snippet={item.snippet || ''}
                 data-parent={item.parentName || ''}
                 data-parent-type={item.parentType || ''}
                 role="option"
-                aria-selected={flatItems.indexOf(item) === selectedIndex}
+                aria-selected={item.globalIndex === searchState.selectedIndex}
                 tabindex="-1"
                 onmouseenter={(e) => handleMouseEnter(e, item.snippet)}
                 onmousemove={handleMouseMove}

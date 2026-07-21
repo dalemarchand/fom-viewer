@@ -112,16 +112,44 @@ export async function clearAppspace() {
   });
 }
 
+export async function saveBundleId(bundleId) {
+  await initDB();
+  const transaction = db.transaction([STORE_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  store.put({ name: '__bundleId__', bundleId });
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function loadBundleId() {
+  await initDB();
+  const transaction = db.transaction([STORE_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_NAME);
+  const request = store.get('__bundleId__');
+  return new Promise((resolve) => {
+    request.onsuccess = () => resolve(request.result?.bundleId || null);
+    request.onerror = () => resolve(null);
+  });
+}
+
 export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
   await initDB();
   const transaction = db.transaction([STORE_NAME], 'readwrite');
   const store = transaction.objectStore(STORE_NAME);
-  // Preserve __recentFiles__ before clearing
+  // Preserve __recentFiles__ and __bundleId__ before clearing
   const recentFilesReq = store.get('__recentFiles__');
+  const bundleIdReq = store.get('__bundleId__');
   const recentFiles = await new Promise((resolve) => {
     recentFilesReq.onsuccess = () => resolve(recentFilesReq.result || null);
     recentFilesReq.onerror = () => resolve(null);
   });
+  const bundleIdVal = await new Promise((resolve) => {
+    bundleIdReq.onsuccess = () => resolve(bundleIdReq.result || null);
+    bundleIdReq.onerror = () => resolve(null);
+  });
+  
   store.clear();
   for (const file of files) {
     store.put({ name: file.name, xml: file.xml });
@@ -129,6 +157,9 @@ export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
   store.put({ name: '__uiState__', uiState });
   if (recentFiles) {
     store.put(recentFiles);
+  }
+  if (bundleIdVal) {
+    store.put(bundleIdVal);
   }
   if (appspaceData) {
     store.put({ name: '__appspace__', data: appspaceData, subTab: appspaceSubTab });
@@ -138,3 +169,4 @@ export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
     transaction.onerror = () => reject(transaction.error);
   });
 }
+

@@ -29,24 +29,30 @@
     html += '</ul>';
     return html;
   }
+
+  function shortName(str) {
+    if (!str) return '';
+    return str.split('.').pop();
+  }
 </script>
 
+{#if item}
 <div class="detail-section">
   {#if parents.length > 0}
     <div class="breadcrumb">
       {#each parents as p, idx}
-        <span class="breadcrumb-item clickable-item" onclick={() => window.__showDetail(p.name, 'interaction', true)}>{p.name.split('.').pop()}<span class="widget-badge">{widgetBadges[p.name] ?? '?'}</span></span>
+        <span class="breadcrumb-item clickable-item" onclick={() => window.__showDetail(p.name, 'interaction', true)}>{shortName(p.name)}<span class="widget-badge">{widgetBadges[p.name] ?? '?'}</span></span>
         {#if idx < parents.length - 1}<span class="breadcrumb-sep"> &gt; </span>{/if}
       {/each}
       <span class="breadcrumb-sep"> &gt; </span>
-      <span class="breadcrumb-current">{item.name.split('.').pop()}<span class="widget-badge">{widgetBadges[item.name] ?? safeParams.length}</span></span>
+      <span class="breadcrumb-current">{shortName(item.name)}<span class="widget-badge">{widgetBadges[item.name] ?? safeParams.length}</span></span>
     </div>
   {/if}
 
   <h3>Interaction Class</h3>
   <table class="property-table">
     <tbody>
-    <tr><th>Name</th><td>{item.name.split('.').pop()}</td></tr>
+    <tr><th>Name</th><td>{shortName(item.name)}</td></tr>
     {#if item.sharing}<tr><th>Sharing</th><td>{item.sharing}</td></tr>{/if}
     {#if item.semantics}<tr><th>Semantics</th><td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">{item.semantics}</td></tr>{/if}
     {#if item.notes}
@@ -62,7 +68,7 @@
       </tr>
     {/if}
     {#if item.parent}
-      <tr><th>Parent</th><td><span class="clickable-item" onclick={() => window.__showDetail(item.parent, 'interaction', true)}>{item.parent.split('.').pop()}</span></td></tr>
+      <tr><th>Parent</th><td><span class="clickable-item" onclick={() => window.__showDetail(item.parent, 'interaction', true)}>{shortName(item.parent)}</span></td></tr>
     {/if}
     {#if item.order}
       <tr><th>Order</th><td>{item.order}</td></tr>
@@ -129,3 +135,4 @@
 <CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
 </CollapsibleSection>
+{/if}

@@ -6,7 +6,7 @@ export const searchState = $state({
 });
 
 export function showSearchPanel(results, query) {
-  searchState.results = results;
+  searchState.results = results.map((r, idx) => ({ ...r, globalIndex: idx }));
   searchState.query = query;
   searchState.selectedIndex = -1;
   searchState.visible = true;

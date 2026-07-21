@@ -13,19 +13,41 @@ mount(App, { target: document.getElementById('svelte-root') });
 let workerInstance = null;
 let workerProxy = null;
 let workerFailed = false;
+let FomWorker = null;
 
 async function parseInWorker(xml) {
+  if (window.location.protocol === 'file:') {
+    return parseSync(xml);
+  }
   if (!workerProxy && !workerFailed) {
     try {
-      workerInstance = new Worker(new URL('./lib/fom-worker.js', import.meta.url), { type: 'module' });
+      if (!FomWorker) {
+        const module = await import('./lib/fom-worker.js?worker&inline');
+        FomWorker = module.default;
+      }
+      workerInstance = new FomWorker();
       workerProxy = wrap(workerInstance);
     } catch (e) {
       workerFailed = true;
     }
   }
   if (workerProxy) {
-    try { return await workerProxy.parse(xml); }
-    catch (e) { workerFailed = true; }
+    try {
+      const workerPromise = workerProxy.parse(xml);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Worker timeout')), 500)
+      );
+      return await Promise.race([workerPromise, timeoutPromise]);
+    }
+    catch (e) {
+      console.warn('Worker parsing failed or timed out, falling back to sync parsing:', e);
+      workerFailed = true;
+      if (workerInstance) {
+        try { workerInstance.terminate(); } catch (err) {}
+        workerInstance = null;
+      }
+      workerProxy = null;
+    }
   }
   return parseSync(xml);
 }
@@ -64,6 +86,27 @@ import * as storage from './lib/storage.js';
 import * as searchStore from './lib/stores/searchStore.svelte.js';
 import { initRecentFiles, addRecentFile } from './lib/stores/recentFilesStore.svelte.js';
 import * as appspaceStore from './lib/stores/appspaceStore.svelte.js';
+import customConfig from './custom-config.json';
+
+function hashCode(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash.toString(16);
+}
+
+function reclassifyAppspace() {
+  if (state.appspace && state.appspace.rawContent && state.mergedFOM) {
+    const entries = parseAppspaceFile(state.appspace.rawContent);
+    const classified = classifyAppspaceEntries(entries, state.mergedFOM.objectClasses || [], state.mergedFOM.interactionClasses || []);
+    state.appspace.entries = classified.objects;
+    state.appspace.interactions = classified.interactions;
+    state.appspace.unknown = classified.unknown;
+    updateAppspaceTabCount();
+  }
+}
 
 // ============================================================================
 // CONSTANTS & STATE
@@ -157,8 +200,115 @@ async function clearStorage() {
 
 async function loadFromStorage() {
   try {
-    // Load UI state
-    const uiState = await storage.loadUiState();
+    // Check for preloaded bundle version update
+    let storedBundleId = null;
+    let uiState = null;
+    let appspaceEntry = null;
+    let fileData = [];
+
+    if (customConfig.mode === 'strict') {
+      storedBundleId = customConfig.bundleId;
+      if (customConfig.preloadedFiles && customConfig.preloadedFiles.length > 0) {
+        fileData = customConfig.preloadedFiles;
+      }
+      if (customConfig.preloadedAppspace) {
+        appspaceEntry = {
+          data: {
+            fileName: customConfig.preloadedAppspace.fileName,
+            rawContent: customConfig.preloadedAppspace.content
+          },
+          subTab: 'objects'
+        };
+      }
+      try {
+        uiState = await storage.loadUiState();
+      } catch (e) {
+        console.warn('Failed to load UI state in strict mode:', e);
+      }
+    } else {
+      try {
+        storedBundleId = await storage.loadBundleId();
+      } catch (e) {
+        console.warn('Failed to load bundle ID:', e);
+      }
+      if (customConfig.bundleId && storedBundleId !== customConfig.bundleId) {
+        try {
+          await storage.clearAll();
+          if (customConfig.preloadedFiles && customConfig.preloadedFiles.length > 0) {
+            await storage.saveFiles(customConfig.preloadedFiles);
+          }
+          if (customConfig.preloadedAppspace) {
+            await storage.saveAppspace(
+              {
+                fileName: customConfig.preloadedAppspace.fileName,
+                rawContent: customConfig.preloadedAppspace.content
+              },
+              'objects'
+            );
+          }
+          await storage.saveBundleId(customConfig.bundleId);
+          await storage.saveUiState({
+            currentTab: 'overview',
+            currentSubTab: 'basic',
+            selectedItem: null,
+            sortEnabled: 'asc',
+            issuesFilter: 'all'
+          });
+        } catch (e) {
+          console.warn('Failed to initialize preloaded database cache:', e);
+        }
+      }
+
+      try {
+        uiState = await storage.loadUiState();
+      } catch (e) {
+        console.warn('Failed to load UI state:', e);
+      }
+
+      let dbAppspaceFailed = false;
+      try {
+        appspaceEntry = await storage.loadAppspace();
+      } catch (e) {
+        console.warn('Failed to load appspace from storage:', e);
+        dbAppspaceFailed = true;
+      }
+      if (!appspaceEntry && (dbAppspaceFailed || !storedBundleId)) {
+        if (customConfig.preloadedAppspace) {
+          appspaceEntry = {
+            data: {
+              fileName: customConfig.preloadedAppspace.fileName,
+              rawContent: customConfig.preloadedAppspace.content
+            },
+            subTab: 'objects'
+          };
+        }
+      }
+
+      let dbFilesFailed = false;
+      try {
+        fileData = await storage.loadAllFiles();
+      } catch (e) {
+        console.warn('Failed to load files from storage:', e);
+        dbFilesFailed = true;
+      }
+      if (!fileData || fileData.length === 0) {
+        if (customConfig.preloadedFiles && customConfig.preloadedFiles.length > 0) {
+          fileData = customConfig.preloadedFiles;
+          // Save preloaded files to IndexedDB for future regular sessions
+          try {
+            await storage.saveFiles(customConfig.preloadedFiles);
+            await storage.saveBundleId(customConfig.bundleId);
+          } catch (e) {
+            console.warn('Failed to persist preloaded files:', e);
+          }
+        }
+      }
+    }
+
+    if (customConfig.title) {
+      document.title = customConfig.title;
+    }
+
     if (uiState) {
       state.currentTab = uiState.currentTab || 'modules';
       state.currentSubTab = uiState.currentSubTab || 'basic';
@@ -167,13 +317,14 @@ async function loadFromStorage() {
       state.issuesFilter = uiState.issuesFilter || 'all';
       updateSortButton();
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelector(`.tab[data-tab="${state.currentTab}"]`).classList.add('active');
+      const activeTabEl = document.querySelector(`.tab[data-tab="${state.currentTab}"]`);
+      if (activeTabEl) activeTabEl.classList.add('active');
       const dtTabs = document.getElementById('dataTypeTabs');
-      dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
+      if (dtTabs) dtTabs.style.display = state.currentTab === 'datatypes' ? 'flex' : 'none';
       const appspaceTabs = document.getElementById('appspaceTabs');
-      appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
+      if (appspaceTabs) appspaceTabs.style.display = state.currentTab === 'appspaces' ? 'flex' : 'none';
       const issuesTabs = document.getElementById('issuesTabs');
-      issuesTabs.style.display = state.currentTab === 'issues' ? 'flex' : 'none';
+      if (issuesTabs) issuesTabs.style.display = state.currentTab === 'issues' ? 'flex' : 'none';
       document.querySelectorAll('.subtab').forEach(t => t.classList.remove('active'));
       const subTabEl = document.querySelector(`.subtab[data-subtab="${state.currentSubTab}"]`);
       if (subTabEl) subTabEl.classList.add('active');
@@ -191,31 +342,32 @@ async function loadFromStorage() {
         if (issuesSubtabEl) issuesSubtabEl.classList.add('active');
       }
     }
-    // Load appspace data
-    const appspaceEntry = await storage.loadAppspace();
+
     if (appspaceEntry && appspaceEntry.data) {
       state.appspace = appspaceEntry.data;
       state.appspaceSubTab = appspaceEntry.subTab || 'objects';
       const loadBtn = document.getElementById('loadAppspaceBtn');
       const clearBtn = document.getElementById('clearAppspaceBtn');
       const separator = document.getElementById('appspaceSeparator');
-      if (loadBtn) { loadBtn.textContent = 'Change Appspace'; loadBtn.style.display = 'inline-block'; }
-      if (clearBtn) clearBtn.style.display = 'inline-block';
-      if (separator) separator.style.display = 'block';
+      if (customConfig.mode === 'strict') {
+        if (loadBtn) loadBtn.style.display = 'none';
+        if (clearBtn) clearBtn.style.display = 'none';
+        if (separator) separator.style.display = 'none';
+      } else {
+        if (loadBtn) { loadBtn.textContent = 'Change Appspace'; loadBtn.style.display = 'inline-block'; }
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+        if (separator) separator.style.display = 'block';
+      }
       updateAppspaceTabCount();
     }
-    // Load FOM files
-    const fileData = await storage.loadAllFiles();
+
     if (Array.isArray(fileData) && fileData.length > 0) {
       for (const f of fileData) {
         try {
           const fom = await parseInWorker(f.xml);
-          state.files.push(fom);
-          await addRecentFile(f.name, {
-            objects: fom.objectClasses?.length || 0,
-            interactions: fom.interactionClasses?.length || 0,
-            dataTypes: Object.values(fom.dataTypes || {}).reduce((s, a) => s + (Array.isArray(a) ? a.length : 0), 0)
-          });
+          fom.name = f.name;
+          fom.xml = f.xml;
+          state.files = [...state.files, fom];
         }
         catch (e) { console.error('Failed to parse stored file', f.name, e); }
       }
@@ -225,6 +377,7 @@ async function loadFromStorage() {
         state.conflicts = state.conflicts.filter(c => c.type !== 'enum' && c.type !== 'variant');
         state.conflicts.push(...dtResult.conflicts);
         state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: dtResult.result, transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
+        reclassifyAppspace();
         detectSubspaceDimensions(); enrichAppspaceApps();
         validate(state, makeIssue); updateUI(); updateTabCounts(); updateIssuesTabVisibility(state);
         if (state.selectedItem) {
@@ -723,6 +876,7 @@ function switchToModule(moduleName, addToHistory = true) {
 }
 
 function showModuleDetails(file, addToHistory = true) {
+  console.log('[DEBUG-LOOP] showModuleDetails called. file=' + file?.name + ' addToHistory=' + addToHistory);
   const prevTab = state.currentTab;
   const prevSubTab = state.currentSubTab;
   const prevSelected = state.selectedItem || { name: file.name, type: 'module' };
@@ -736,6 +890,7 @@ function showModuleDetails(file, addToHistory = true) {
 }
 
 function renderModuleBody(file) {
+  console.log('[DEBUG-LOOP] renderModuleBody called. file=' + file?.name);
   const sortItems = (items) => state.sortEnabled !== false ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items;
   const makeLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDataType('${d.name}', '${type}'); return false;">${d.name}</a></li>`).join('') + '</ul>';
   const makeClassLinks = (list, type) => '<ul style="list-style:none;margin:0;padding:0;">' + sortItems(list).map(d => `<li><a href="#" class="clickable-item" onclick="showDetail('${d.name}', '${type}', true); return false;">${d.name}</a></li>`).join('') + '</ul>';
@@ -793,7 +948,7 @@ function renderModuleBody(file) {
     </table>
     <h4 style="margin:16px 0 8px">Model Identification</h4>
     ${modelIdentHtml}
-    <button class="btn btn-danger" style="margin-top:12px" onclick="removeFile(${state.files.indexOf(file)});">Remove Module</button>
+    ${customConfig.mode === 'strict' ? '' : `<button class="btn btn-danger" style="margin-top:12px" onclick="removeFile(${state.files.indexOf(file)});">Remove Module</button>`}
   </div>`;
 }
 
@@ -823,6 +978,7 @@ function getFirstDisplayedIssue() {
 }
 
 function updateUI(skipAutoSelect) {
+  console.log('[DEBUG-LOOP] updateUI called. skipAutoSelect=' + skipAutoSelect + ' tab=' + state.currentTab + ' selectedItem=' + JSON.stringify(state.selectedItem));
   updateTabCounts();
   updateTabScrollButtons();
   const treeView = document.getElementById('treeView');
@@ -857,7 +1013,6 @@ function updateUI(skipAutoSelect) {
 
   if (!state.mergedFOM && state.currentTab !== 'modules' && state.currentTab !== 'overview') {
     showPanel(null);
-    treeView.innerHTML = '<div class="empty-state">Load FOM files to begin. Use the "Load FOM" button in the header.</div>';
     return;
   }
 
@@ -1001,6 +1156,10 @@ function updateTabCounts() {
 }
 
 async function loadFiles(files) {
+  if (customConfig.mode === 'strict') {
+    showToast('Loading files is disabled in strict mode');
+    return;
+  }
   state.issues = [];
   const totalFiles = files.length;
   let failedFiles = 0;
@@ -1009,7 +1168,7 @@ async function loadFiles(files) {
     try {
       const text = await file.text();
       const fom = await parseInWorker(text);
-      state.files.push(fom);
+      state.files = [...state.files, fom];
       await addRecentFile(file.name, {
         objects: fom.objectClasses?.length || 0,
         interactions: fom.interactionClasses?.length || 0,
@@ -1034,7 +1193,7 @@ async function loadFiles(files) {
       tags: mergeTags(sorted),
       time: mergeTime(sorted)
     };
-    detectSubspaceDimensions(); enrichAppspaceApps();
+    detectSubspaceDimensions(); reclassifyAppspace(); enrichAppspaceApps();
     state.history = [];
     state.currentTab = 'modules';
     document.getElementById('globalSearch').value = '';
@@ -1087,6 +1246,9 @@ async function loadFiles(files) {
 
 // eslint-disable-next-line no-unused-vars
 function removeFile(index) {
+  if (customConfig.mode === 'strict') {
+    return;
+  }
   const dh = document.getElementById('detailHeader'); if (dh) dh.style.display = 'none';
   state.files.splice(index, 1);
   if (state.files.length > 0) { 
@@ -1095,13 +1257,24 @@ function removeFile(index) {
     state.conflicts = state.conflicts.filter(c => c.type !== 'enum' && c.type !== 'variant');
     state.conflicts.push(...dtResult.conflicts);
     state.mergedFOM = { objectClasses: mergeClasses(sorted, 'object'), interactionClasses: mergeClasses(sorted, 'interaction'), dataTypes: dtResult.result, transportations: mergeTransportations(sorted), switches: mergeSwitches(sorted), tags: mergeTags(sorted), time: mergeTime(sorted) };
+    reclassifyAppspace();
     detectSubspaceDimensions(); enrichAppspaceApps();
   }
-  else { state.mergedFOM = null; state.subspaceDimensions = []; }
+  else {
+    state.mergedFOM = null;
+    state.subspaceDimensions = [];
+    if (state.appspace && state.appspace.rawContent) {
+      const entries = parseAppspaceFile(state.appspace.rawContent);
+      state.appspace.entries = [];
+      state.appspace.interactions = [];
+      state.appspace.unknown = entries;
+      updateAppspaceTabCount();
+    }
+  }
   saveToStorage(); validate(state, makeIssue); updateUI(); updateIssuesTabVisibility(state);
 }
 
-document.getElementById('fileInput').addEventListener('change', e => {
+document.getElementById('fileInput')?.addEventListener('change', e => {
   const files = Array.from(e.target.files);
   if (files.length > 0) {
     loadFiles(files);
@@ -1133,7 +1306,7 @@ document.getElementById('sortBtn')?.addEventListener('click', () => {
   updateUI();
 });
 
-document.getElementById('exportBtn').addEventListener('click', () => {
+document.getElementById('exportBtn')?.addEventListener('click', () => {
   const btn = document.getElementById('exportBtn');
   const existing = document.getElementById('exportMenu');
   if (existing) { existing.remove(); return; }
@@ -1754,22 +1927,19 @@ async function init() {
       showDetail(detail.name, type, true);
     };
 
-    // Tree filter: re-push filtered data on input
-    const treeFilter = document.getElementById('treeFilter');
-    if (treeFilter) {
-      treeFilter.addEventListener('input', function() {
-        const q = this.value.toLowerCase();
-        if (state.currentTab === 'objects' || state.currentTab === 'interactions') {
-          const classes = mergeClasses(state.files, state.currentTab === 'objects' ? 'object' : 'interaction');
-          const filtered = filterClassTree(classes, q);
-          const sorted = state.sortEnabled === 'asc' ? [...filtered].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...filtered].sort((a, b) => b.name.localeCompare(a.name)) : filtered;
-          window.__treeViewComponent?.setItems(sorted, 'tree');
-        } else if (state.currentTab === 'modules') {
-          const sortedFiles = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
-          window.__moduleListComponent?.setFiles(q ? sortedFiles.filter(f => f.name.toLowerCase().includes(q)) : sortedFiles, state.sortEnabled);
-        }
-      });
-    }
+    // Tree filter: exposed globally for Svelte component's oninput handler
+    window.__handleTreeFilter = function(rawQ) {
+      const q = (rawQ || '').toLowerCase();
+      if (state.currentTab === 'objects' || state.currentTab === 'interactions') {
+        const classes = mergeClasses(state.files, state.currentTab === 'objects' ? 'object' : 'interaction');
+        const filtered = filterClassTree(classes, q);
+        const sorted = state.sortEnabled === 'asc' ? [...filtered].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...filtered].sort((a, b) => b.name.localeCompare(a.name)) : filtered;
+        window.__treeViewComponent?.setItems(sorted, 'tree');
+      } else if (state.currentTab === 'modules') {
+        const sortedFiles = state.sortEnabled === 'asc' ? [...state.files].sort((a, b) => a.name.localeCompare(b.name)) : state.sortEnabled === 'desc' ? [...state.files].sort((a, b) => b.name.localeCompare(a.name)) : state.files;
+        window.__moduleListComponent?.setFiles(q ? sortedFiles.filter(f => f.name.toLowerCase().includes(q)) : sortedFiles, state.sortEnabled);
+      }
+    };
 
     updateUI();
     await loadFromStorage();
@@ -2106,7 +2276,10 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-document.getElementById('clearBtn').addEventListener('click', () => {
+document.getElementById('clearBtn')?.addEventListener('click', () => {
+  if (customConfig.mode === 'strict') {
+    return;
+  }
   if (confirm('Clear all loaded FOM files?')) {
     state.files = [];
     state.mergedFOM = null;
@@ -2159,11 +2332,29 @@ function parseAppspaceFile(content) {
     line = line.trim();
     if (!line || line.startsWith('#')) return;
     
-    const parts = line.split('|');
-    if (parts.length !== 2) return;
+    // Skip CSV header line if present
+    const lower = line.toLowerCase();
+    if (lower.startsWith('class,') || lower.startsWith('classname,') || lower.startsWith('class|') || lower.startsWith('classname|')) {
+      return;
+    }
     
-    const className = parts[0].trim();
-    const apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
+    let className = '';
+    let apps = [];
+    
+    if (line.includes('|')) {
+      const parts = line.split('|');
+      if (parts.length === 2) {
+        className = parts[0].trim();
+        apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
+      }
+    } else if (line.includes(',')) {
+      const firstCommaIdx = line.indexOf(',');
+      if (firstCommaIdx > 0) {
+        className = line.substring(0, firstCommaIdx).trim();
+        const appsStr = line.substring(firstCommaIdx + 1).trim();
+        apps = appsStr.split(/[;,]/).map(a => a.trim().replace(/^["']|["']$/g, '')).filter(a => a);
+      }
+    }
     
     if (className && apps.length > 0) {
       entries.push({ className, apps });
@@ -2178,6 +2369,13 @@ function setupAppspaceButtons() {
   const loadBtn = document.getElementById('loadAppspaceBtn');
   const clearBtn = document.getElementById('clearAppspaceBtn');
   const appspaceSep = document.getElementById('appspaceSeparator');
+  
+  if (customConfig.mode === 'strict') {
+    if (loadBtn) loadBtn.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (appspaceSep) appspaceSep.style.display = 'none';
+    return;
+  }
   
   // Set initial visibility - Load button always visible, Clear hidden until appspace loaded
   if (loadBtn) loadBtn.style.display = 'inline-block';
@@ -2218,7 +2416,8 @@ function setupAppspaceButtons() {
           fileName: file.name,
           entries: classified.objects,
           interactions: classified.interactions,
-          unknown: classified.unknown
+          unknown: classified.unknown,
+          rawContent: content
         };
         state.appspaceSubTab = 'objects';
         state.history = [];
@@ -2497,28 +2696,30 @@ function detectSubspaceDimensions() {
     state.subspaceDimensions = [];
     return;
   }
-  const dimMap = {};
-  state.files.forEach(f => {
-    (f.dimensions || []).forEach(d => {
-      if (!dimMap[d.name]) dimMap[d.name] = { ...d };
-    });
-  });
-  const mergedDims = Object.values(dimMap);
   const enumTypes = state.mergedFOM.dataTypes?.enum || [];
   const enumMap = {};
   enumTypes.forEach(e => { enumMap[e.name] = e; });
   const result = [];
-  mergedDims.forEach(dim => {
-    if (dim.isComplex && dim.rows) {
-      const dtRow = dim.rows.find(r => r.key.toLowerCase() === 'datatype');
-      if (dtRow && enumMap[dtRow.value]) {
-        result.push({
-          dimensionName: dim.name,
-          enumName: dtRow.value,
-          enumerators: enumMap[dtRow.value].values || [],
+  const seen = new Set();
+  
+  state.files.forEach(f => {
+    (f.dimensions || []).forEach(dim => {
+      if (dim.isComplex && dim.rows) {
+        dim.rows.forEach(r => {
+          if (r.key.toLowerCase() === 'datatype' && enumMap[r.value]) {
+            const key = `${dim.name}|${r.value}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              result.push({
+                dimensionName: dim.name,
+                enumName: r.value,
+                enumerators: enumMap[r.value].values || [],
+              });
+            }
+          }
         });
       }
-    }
+    });
   });
   state.subspaceDimensions = result;
 }
@@ -2676,7 +2877,7 @@ document.getElementById('aboutBtn')?.addEventListener('click', () => {
   const version = (metaVersion && metaVersion !== '__VERSION__') ? metaVersion : '-1.-1.-1';
   const toast = document.getElementById('toast');
   toast.innerHTML = `
-    <h3>About FOM Viewer</h3>
+    <h3>About ${customConfig.title || 'FOM Viewer'}</h3>
     <p>Single-page HTML viewer for IEEE 1516 FOM files. Load multiple FOM, MIM, and FED files to explore HLA data models.</p>
     <div class="version">Version ${version} | <a href="https://github.com/dalemarchand/fom-viewer" target="_blank" style="color:var(--accent)">GitHub</a></div>
   `;
@@ -2735,6 +2936,44 @@ window.initTheme = initTheme;
 window.loadFiles = loadFiles;
 window.renderAppspacesPanel = renderAppspacesPanel;
 window.mergeClasses = mergeClasses;
+
+window.hashCode = hashCode;
+window.customConfig = customConfig;
+
+document.getElementById('restoreBundleBtn')?.addEventListener('click', async () => {
+  if (confirm(`Are you sure you want to restore the pre-loaded bundle of "${customConfig.title || 'FOM Viewer'}"? This will reset your current workspace.`)) {
+    try {
+      await storage.clearAll();
+      if (customConfig.preloadedFiles && customConfig.preloadedFiles.length > 0) {
+        await storage.saveFiles(customConfig.preloadedFiles);
+      }
+      if (customConfig.preloadedAppspace) {
+        await storage.saveAppspace(
+          {
+            fileName: customConfig.preloadedAppspace.fileName,
+            rawContent: customConfig.preloadedAppspace.content
+          },
+          'objects'
+        );
+      }
+      await storage.saveBundleId(customConfig.bundleId);
+      await storage.saveUiState({
+        currentTab: 'overview',
+        currentSubTab: 'basic',
+        selectedItem: null,
+        sortEnabled: 'asc',
+        issuesFilter: 'all'
+      });
+      window.location.reload();
+    } catch (e) {
+      alert("Failed to restore bundle: " + e.message);
+    }
+  }
+});
+
+window.showModuleDetails = showModuleDetails;
+window.updateUI = updateUI;
+window.renderModuleBody = renderModuleBody;
 
 // ============================================================================
 // END OF FILE

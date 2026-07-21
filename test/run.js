@@ -20,6 +20,7 @@ const { test_DomSvelteBaseline } = require('./dom-svelte-baseline.test.js');
 const { test_ScrollIntoView } = require('./scroll-into-view.test.js');
 const { test_HistoryReset } = require('./history-reset.test.js');
 const { test_SubspaceFeature } = require('./subspace.test.js');
+const { test_PreloadBundle } = require('./preload-bundle.test.js');
 
 const args = process.argv.slice(2);
 const opts = {
@@ -56,8 +57,16 @@ async function captureScreenshot(name) {
     fs.mkdirSync(screenshotDir, { recursive: true });
   }
   const filepath = path.join(screenshotDir, `${name}.png`);
-  await page.screenshot({ path: filepath });
-  log(`Screenshot saved: ${filepath}`, 'info');
+  if (!page || page.isClosed()) {
+    log('Screenshot skipped: page not available', 'warn');
+    return;
+  }
+  try {
+    await page.screenshot({ path: filepath, timeout: 120000 });
+    log(`Screenshot saved: ${filepath}`, 'info');
+  } catch (err) {
+    logError('Screenshot failed', err);
+  }
 }
 
 async function waitAndClick(selector, waitOpts = {}) {
@@ -89,7 +98,8 @@ async function launchBrowser() {
     headless: !opts.visible,
     slowMo: opts.debug ? 50 : config.browser.slowMo,
     args: config.browser.args,
-    executablePath: config.browser.executablePath
+    executablePath: config.browser.executablePath,
+    protocolTimeout: 180000,
   };
   
   if (!opts.visible) {
@@ -98,6 +108,9 @@ async function launchBrowser() {
   
   browser = await puppeteer.launch(browserOptions);
   page = await browser.newPage();
+  // Increase default timeouts for slower UI interactions and screenshot capture
+  await page.setDefaultTimeout(60000);
+  await page.setDefaultNavigationTimeout(60000);
   
   await page.setViewport({ width: 1280, height: 800 });
   
@@ -943,7 +956,8 @@ async function test_SearchFunctionality() {
 
     await page.focus('#globalSearch');
     await page.keyboard.type('Test');
-    await sleep(400);
+    // Wait for the search panel to become visible
+    await page.waitForSelector('#searchPanel', { visible: true, timeout: 60000 });
 
     const panel = await page.$('#searchPanel');
     if (!panel) {
@@ -957,7 +971,7 @@ async function test_SearchFunctionality() {
     }
 
     await page.keyboard.press('Escape');
-    await sleep(200);
+    await page.waitForSelector('#searchPanel', { hidden: true, timeout: 60000 });
 
     const panelAfter = await page.$('#searchPanel');
     if (panelAfter) {
@@ -1669,6 +1683,7 @@ async function runAllTests() {
         { name: 'DomSvelteBaseline', fn: test_DomSvelteBaseline },
         { name: 'ScrollIntoView', fn: test_ScrollIntoView },
         { name: 'HistoryReset', fn: test_HistoryReset },
+        { name: 'PreloadBundle', fn: test_PreloadBundle },
       ];
   
   for (const test of tests) {
