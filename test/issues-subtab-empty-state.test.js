@@ -48,14 +48,22 @@ async function test_IssuesSubtabEmptyState() {
       return document.getElementById('app') !== null;
     }, { timeout: config.test.timeout });
 
-    // Wait for init() to complete (async storage load, etc.)
-    await page.waitForTimeout(1000);
+    // Clear pre-existing files to ensure a clean state
+    console.log('Clearing pre-existing files on test start...');
+    try {
+      await page.click('[data-testid="overflowToggle"]');
+      await sleep(200);
+      await waitAndClick(page, '#clearBtn');
+      await sleep(500);
+    } catch (e) {
+      console.log('No pre-existing files to clear or clear button not available.');
+    }
 
     // Test 1: With FOM files loaded that have no issues, clicking an issues subtab shows "No issues found."
     console.log('Test 1: Loading FOM file and checking issues subtab empty state...');
     
-    // Load a test FOM file (HLAstandardMIM.xml)
-    await loadTestFomFile(page, 'HLAstandardMIM.xml');
+    // Load a test FOM file (SubspaceTest.xml)
+    await loadTestFomFile(page, 'SubspaceTest.xml');
     
     // Debug: Check state after file load
     const stateAfterLoad = await page.evaluate(() => {
@@ -66,7 +74,7 @@ async function test_IssuesSubtabEmptyState() {
         currentTab: state.currentTab
       };
     });
-    console.log('State after loading HLAstandardMIM.xml:', stateAfterLoad);
+    console.log('State after loading SubspaceTest.xml:', stateAfterLoad);
     
     // Force the issues tab to be visible for testing (normally hidden when issues.length === 0)
     await page.evaluate(() => {
@@ -92,19 +100,25 @@ async function test_IssuesSubtabEmptyState() {
     });
     if (!emptyStateText.includes('No issues')) {
       // Fallback: check if welcome screen is showing (acceptable for Svelte when state.selectedItem is null)
-      const welcomeScreen = document.getElementById('welcomeScreen');
-      if (welcomeScreen && getComputedStyle(welcomeScreen).display !== 'none') {
-        console.log('⚠ Welcome screen showing in detail panel (Svelte: selectedItem=null), checking sidebar for empty state');
-        if (!emptyStateText) {
-          // Try checking the detail body
-          const body = document.getElementById('detailBody');
-          if (!body || !body.textContent.includes('No issues')) {
-            throw new Error('Empty state message not found in sidebar or detail body');
+      const fallbackResult = await page.evaluate((text) => {
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        if (welcomeScreen && window.getComputedStyle(welcomeScreen).display !== 'none') {
+          if (!text) {
+            // Try checking the detail body
+            const body = document.getElementById('detailBody');
+            if (!body || !body.textContent.includes('No issues')) {
+              return { success: false, error: 'Empty state message not found in sidebar or detail body' };
+            }
           }
+          return { success: true };
         }
-      } else {
-        throw new Error('Empty state message not found in sidebar');
+        return { success: false, error: 'Empty state message not found in sidebar' };
+      }, emptyStateText);
+
+      if (!fallbackResult.success) {
+        throw new Error(fallbackResult.error);
       }
+      console.log('⚠ Welcome screen showing in detail panel (Svelte: selectedItem=null), checked sidebar/detail body for empty state');
     }
     
     console.log('✓ Test 1 passed: No issues found message displayed correctly');

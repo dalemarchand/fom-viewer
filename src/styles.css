@@ -1380,3 +1380,74 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
     font-size: 16px;
   }
 }
+
+/* ============================================================================
+   CUSTOM BRANDING & PRELOADED BUNDLE BADGES
+   ============================================================================ */
+
+.custom-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.custom-badge-img {
+  height: 32px;
+  vertical-align: middle;
+}
+
+.bundle-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+}
+
+.bundle-mode-badge.strict-mode {
+  background: rgba(231, 76, 60, 0.2);
+  border-color: rgba(231, 76, 60, 0.4);
+  color: #ff8a80;
+}
+
+.bundle-mode-badge.flexible-mode {
+  background: rgba(46, 204, 113, 0.2);
+  border-color: rgba(46, 204, 113, 0.4);
+  color: #b9f6ca;
+}
+
+.bundle-mode-badge.flexible-mode.modified {
+  background: rgba(241, 196, 15, 0.2);
+  border-color: rgba(241, 196, 15, 0.4);
+  color: #ffe57f;
+}
+
+.btn-restore-inline {
+  background: none;
+  border: none;
+  color: white;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 11px;
+  margin-left: 6px;
+  opacity: 0.8;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.btn-restore-inline:hover {
+  opacity: 1;
+}
+

@@ -31,6 +31,7 @@
   }
 </script>
 
+{#if item}
 <div class="detail-section">
   <h3>Variant Record Data Type</h3>
   <table class="property-table">
@@ -123,3 +124,4 @@
 <CollapsibleSection title="Related Issues" count={issues.length} orange={issues.length > 0} threshold={0}>
 <RelatedIssues issues={issues} />
 </CollapsibleSection>
+{/if}

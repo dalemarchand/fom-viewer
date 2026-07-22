@@ -89,6 +89,7 @@ function toggleAllExpand() {
 
 onMount(() => {
   window.__treeViewComponent = { setItems, getSelectedItem, scrollToItem, setSelected };
+  if (typeof window.updateUI === 'function') window.updateUI();
 
   if (containerEl) {
     const ro = new ResizeObserver(entries => {

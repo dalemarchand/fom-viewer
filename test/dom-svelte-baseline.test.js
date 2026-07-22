@@ -49,6 +49,16 @@ async function runBaselineTests() {
     await page.waitForFunction(() => document.getElementById('app') !== null, { timeout: config.test.timeout });
     await page.waitForTimeout(1000);
 
+    // Clear any pre-existing files to guarantee starting state
+    try {
+      await page.click('[data-testid="overflowToggle"]');
+      await page.waitForTimeout(200);
+      await page.click('#clearBtn');
+      await page.waitForTimeout(500);
+    } catch (e) {
+      console.log('  No pre-existing files to clear or clear button not available');
+    }
+
     // Helper: load a FOM file
     const loadFom = async (filename) => {
       const fileInput = await page.$('#fileInput');
@@ -515,6 +525,14 @@ async function runBaselineTests() {
       await page.goto(APP_PATH, { waitUntil: 'networkidle0' });
       await page.waitForFunction(() => document.getElementById('app') !== null, { timeout: config.test.timeout });
       await page.waitForTimeout(1000);
+      try {
+        await page.click('[data-testid="overflowToggle"]');
+        await page.waitForTimeout(200);
+        await page.click('#clearBtn');
+        await page.waitForTimeout(500);
+      } catch (e) {
+        console.log('  No pre-existing files to clear or clear button not available');
+      }
 
       // Check issues tab is hidden initially (no FOM loaded)
       const issuesTab = await page.$('[data-tab="issues"]');

@@ -1,34 +1,51 @@
 <script>
-let files = $state([]);
-let sortEnabled = $state('asc');
-let selectedName = $state('');
+import { onMount } from 'svelte';
+import * as fomStore from './stores/fomStore.svelte.js';
+import * as uiStore from './stores/uiStore.svelte.js';
+
+let files = $derived(fomStore.getFiles());
+let sortEnabled = $derived(uiStore.ui.sortEnabled);
+let selectedItem = $derived(uiStore.ui.selectedItem);
+let selectedName = $derived(selectedItem && selectedItem.type === 'module' ? selectedItem.name : '');
+let filterQuery = $state('');
 
 let sortedFiles = $derived.by(() => {
-  if (sortEnabled === 'asc') {
-    return [...files].sort((a, b) => a.name.localeCompare(b.name));
-  } else if (sortEnabled === 'desc') {
-    return [...files].sort((a, b) => b.name.localeCompare(a.name));
+  let list = [...files];
+  if (filterQuery) {
+    const q = filterQuery.toLowerCase();
+    list = list.filter(f => f.name.toLowerCase().includes(q));
   }
-  return [...files];
+  if (sortEnabled === 'asc') {
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortEnabled === 'desc') {
+    return list.sort((a, b) => b.name.localeCompare(a.name));
+  }
+  return list;
 });
 
 function setFiles(newFiles, sortDir) {
-  files = newFiles || [];
-  sortEnabled = sortDir || 'asc';
+  // Backwards compatibility
 }
 
 function setSelected(name) {
-  selectedName = name || '';
+  // Backwards compatibility
 }
 
 function handleSelect(name) {
-  selectedName = name;
   if (window.__selectTreeItem) window.__selectTreeItem({ name, type: 'module' });
 }
 
-import { onMount } from 'svelte';
 onMount(() => {
   window.__moduleListComponent = { setFiles, setSelected };
+  const input = document.getElementById('treeFilter');
+  if (input) {
+    filterQuery = input.value || '';
+    const handleInput = () => {
+      filterQuery = input.value || '';
+    };
+    input.addEventListener('input', handleInput);
+    return () => input.removeEventListener('input', handleInput);
+  }
 });
 </script>
 

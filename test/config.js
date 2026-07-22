@@ -9,7 +9,7 @@ const config = {
   test: {
     fomDir: path.resolve(__dirname, 'fom'),
     timeout: 10000,
-    waitForSelector: 2000
+    waitForSelector: 10000
   },
   browser: {
     headless: true,

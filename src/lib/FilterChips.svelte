@@ -61,6 +61,26 @@ export function updateIssueChipLabels(allCount, errorCount, warningCount) {
     chips[2].textContent = `Warnings (${warningCount})`;
   }
 }
+  $effect(() => {
+    const _ = ui.currentTab;
+    document.querySelectorAll('#dataTypeTabs .subtab').forEach(chip => {
+      chip.classList.toggle('active', ui.currentSubTab === chip.dataset.subtab);
+    });
+  });
+
+  $effect(() => {
+    const _ = ui.currentTab;
+    document.querySelectorAll('#appspaceTabs .subtab').forEach(chip => {
+      chip.classList.toggle('active', ui.appspaceSubTab === chip.dataset.subtab);
+    });
+  });
+
+  $effect(() => {
+    const _ = ui.currentTab;
+    document.querySelectorAll('#issuesTabs .subtab').forEach(chip => {
+      chip.classList.toggle('active', issueStore.getIssuesFilter() === chip.dataset.subtab);
+    });
+  });
 </script>
 
 <div class="filter-chips" id="dataTypeTabs" data-container="datatypes" style:display={ui.currentTab === 'datatypes' ? 'flex' : 'none'}>
