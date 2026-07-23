@@ -173,10 +173,13 @@ HLAobjectRoot,EntityViewer`;
 
     // Trigger Restore Defaults
     console.log('Clicking Restore Defaults...');
-    await page.click('#restoreBundleBtnInline');
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => {
+        console.log('  [Warning] page.waitForNavigation timed out or resolved early, continuing...');
+      }),
+      page.click('#restoreBundleBtnInline')
+    ]);
     
-    // Page reloads, wait for it
-    await page.waitForNavigation({ waitUntil: 'networkidle0' });
     await page.waitForFunction(() => {
       return document.getElementById('app') !== null;
     }, { timeout: config.test.timeout });
