@@ -17,9 +17,9 @@
       <tr>
         <td>
           {#if u.type === 'object' || u.type === 'interaction'}
-            <span class="clickable-item" onclick={() => window.__showDetail(u.name, u.type, true)}>{u.name}</span>
+            <button type="button" class="clickable-item" onclick={() => window.__showDetail(u.name, u.type, true)}>{u.name}</button>
           {:else}
-            <span class="clickable-item" onclick={() => window.__showDataType(u.name, u.type)}>{u.name}</span>
+            <button type="button" class="clickable-item" onclick={() => window.__showDataType(u.name, u.type)}>{u.name}</button>
           {/if}
         </td>
         <td>{typeLabels[u.type] || u.type}</td>

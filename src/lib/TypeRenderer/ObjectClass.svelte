@@ -10,7 +10,7 @@
     const merged = window.__mergedFOM;
     const exists = merged?.transportations?.some(t => t.name.trim() === transportation.trim());
     if (exists) {
-      return `<span class="clickable-item" onclick="window.__showDetail('${transportation.replace(/'/g, "\\'")}', 'trans', true)">${transportation}</span>`;
+      return `<button type="button" class="clickable-item" onclick="window.__showDetail('${transportation.replace(/'/g, "\\'")}', 'trans', true)">${transportation}</button>`;
     }
     return `<span style="color:red;">${transportation}</span>`;
   }
@@ -32,7 +32,7 @@
       html += '<ul style="list-style:none;margin:0;padding:0;">';
       for (const note of noteList) {
         const safeNote = note.replace(/'/g, "\\'");
-        html += `<li><span class="clickable-item" onclick="window.__showDetail('${safeNote}', 'notes', true)">${note}</span></li>`;
+        html += `<li><button type="button" class="clickable-item" onclick="window.__showDetail('${safeNote}', 'notes', true)">${note}</button></li>`;
       }
       html += '</ul>';
     }
@@ -46,7 +46,7 @@
     for (const d of dimensions) {
       const exists = window.__findDimensionByName(d);
       if (exists) {
-        html += `<li><span class="clickable-item" onclick="window.__showDetail('${d.replace(/'/g, "\\'")}', 'dims', true)">${d}</span></li>`;
+        html += `<li><button type="button" class="clickable-item" onclick="window.__showDetail('${d.replace(/'/g, "\\'")}', 'dims', true)">${d}</button></li>`;
       } else {
         html += `<li><span style="color:red;">${d}</span></li>`;
       }
@@ -66,7 +66,7 @@
   {#if parents.length > 0}
     <div class="breadcrumb">
       {#each parents as p, idx}
-        <span class="breadcrumb-item clickable-item" onclick={() => window.__showDetail(p.name, type, true)}>{shortName(p.name)}<span class="widget-badge">{widgetBadges[p.name] ?? '?'}</span></span>
+        <button type="button" class="breadcrumb-item clickable-item" onclick={() => window.__showDetail(p.name, type, true)}>{shortName(p.name)}<span class="widget-badge">{widgetBadges[p.name] ?? '?'}</span></button>
         {#if idx < parents.length - 1}<span class="breadcrumb-sep"> &gt; </span>{/if}
       {/each}
       <span class="breadcrumb-sep"> &gt; </span>
@@ -86,14 +86,14 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
-              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
             {/each}
           </ul>
         </td>
       </tr>
     {/if}
     {#if item.parent}
-      <tr><th>Parent</th><td><span class="clickable-item" onclick={() => window.__showDetail(item.parent, type, true)}>{shortName(item.parent)}</span></td></tr>
+      <tr><th>Parent</th><td><button type="button" class="clickable-item" onclick={() => window.__showDetail(item.parent, type, true)}>{shortName(item.parent)}</button></td></tr>
     {/if}
     {#if item._sources || item._source}
       <tr>
@@ -101,7 +101,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item._sources || (item._source ? [item._source] : [])) as s}
-              <li><span class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</button></li>
             {/each}
           </ul>
         </td>
@@ -110,7 +110,7 @@
     {#if appspaceName}
       <tr>
         <th>Appspace</th>
-        <td><span class="clickable-item" onclick={() => window.__showDetail(item.name, 'appspace_object', true)}>{appspaceName}</span></td>
+        <td><button type="button" class="clickable-item" onclick={() => window.__showDetail(item.name, 'appspace_object', true)}>{appspaceName}</button></td>
       </tr>
     {/if}
     </tbody>
@@ -129,16 +129,16 @@
     {#each safeAttrs as p}
       <tr>
         <td>{p?.name ?? ''}</td>
-        <td>{#if p?.dataType}<span class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</span>{/if}</td>
+        <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
         <td>{p?.sharing ?? ''}</td>
         <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
-        <td>{#if p?._source}<span class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</span>{/if}</td>
+        <td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>
         <td>{p?.updateType ?? ''}</td><td>{@html updateConditionHtml(p?.updateCondition, p?.updateConditionNotes)}</td>
         <td>
           {#if p?.notes}
             <ul style="list-style:none;margin:0;padding:0;">
               {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
-                <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+                <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
               {/each}
             </ul>
           {/if}

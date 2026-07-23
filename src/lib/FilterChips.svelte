@@ -35,9 +35,9 @@ const APPSPACE_CHIPS = [
 ];
 
 const ISSUE_CHIPS = [
-  { id: 'all', label: `All (${issueAllCount})` },
-  { id: 'error', label: `Errors (${issueErrorCount})` },
-  { id: 'warning', label: `Warnings (${issueWarningCount})` },
+  { id: 'all', get label() { return `All (${issueAllCount})`; } },
+  { id: 'error', get label() { return `Errors (${issueErrorCount})`; } },
+  { id: 'warning', get label() { return `Warnings (${issueWarningCount})`; } },
 ];
 
 export function updateAppspaceChipLabels(counts) {

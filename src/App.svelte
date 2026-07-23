@@ -228,7 +228,7 @@ onMount(() => {
         <OverviewDashboard />
       {:else}
         <div class="sidebar" style="width: {uiStore.ui.sidebarWidth}px" style:display={sidebarVisible ? '' : 'none'}>
-          <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
           <div
             class="resize-handle"
             onmousedown={startResize}

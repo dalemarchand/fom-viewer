@@ -20,7 +20,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
-              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
             {/each}
           </ul>
         </td>
@@ -32,7 +32,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item._sources || (item._source ? [item._source] : [])) as s}
-              <li><span class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</button></li>
             {/each}
           </ul>
         </td>
@@ -50,14 +50,14 @@
     {#each item.fields as f}
       <tr>
         <td>{f.name}</td>
-        <td>{#if f.dataType}<span class="clickable-item" onclick={() => window.__showDataType(f.dataType, window.__getPreferredType(f.dataType))}>{f.dataType}</span>{/if}</td>
+        <td>{#if f.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(f.dataType, window.__getPreferredType(f.dataType))}>{f.dataType}</button>{/if}</td>
         <td>{f.encoding || ''}</td>
         <td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">{f.semantics || ''}</td>
         <td>
           {#if f.notes}
             <ul style="list-style:none;margin:0;padding:0;">
               {#each (f.notes || '').split(/\s+/).filter(Boolean) as note}
-                <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+                <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
               {/each}
             </ul>
           {/if}

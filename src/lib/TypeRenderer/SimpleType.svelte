@@ -15,7 +15,7 @@
     {#if item.representation}
       <tr>
         <th>Representation</th>
-        <td><span class="clickable-item" onclick={() => window.__showDataType(item.representation, 'basic')}>{item.representation}</span></td>
+        <td><button type="button" class="clickable-item" onclick={() => window.__showDataType(item.representation, 'basic')}>{item.representation}</button></td>
       </tr>
     {/if}
     {#if item.units}<tr><th>Units</th><td>{item.units}</td></tr>{/if}
@@ -28,7 +28,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
-              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
             {/each}
           </ul>
         </td>
@@ -40,7 +40,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item.representationNotes || '').split(/\s+/).filter(Boolean) as note}
-              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
             {/each}
           </ul>
         </td>
@@ -52,7 +52,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item._sources || (item._source ? [item._source] : [])) as s}
-              <li><span class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</button></li>
             {/each}
           </ul>
         </td>

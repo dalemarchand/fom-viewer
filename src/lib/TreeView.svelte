@@ -9,7 +9,9 @@ let {
   selectedItem = null
 } = $props();
 
+// svelte-ignore state_referenced_locally
 let flatItems = $state(items);
+// svelte-ignore state_referenced_locally
 let listType = $state(type);
 let selectedName = $state('');
 let listRef = $state(null);

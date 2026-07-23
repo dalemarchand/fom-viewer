@@ -45,7 +45,7 @@
           {#if discriminantMissing}
             <span style="color:var(--error)">{item.dataType}</span>
           {:else}
-            <span class="clickable-item" onclick={showEnumType}>{item.dataType}</span>
+            <button type="button" class="clickable-item" onclick={showEnumType}>{item.dataType}</button>
           {/if}
         </td>
       </tr>
@@ -58,7 +58,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
-              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
             {/each}
           </ul>
         </td>
@@ -70,7 +70,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item._sources || (item._source ? [item._source] : [])) as s}
-              <li><span class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</button></li>
             {/each}
           </ul>
         </td>
@@ -93,20 +93,20 @@
             {#each a.enumerators as enumerator, i}
               {#if i > 0}, {/if}
               {#if enumType && enumeratorExists(enumType, enumerator)}
-                <span class="clickable-item" onclick={() => showEnumTypeAndHighlight(enumerator)}>{enumerator}</span>
+                <button type="button" class="clickable-item" onclick={() => showEnumTypeAndHighlight(enumerator)}>{enumerator}</button>
               {:else}
                 <span style="color:var(--error)">{enumerator}</span>
               {/if}
             {/each}
           {/if}
         </td>
-        <td>{#if a.dataType}<span class="clickable-item" onclick={() => window.__showDataType(a.dataType, window.__getPreferredType(a.dataType))}>{a.dataType}</span>{/if}</td>
+        <td>{#if a.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(a.dataType, window.__getPreferredType(a.dataType))}>{a.dataType}</button>{/if}</td>
         <td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">{a.semantics || ''}</td>
         <td>
           {#if a.notes}
             <ul style="list-style:none;margin:0;padding:0;">
               {#each (a.notes || '').split(/\s+/).filter(Boolean) as note}
-                <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+                <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
               {/each}
             </ul>
           {/if}

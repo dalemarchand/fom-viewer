@@ -506,11 +506,30 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
 }
 .clickable-item { color: var(--accent); text-decoration: none; cursor: pointer; font-weight: 500; }
 .clickable-item:hover { text-decoration: underline; }
+button.clickable-item {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+  display: inline;
+}
 .empty-state { color: var(--text-muted); text-align: center; padding: 20px; }
 
 .sort-controls { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 13px; }
 .sort-label { color: var(--text-secondary); font-weight: 500; }
 .sort-option { color: var(--text-secondary); cursor: pointer; padding: 2px 8px; border-radius: 4px; }
+button.sort-option {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  padding: 2px 8px;
+  cursor: pointer;
+}
 .sort-option:hover { background: var(--bg-tertiary); }
 .sort-option.active { color: var(--accent); font-weight: 600; background: var(--bg-tertiary); }
 

@@ -47,7 +47,7 @@
         {#each item.sources as source}
           <tr>
             <td>
-              <span class="clickable-item" onclick={() => window.__switchToModule?.(source)}>{source}</span>
+              <button type="button" class="clickable-item" onclick={() => window.__switchToModule?.(source)}>{source}</button>
             </td>
           </tr>
         {/each}
@@ -63,9 +63,9 @@
           <tr>
             <td>
               {#if loc.tab && loc.itemName}
-                <span class="clickable-item" onclick={() => navigateToLocation(loc)}>
+                <button type="button" class="clickable-item" onclick={() => navigateToLocation(loc)}>
                   {loc.file || ''}{#if loc.tab} &mdash; {loc.tab}{/if}{#if loc.item}: {loc.item}{/if}
-                </span>
+                </button>
               {:else}
                 <span>{loc.file || ''}{#if loc.tab} &mdash; {loc.tab}{/if}{#if loc.item}: {loc.item}{/if}</span>
               {/if}

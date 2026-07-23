@@ -16,7 +16,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
-              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
             {/each}
           </ul>
         </td>
@@ -28,7 +28,7 @@
           <th>{r.key}</th>
           <td style="max-width:600px;word-wrap:break-word;white-space:pre-wrap;">
             {#if r.key === 'dataType' && r.value}
-              <span class="clickable-item" onclick={() => window.__showDataType(r.value, window.__getPreferredType(r.value))}>{r.value}</span>
+              <button type="button" class="clickable-item" onclick={() => window.__showDataType(r.value, window.__getPreferredType(r.value))}>{r.value}</button>
             {:else}
               {r.value}
             {/if}

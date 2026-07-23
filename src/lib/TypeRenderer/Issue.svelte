@@ -46,7 +46,7 @@
           {@const match = di.visibleText.match(/^(.+?):\s*(\d+)\s*(?:attribute|parameter)s?/)}
           {#if match}
             <tr class="conflict-row" onclick={() => di.tooltipText && toggleRow(i)}>
-              <td><span class="clickable-item" onclick={() => window.__switchToModule?.(match[1])}>{match[1]}</span></td>
+              <td><button type="button" class="clickable-item" onclick={() => window.__switchToModule?.(match[1])}>{match[1]}</button></td>
               <td>
                 <span class="count-badge" class:same={match[2] === '0'} class:different={match[2] !== '0'}>{match[2]}</span>
               </td>
@@ -69,7 +69,7 @@
           {@const colonIdx = di.visibleText.indexOf(': ')}
           <div class="detail-list-item" title={di.tooltipText}>
             {#if colonIdx > 0}
-              <span class="clickable-item" onclick={() => window.__switchToModule?.(di.visibleText.substring(0, colonIdx))}>{di.visibleText.substring(0, colonIdx)}</span>{di.visibleText.substring(colonIdx)}
+              <button type="button" class="clickable-item" onclick={() => window.__switchToModule?.(di.visibleText.substring(0, colonIdx))}>{di.visibleText.substring(0, colonIdx)}</button>{di.visibleText.substring(colonIdx)}
             {:else}
               {di.visibleText}
             {/if}

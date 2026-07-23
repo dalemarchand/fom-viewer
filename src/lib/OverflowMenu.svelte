@@ -22,7 +22,8 @@
 
 <div class="overflow-menu" bind:this={menuEl}>
   <button class="overflow-toggle" onclick={toggle} aria-label="More actions" data-testid="overflowToggle">···</button>
-  <div class="overflow-dropdown" style="display:{open ? 'block' : 'none'}" onclick={handleItemClick} role="menu">
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="overflow-dropdown" style="display:{open ? 'block' : 'none'}" onclick={handleItemClick} role="menu" tabindex="-1">
     {@render children()}
   </div>
 </div>

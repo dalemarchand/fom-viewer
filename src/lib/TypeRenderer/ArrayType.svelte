@@ -15,7 +15,7 @@
     {#if item.dataType}
       <tr>
         <th>Data Type</th>
-        <td><span class="clickable-item" onclick={() => window.__showDataType(item.dataType, window.__getPreferredType(item.dataType))}>{item.dataType}</span></td>
+        <td><button type="button" class="clickable-item" onclick={() => window.__showDataType(item.dataType, window.__getPreferredType(item.dataType))}>{item.dataType}</button></td>
       </tr>
     {/if}
     {#if item.cardinality}<tr><th>Cardinality</th><td>{item.cardinality}</td></tr>{/if}
@@ -27,7 +27,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item.notes || '').split(/\s+/).filter(Boolean) as note}
-              <li><span class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
             {/each}
           </ul>
         </td>
@@ -39,7 +39,7 @@
         <td>
           <ul style="list-style:none;margin:0;padding:0;">
             {#each (item._sources || (item._source ? [item._source] : [])) as s}
-              <li><span class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</span></li>
+              <li><button type="button" class="clickable-item" onclick={() => window.__switchToModule(s)}>{s}</button></li>
             {/each}
           </ul>
         </td>

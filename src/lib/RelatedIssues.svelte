@@ -8,11 +8,12 @@
       Related Issues ({issues.length})
     </h4>
     {#each issues as issue}
-      <div
+      <button
+        type="button"
         class="related-issue"
         data-tab="issues"
         data-issue-id={issue.id}
-        style="cursor:pointer;padding:4px 8px;margin:2px 0;background:var(--bg-tertiary);border-radius:4px;font-size:13px;display:flex;align-items:center;gap:6px;"
+        style="border:none;background:var(--bg-tertiary);width:100%;text-align:left;font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;padding:4px 8px;margin:2px 0;border-radius:4px;font-size:13px;display:flex;align-items:center;gap:6px;"
         onclick={() => {
           const el = document.querySelector(`.related-issue[data-issue-id="${issue.id}"]`);
           if (el) el.click();
@@ -20,7 +21,7 @@
       >
         <span>{issue.severity === 'error' ? '❗' : '⚠️'}</span>
         <span>{issue.message}</span>
-      </div>
+      </button>
     {/each}
   </div>
 {/if}

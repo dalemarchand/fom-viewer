@@ -149,6 +149,7 @@ function closePanel() {
           <div class="search-panel-group" role="group" aria-label={group.label}>
             <div class="search-panel-group-header">{group.icon} {group.label} ({group.items.length})</div>
             {#each group.items as item, i}
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
               <div
                 class="search-panel-item"
                 class:selected={item.globalIndex === searchState.selectedIndex}
