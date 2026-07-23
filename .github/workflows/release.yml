@@ -91,7 +91,7 @@ jobs:
         with:
           tag_name: ${{ steps.next_version.outputs.version }}
           name: Release ${{ steps.next_version.outputs.version }}
-          draft: true
+          draft: false
           prerelease: false
           body: FOM Viewer Release
           files: dist/fom-viewer.html
