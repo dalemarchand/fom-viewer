@@ -1,5 +1,6 @@
 <script>
   let { title, count = null, defaultOpen = true, threshold = 6, orange = false, children } = $props();
+  // svelte-ignore state_referenced_locally
   let open = $state(defaultOpen);
   let childCount = $state(0);
   let wrapperEl = $state(null);
@@ -78,15 +79,10 @@
     text-align: left;
     border-bottom: 1px solid var(--border);
   }
-  .collapsible-section.flat .section-toggle {
-    border-bottom: none;
-  }
   .section-toggle:hover {
     background: var(--bg-hover, rgba(128,128,128,0.05));
   }
-  .collapsible-section.flat .section-toggle {
-    padding: 6px 8px;
-  }
+
   .chevron {
     font-size: 0.75em;
     width: 12px;

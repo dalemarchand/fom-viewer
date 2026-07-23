@@ -1,5 +1,6 @@
 <script>
 import HighlightedText from './HighlightedText.svelte';
+import TreeItem from './TreeItem.svelte';
 
 let {
   item = {},
@@ -8,6 +9,7 @@ let {
   selectedName = ''
 } = $props();
 
+// svelte-ignore state_referenced_locally
 let isExpanded = $state(expanded);
 $effect(() => {
   isExpanded = expanded;
@@ -54,7 +56,7 @@ function toggle(e) {
 {#if item.children && item.children.length > 0 && isExpanded}
   <div class="tree-children" class:collapsed={!isExpanded}>
     {#each item.children as child}
-      <svelte:self
+      <TreeItem
         item={child}
         type={type}
         selectedName={selectedName}
