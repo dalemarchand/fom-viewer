@@ -45,6 +45,32 @@
     const recents = document.querySelectorAll('.recent-file-item');
     if (recents.length > 0) recents[0].click();
   }
+
+  function handleDragOver(e) {
+    if (customConfig.mode === 'strict') return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.add('dragover');
+  }
+
+  function handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.remove('dragover');
+  }
+
+  function handleDrop(e) {
+    if (customConfig.mode === 'strict') return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.classList.remove('dragover');
+    if (e.dataTransfer && e.dataTransfer.files) {
+      const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.xml'));
+      if (files.length > 0 && typeof window.loadFiles === 'function') {
+        window.loadFiles(files);
+      }
+    }
+  }
 </script>
 
 <div id="welcomeScreen" class="overview-placeholder dashboard" data-testid="welcomeScreen">
@@ -109,7 +135,17 @@
     </div>
 
     <!-- Drop Zone — click to open file dialog -->
-    <div id="dropZone" data-testid="dropZone" onclick={handleLoadFOM} role="button" tabindex="0" onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleLoadFOM())}>
+    <div 
+      id="dropZone" 
+      data-testid="dropZone" 
+      onclick={handleLoadFOM} 
+      role="button" 
+      tabindex="0" 
+      onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), handleLoadFOM())}
+      ondragover={handleDragOver}
+      ondragleave={handleDragLeave}
+      ondrop={handleDrop}
+    >
       Drop FOM files here or click to browse
     </div>
   {/if}
