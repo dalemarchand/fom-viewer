@@ -23,25 +23,49 @@ Options:
 const args = process.argv.slice(2);
 const options = {};
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--dir' && args[i+1]) {
-    options.dir = args[++i];
-  } else if (args[i] === '--zip' && args[i+1]) {
-    options.zip = args[++i];
-  } else if (args[i] === '--mode' && args[i+1]) {
-    options.mode = args[++i];
-  } else if (args[i] === '--title' && args[i+1]) {
-    options.title = args[++i];
-  } else if (args[i] === '--badge-text' && args[i+1]) {
-    options.badgeText = args[++i];
-  } else if (args[i] === '--badge-color' && args[i+1]) {
-    options.badgeColor = args[++i];
-  } else if (args[i] === '--badge-text-color' && args[i+1]) {
-    options.badgeTextColor = args[++i];
-  } else if (args[i] === '--badge-image' && args[i+1]) {
-    options.badgeImage = args[++i];
-  } else if (args[i] === '--clear') {
-    options.clear = true;
-  } else if (args[i] === '--help' || args[i] === '-h') {
+  const arg = args[i];
+  if (arg.startsWith('--')) {
+    const eqIdx = arg.indexOf('=');
+    let key, value;
+    if (eqIdx !== -1) {
+      key = arg.slice(0, eqIdx);
+      value = arg.slice(eqIdx + 1);
+    } else {
+      key = arg;
+      value = args[i + 1];
+    }
+
+    if (key === '--dir') {
+      options.dir = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--zip') {
+      options.zip = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--mode') {
+      options.mode = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--title') {
+      options.title = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--badge-text') {
+      options.badgeText = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--badge-color') {
+      options.badgeColor = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--badge-text-color') {
+      options.badgeTextColor = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--badge-image') {
+      options.badgeImage = value;
+      if (eqIdx === -1) i++;
+    } else if (key === '--clear') {
+      options.clear = true;
+    } else if (key === '--help') {
+      printUsage();
+      process.exit(0);
+    }
+  } else if (arg === '-h') {
     printUsage();
     process.exit(0);
   }
@@ -97,7 +121,7 @@ const config = {
   preloadedFiles: [],
   preloadedAppspace: null,
   bundleId: "",
-  mode: options.mode === 'strict' ? 'strict' : 'flexible'
+  mode: (options.mode && options.mode.toLowerCase() === 'strict') ? 'strict' : 'flexible'
 };
 
 let sourceDir = null;
