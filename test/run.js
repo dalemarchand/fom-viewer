@@ -21,6 +21,7 @@ const { test_ScrollIntoView } = require('./scroll-into-view.test.js');
 const { test_HistoryReset } = require('./history-reset.test.js');
 const { test_SubspaceFeature } = require('./subspace.test.js');
 const { test_PreloadBundle } = require('./preload-bundle.test.js');
+const { test_DragAndDrop } = require('./drag-and-drop.test.js');
 
 const args = process.argv.slice(2);
 const opts = {
@@ -1684,6 +1685,7 @@ async function runAllTests() {
         { name: 'ScrollIntoView', fn: test_ScrollIntoView },
         { name: 'HistoryReset', fn: test_HistoryReset },
         { name: 'PreloadBundle', fn: test_PreloadBundle },
+        { name: 'DragAndDrop', fn: test_DragAndDrop },
       ];
   
   for (const test of tests) {

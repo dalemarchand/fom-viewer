@@ -558,7 +558,7 @@ button.sort-option {
   cursor: pointer; 
   transition: all 0.2s; 
 }
-#dropZone:hover { border-color: var(--accent); background: var(--accent-light); }
+#dropZone:hover, #dropZone.dragover { border-color: var(--accent); background: var(--accent-light); }
 
 /* Overview dashboard overrides — #welcomeScreen.dashboard specificity beats #welcomeScreen */
 #welcomeScreen.dashboard {
@@ -1352,7 +1352,7 @@ button.sort-option {
   display: block;
 }
 
-#welcomeScreen.dashboard #dropZone:hover {
+#welcomeScreen.dashboard #dropZone:hover, #welcomeScreen.dashboard #dropZone.dragover {
   border-color: var(--accent);
   color: var(--accent);
   background: var(--accent-dim);
