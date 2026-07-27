@@ -2608,22 +2608,26 @@ function classifyAppspaceEntries(entries, objectClasses, interactionClasses) {
   const unknown = [];
   
   entries.forEach(entry => {
-    // Check object classes first
+    let matched = false;
+    
+    // Check object classes
     const objectMatch = findClassByRightSideMatch(entry.className, objectClasses);
     if (objectMatch) {
       objects.push({ ...entry, matchedClass: objectMatch.name });
-      return;
+      matched = true;
     }
     
-    // Check interaction classes next
+    // Check interaction classes
     const interactionMatch = findClassByRightSideMatch(entry.className, interactionClasses);
     if (interactionMatch) {
       interactions.push({ ...entry, matchedClass: interactionMatch.name });
-      return;
+      matched = true;
     }
     
     // No match found
-    unknown.push({ ...entry });
+    if (!matched) {
+      unknown.push({ ...entry });
+    }
   });
   
   return { objects, interactions, unknown };

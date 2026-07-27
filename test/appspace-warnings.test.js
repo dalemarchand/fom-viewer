@@ -362,6 +362,79 @@ async function test_AppspaceWarnings() {
 
     console.log('  ✓ Test 5 passed: Warnings aligned with unmapped classes');
 
+    // =========================================================================
+    // Test 6: Verify duplicate hierarchical names (HLAmanager.HLAfederate)
+    //         in both object and interaction trees match correctly without
+    //         generating unmapped-class warnings for either.
+    // =========================================================================
+    console.log('Test 6: Verify duplicate hierarchical names match in both trees...');
+
+    // Load an appspace that matches only HLAmanager.HLAfederate
+    const duplicateAppspaceContent = `; class,app1\nHLAmanager.HLAfederate,TestApp1\n`;
+
+    await page.evaluate((content) => {
+      const entries = parseAppspaceFile(content);
+      const objectClasses = state.mergedFOM?.objectClasses || [];
+      const interactionClasses = state.mergedFOM?.interactionClasses || [];
+      const classified = classifyAppspaceEntries(entries, objectClasses, interactionClasses);
+
+      state.appspace = {
+        fileName: 'test-duplicate.appspace',
+        entries: classified.objects,
+        interactions: classified.interactions,
+        unknown: classified.unknown
+      };
+      state.appspaceSubTab = 'objects';
+      state.history = [];
+
+      window.generateAppspaceWarnings(state, window.makeIssue);
+      window.updateIssuesTabVisibility(state);
+      updateUI();
+    }, duplicateAppspaceContent);
+
+    await sleep(500);
+
+    const dupCheck = await page.evaluate(() => {
+      // Check if warnings exist for either object class HLAmanager.HLAfederate or interaction class HLAmanager.HLAfederate
+      const federateWarnings = state.issues.filter(i =>
+        i.category === 'appspace' &&
+        i.message && (
+          i.message.includes('"HLAobjectRoot.HLAmanager.HLAfederate" has no appspace mapping') ||
+          i.message.includes('"HLAinteractionRoot.HLAmanager.HLAfederate" has no appspace mapping')
+        )
+      );
+
+      // Verify they are classified in both lists
+      const objectsMatched = (state.appspace?.entries || []).map(e => e.matchedClass);
+      const interactionsMatched = (state.appspace?.interactions || []).map(e => e.matchedClass);
+
+      return {
+        federateWarningsCount: federateWarnings.length,
+        federateWarnings: federateWarnings.map(i => i.message),
+        objectsMatched,
+        interactionsMatched
+      };
+    });
+
+    console.log(`  Federate warnings count: ${dupCheck.federateWarningsCount}`);
+    console.log('  Federate warnings messages:', dupCheck.federateWarnings);
+    console.log('  Objects matched classes:', dupCheck.objectsMatched);
+    console.log('  Interactions matched classes:', dupCheck.interactionsMatched);
+
+    if (dupCheck.federateWarningsCount > 0) {
+      throw new Error(`Expected 0 federate warnings, but got ${dupCheck.federateWarningsCount} warnings: ${JSON.stringify(dupCheck.federateWarnings)}`);
+    }
+
+    if (!dupCheck.objectsMatched.includes('HLAobjectRoot.HLAmanager.HLAfederate')) {
+      throw new Error('Expected HLAobjectRoot.HLAmanager.HLAfederate to be matched in objects list');
+    }
+
+    if (!dupCheck.interactionsMatched.includes('HLAinteractionRoot.HLAmanager.HLAfederate')) {
+      throw new Error('Expected HLAinteractionRoot.HLAmanager.HLAfederate to be matched in interactions list');
+    }
+
+    console.log('  ✓ Test 6 passed: Duplicate hierarchical names matched in both trees without warnings');
+
     console.log('\n✓ All appspace warnings tests passed!');
     return true;
   } catch (error) {
