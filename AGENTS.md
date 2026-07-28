@@ -83,19 +83,25 @@ Always verify syntax of JavaScript entry points:
 node --check src/main.js
 ```
 
-### Step 2: Unit Verification
+### Step 2: Type Check
+Verify JSDoc type validation across core business logic:
+```bash
+npm run typecheck
+```
+
+### Step 3: Unit Verification
 Run the Vitest logic test suite:
 ```bash
 npm run test:unit
 ```
 
-### Step 3: Rebuild HTML
+### Step 4: Rebuild HTML
 Compile assets into the single HTML output:
 ```bash
 npm run build
 ```
 
-### Step 4: E2E Integration Verification
+### Step 5: E2E Integration Verification
 Run browser automation scenarios using Puppeteer:
 ```bash
 npm test

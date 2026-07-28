@@ -1,3 +1,4 @@
+// @ts-check
 export function topologicalSort(files) {
   const graph = {};
   const inDegree = {};
