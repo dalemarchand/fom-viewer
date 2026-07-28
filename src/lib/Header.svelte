@@ -4,6 +4,8 @@
   import * as fomStore from './stores/fomStore.svelte.js';
   import * as appspaceStore from './stores/appspaceStore.svelte.js';
 
+  let { ontoggledrawer = () => {} } = $props();
+
   let isMobile = $state(false);
 
   $effect(() => {
@@ -70,6 +72,9 @@
 
 <header data-testid="app-header">
   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    {#if isMobile}
+      <button class="drawer-toggle-btn" onclick={ontoggledrawer} aria-label="Toggle navigation drawer" data-testid="drawerToggle">☰</button>
+    {/if}
     {#if customConfig.badgeImage}
       <img class="custom-badge-img" src={customConfig.badgeImage} alt="badge" />
     {:else if customConfig.badgeText}
@@ -141,6 +146,20 @@
 </header>
 
 <style>
+  .drawer-toggle-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.2s;
+  }
+  .drawer-toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
   .theme-selector-container {
     display: flex;
     flex-direction: column;
