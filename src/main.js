@@ -86,6 +86,7 @@ import * as storage from './lib/storage.js';
 import * as searchStore from './lib/stores/searchStore.svelte.js';
 import { initRecentFiles, addRecentFile } from './lib/stores/recentFilesStore.svelte.js';
 import * as appspaceStore from './lib/stores/appspaceStore.svelte.js';
+import { parseAppspaceFile, classifyAppspaceEntries } from './lib/appspace.js';
 import customConfig from './custom-config.json';
 
 function hashCode(str) {
@@ -1655,34 +1656,7 @@ function renderAppspacesPanel() {
   }
 }
 
-// Find a class in the list using right-side matching (like findAppspaceForClass does)
-function findClassByRightSideMatch(entryName, classList) {
-  let bestMatch = null;
-  let bestLength = 0;
 
-  classList.forEach(cls => {
-    const entryParts = entryName.split('.');
-    const classParts = cls.name.split('.');
-
-    // Check if entry matches the right side of className
-    if (classParts.length >= entryParts.length) {
-      const startIdx = classParts.length - entryParts.length;
-      let matches = true;
-      for (let i = 0; i < entryParts.length; i++) {
-        if (classParts[startIdx + i] !== entryParts[i]) {
-          matches = false;
-          break;
-        }
-      }
-      if (matches && entryParts.length > bestLength) {
-        bestMatch = cls;
-        bestLength = entryParts.length;
-      }
-    }
-  });
-
-  return bestMatch;
-}
 
 function makeSnippet(item, type) {
   if (!item) return '';
@@ -2323,46 +2297,7 @@ function setupTabScroll() {
 // APPSPACE FUNCTIONALITY
 // ============================================================================
 
-// Parse appspace file content
-function parseAppspaceFile(content) {
-  const lines = content.split('\n');
-  const entries = [];
-  
-  lines.forEach(line => {
-    line = line.trim();
-    if (!line || line.startsWith('#')) return;
-    
-    // Skip CSV header line if present
-    const lower = line.toLowerCase();
-    if (lower.startsWith('class,') || lower.startsWith('classname,') || lower.startsWith('class|') || lower.startsWith('classname|')) {
-      return;
-    }
-    
-    let className = '';
-    let apps = [];
-    
-    if (line.includes('|')) {
-      const parts = line.split('|');
-      if (parts.length === 2) {
-        className = parts[0].trim();
-        apps = parts[1].split(',').map(a => a.trim()).filter(a => a);
-      }
-    } else if (line.includes(',')) {
-      const firstCommaIdx = line.indexOf(',');
-      if (firstCommaIdx > 0) {
-        className = line.substring(0, firstCommaIdx).trim();
-        const appsStr = line.substring(firstCommaIdx + 1).trim();
-        apps = appsStr.split(/[;,]/).map(a => a.trim().replace(/^["']|["']$/g, '')).filter(a => a);
-      }
-    }
-    
-    if (className && apps.length > 0) {
-      entries.push({ className, apps });
-    }
-  });
-  
-  return entries;
-}
+
 
 // Load appspace button click handler
 function setupAppspaceButtons() {
@@ -2601,37 +2536,7 @@ HLAinteractionRoot.Warfare|SIM_APP`;
   URL.revokeObjectURL(url);
 }
 
-// Classify appspace entries: check object classes first, then interactions, then unknown
-function classifyAppspaceEntries(entries, objectClasses, interactionClasses) {
-  const objects = [];
-  const interactions = [];
-  const unknown = [];
-  
-  entries.forEach(entry => {
-    let matched = false;
-    
-    // Check object classes
-    const objectMatch = findClassByRightSideMatch(entry.className, objectClasses);
-    if (objectMatch) {
-      objects.push({ ...entry, matchedClass: objectMatch.name });
-      matched = true;
-    }
-    
-    // Check interaction classes
-    const interactionMatch = findClassByRightSideMatch(entry.className, interactionClasses);
-    if (interactionMatch) {
-      interactions.push({ ...entry, matchedClass: interactionMatch.name });
-      matched = true;
-    }
-    
-    // No match found
-    if (!matched) {
-      unknown.push({ ...entry });
-    }
-  });
-  
-  return { objects, interactions, unknown };
-}
+
 
 // Update Appspaces tab count
 function updateAppspaceTabCount() {
