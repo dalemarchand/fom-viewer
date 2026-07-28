@@ -68,3 +68,24 @@ describe('prepare-bundle.cjs CLI script', () => {
     expect(config.badgeColor).toBe('#123456');
   });
 });
+
+describe('Committed build check', () => {
+  it('verifies that the root fom-viewer.html is a clean, non-bundled build', () => {
+    const htmlPath = path.resolve(__dirname, '../fom-viewer.html');
+    if (fs.existsSync(htmlPath)) {
+      const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+      
+      // A bundled build has a bundleId starting with "bundle-"
+      const isBundled = htmlContent.includes('bundleId:') && 
+                        /bundleId:\s*[`"']bundle-/.test(htmlContent);
+      
+      expect(isBundled).toBe(false);
+      
+      // Double check that the size of fom-viewer.html is reasonably small (less than 1.5MB)
+      // The clean build is ~350kB, whereas a bundled build with many FOM XML files easily exceeds 6MB.
+      const stats = fs.statSync(htmlPath);
+      expect(stats.size).toBeLessThan(1500000); // 1.5 MB limit for a clean build
+    }
+  });
+});
+
