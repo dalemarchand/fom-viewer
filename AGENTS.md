@@ -46,6 +46,12 @@ For multi-step tasks, state a brief plan:
 3. [Step] → verify: [check]
 ```
 
+## 5. Documentation Maintenance
+**Keep root documentation clean, actionable, and current.**
+* Only active, current user-facing guides, bundle instructions, and backlog items should remain in the root of the `docs/` folder.
+* Completed plans, audits, specs, migration logs, decision records, and retired architectural design documents must be moved into the `docs/historical/` subfolder as soon as they are completed or made obsolete.
+* Always check for orphan or outdated references in root documents when moving files.
+
 ---
 
 ## Project Overview
