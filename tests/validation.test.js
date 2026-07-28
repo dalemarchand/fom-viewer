@@ -103,6 +103,64 @@ describe('validate', () => {
     validate(state, makeIssue);
     expect(state.issues.some(i => i.type === 'enum-values')).toBe(true);
   });
+
+  it('detects object attribute count conflicts', () => {
+    const state = {
+      files: [
+        { name: 'A', objectClasses: [{ name: 'Cls', attributes: [{ name: 'a1' }, { name: 'a2' }] }], interactionClasses: [], dataTypes: emptyMerged().dataTypes },
+        { name: 'B', objectClasses: [{ name: 'Cls', attributes: [{ name: 'a1' }] }], interactionClasses: [], dataTypes: emptyMerged().dataTypes }
+      ],
+      mergedFOM: {
+        ...emptyMerged(),
+        objectClasses: [{ name: 'Cls', attributes: [{ name: 'a1' }, { name: 'a2' }], _sources: ['A', 'B'] }]
+      }
+    };
+    validate(state, makeIssue);
+    expect(state.issues.some(i => i.type === 'object-attributes')).toBe(true);
+  });
+
+  it('detects interaction parameter count conflicts', () => {
+    const state = {
+      files: [
+        { name: 'A', interactionClasses: [{ name: 'Int', parameters: [{ name: 'p1' }, { name: 'p2' }] }], objectClasses: [], dataTypes: emptyMerged().dataTypes },
+        { name: 'B', interactionClasses: [{ name: 'Int', parameters: [{ name: 'p1' }] }], objectClasses: [], dataTypes: emptyMerged().dataTypes }
+      ],
+      mergedFOM: {
+        ...emptyMerged(),
+        interactionClasses: [{ name: 'Int', parameters: [{ name: 'p1' }, { name: 'p2' }], _sources: ['A', 'B'] }]
+      }
+    };
+    validate(state, makeIssue);
+    expect(state.issues.some(i => i.type === 'interaction-parameters')).toBe(true);
+  });
+
+  it('detects transportation conflicts', () => {
+    const state = {
+      files: [
+        { name: 'A', transportations: [{ name: 'Reliable', reliable: 'Yes', semantics: 'Sem A' }] },
+        { name: 'B', transportations: [{ name: 'Reliable', reliable: 'No', semantics: 'Sem B' }] }
+      ],
+      mergedFOM: {
+        ...emptyMerged(),
+        transportations: [{ name: 'Reliable', reliable: 'Yes', semantics: 'Sem A', _sources: ['A', 'B'] }]
+      }
+    };
+    validate(state, makeIssue);
+    expect(state.issues.some(i => i.type === 'transportation')).toBe(true);
+  });
+
+  it('detects missing dependencies', () => {
+    const state = {
+      files: [
+        { name: 'A', dependencies: ['MissingModule'] }
+      ],
+      mergedFOM: {
+        ...emptyMerged()
+      }
+    };
+    validate(state, makeIssue);
+    expect(state.issues.some(i => i.type === 'missing-dependency')).toBe(true);
+  });
 });
 
 describe('detectCircularDependencies', () => {
