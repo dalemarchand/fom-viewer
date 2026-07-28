@@ -10,6 +10,7 @@ env:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   release:
@@ -62,14 +63,20 @@ jobs:
           npm pkg set version=$VERSION
           npm install --package-lock-only
 
-      - name: Commit package.json version update
+      - name: Commit and push version update via Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          BRANCH_NAME="version-bump-${{ steps.next_version.outputs.version }}"
+          git checkout -b "$BRANCH_NAME"
           git add package.json package-lock.json
           git commit -m "Bump version to ${{ steps.next_version.outputs.version }} [skip ci]"
-
-      - name: Push version update
-        run: |
-          git push origin main
+          git push origin "$BRANCH_NAME"
+          PR_URL=$(gh pr create --title "Bump version to ${{ steps.next_version.outputs.version }} [skip ci]" --body "Automated version bump for release ${{ steps.next_version.outputs.version }}." --head "$BRANCH_NAME" --base main)
+          gh pr merge "$PR_URL" --merge --delete-branch
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
 
       - uses: actions/setup-node@v4
         with:
