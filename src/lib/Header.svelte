@@ -58,6 +58,9 @@
 
   function setTheme(theme) {
     currentTheme = theme;
+    if (typeof window.applyTheme === 'function') {
+      window.applyTheme(theme);
+    }
     const sel = document.getElementById('overflowThemeSelect');
     if (sel) {
       sel.value = theme;
@@ -66,7 +69,11 @@
   }
 
   function handleNativeSelectChange(e) {
-    currentTheme = e.target.value;
+    const theme = e.target.value;
+    currentTheme = theme;
+    if (typeof window.applyTheme === 'function') {
+      window.applyTheme(theme);
+    }
   }
 </script>
 
