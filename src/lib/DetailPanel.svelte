@@ -235,6 +235,10 @@ import IssueRenderer from './TypeRenderer/Issue.svelte';
   });
 </script>
 
+{#if selectedItem}
+  <button class="detail-back-btn" onclick={() => uiStore.setSelectedItem(null)} data-testid="detailBackBtn">← Back to List</button>
+{/if}
+
 <div class="detail-header" id="detailHeader" style:display={!selectedItem || (!detailData && selectedItem?.type !== 'issue' && selectedItem?.type !== 'appspace' && !selectedItem?.type?.startsWith('appspace_')) ? 'none' : 'block'}>
   <h2 class="detail-title" id="detailTitle"><span>{selectedItem?.type === 'issue' ? selectedItem?.message ?? selectedItem?.name ?? '' : selectedItem?.name ?? ''}</span></h2>
   {#if selectedItem?.type !== 'issue'}

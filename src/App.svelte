@@ -210,6 +210,28 @@ function handleTreeFilterInput(e) {
   }
 }
 
+let drawerOpen = $state(false);
+function toggleDrawer() {
+  drawerOpen = !drawerOpen;
+}
+
+let currentMobileView = $state('list');
+let selectedItem = $derived(uiStore.ui.selectedItem);
+
+$effect(() => {
+  if (selectedItem) {
+    currentMobileView = 'detail';
+  } else {
+    currentMobileView = 'list';
+  }
+});
+
+$effect(() => {
+  if (currentTab) {
+    drawerOpen = false;
+  }
+});
+
 onMount(() => {
   window.addEventListener('keydown', handleKeydown);
   return () => {
@@ -220,10 +242,11 @@ onMount(() => {
 
 <div id="toast" class="toast" data-testid="toast"></div>
 <div id="app" data-testid="app">
-  <Header />
-  <div class="app-body">
+  <Header ontoggledrawer={toggleDrawer} />
+  <div class="app-body" class:drawer-open={drawerOpen}>
+    <div class="drawer-backdrop" onclick={() => drawerOpen = false} role="presentation"></div>
     <LeftRail />
-    <div class="content-area" class:pinned={uiStore.ui.leftRailPinned}>
+    <div class="content-area" class:pinned={uiStore.ui.leftRailPinned} class:mobile-view-list={currentMobileView === 'list'} class:mobile-view-detail={currentMobileView === 'detail'}>
       {#if currentTab === 'overview'}
         <OverviewDashboard />
       {:else}

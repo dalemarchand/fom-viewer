@@ -41,6 +41,7 @@ function escapeHtml(str) {
 }
 
 function handleMouseEnter(e, snippet) {
+  if (window.matchMedia('(max-width: 767px)').matches) return;
   if (!snippet) return;
   tooltipText = snippet;
   tooltipVisible = true;

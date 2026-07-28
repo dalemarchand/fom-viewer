@@ -1363,28 +1363,105 @@ button.sort-option {
    ============================================================================ */
 
 @media (max-width: 767px) {
-  .content-area {
-    flex-direction: column;
-    padding: 8px;
-    gap: 8px;
+  .drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 10001;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.25s ease;
   }
 
-  .sidebar {
+  .app-body.drawer-open .drawer-backdrop {
+    display: block;
+    opacity: 1;
+  }
+
+  .left-rail {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 10002;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+  }
+
+  .app-body.drawer-open .left-rail {
+    width: 200px !important;
+    transform: translateX(0);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .app-body.drawer-open .left-rail .rail-label {
+    display: inline !important;
+  }
+
+  .app-body.drawer-open .left-rail .rail-item {
+    justify-content: flex-start !important;
+    gap: 8px !important;
     width: 100% !important;
-    max-height: 35vh;
+    padding: 0 8px !important;
+    font-size: 14px !important;
+  }
+
+  .app-body.drawer-open .left-rail .rail-section {
+    align-items: stretch !important;
+    padding: 0 4px !important;
+  }
+
+  .content-area {
+    padding: 8px;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .content-area.mobile-view-list .sidebar {
+    display: flex !important;
+    width: 100% !important;
+    max-height: 100% !important;
     border-radius: var(--radius-sm);
+  }
+
+  .content-area.mobile-view-list .detail {
+    display: none !important;
+  }
+
+  .content-area.mobile-view-detail .sidebar {
+    display: none !important;
+  }
+
+  .content-area.mobile-view-detail .detail {
+    display: flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: var(--radius-sm);
+  }
+
+  .detail-back-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  }
+
+  .detail-back-btn:hover {
+    background: var(--border-hover);
   }
 
   .resize-handle {
     display: none;
-  }
-
-  .detail {
-    border-radius: var(--radius-sm);
-  }
-
-  .app-body {
-    /* left-rail stays in flow at 48px on mobile */
   }
 
   .header-controls .global-search {
@@ -1399,6 +1476,21 @@ button.sort-option {
     font-size: 16px;
   }
 }
+
+@media (max-width: 500px) {
+  #appspaceFormatModal > div {
+    width: 95% !important;
+    max-height: 90vh !important;
+  }
+  #appspaceFormatModal > div > div {
+    padding: 16px !important;
+  }
+  .search-panel {
+    width: 95% !important;
+    max-height: 85vh !important;
+  }
+}
+
 
 /* ============================================================================
    CUSTOM BRANDING & PRELOADED BUNDLE BADGES
