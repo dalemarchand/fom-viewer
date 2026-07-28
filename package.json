@@ -1,6 +1,6 @@
 {
   "name": "fom-viewer",
-  "version": "3.0.17",
+  "version": "3.1.0",
   "description": "Single page HTML viewer for IEEE 1516 FOM files",
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "build:dev": "vite build --mode development",
     "build:map": "vite build --sourcemap && cp dist/index.html dist/fom-viewer.html && cp dist/fom-viewer.html fom-viewer.html && node -e \"const fs = require('fs'); ['dist/fom-viewer.html', 'fom-viewer.html'].forEach(f => { if (fs.existsSync(f)) { const h = fs.readFileSync(f, 'utf8'); fs.writeFileSync(f, h.replace(/new Worker/g, 'new window.Worker')); } })\"",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
     "test": "cd test && npm test",
     "test:combined": "npm run build && cd test && npm run test -- --combined",
     "test:unit": "vitest run",
@@ -21,6 +22,8 @@
     "eslint": "^8.57.1",
     "jsdom": "^29.1.1",
     "svelte": "^5.56.2",
+    "svelte-check": "^4.0.1",
+    "typescript": "^5.5.4",
     "vite": "^8.0.16",
     "vite-plugin-singlefile": "^2.3.3",
     "vitest": "^4.1.8"

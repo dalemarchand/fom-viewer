@@ -1,3 +1,4 @@
+// @ts-check
 function getSourceVariantAlternatives(item, source, files) {
   const file = files.find(f => f.name === source);
   if (!file) return item.alternatives || [];
@@ -448,7 +449,7 @@ export function validate(state, makeIssue) {
 }
 
 export function updateIssuesTabVisibility(state) {
-  const tab = document.querySelector('.tab[data-tab="issues"]');
+  const tab = /** @type {HTMLElement | null} */(document.querySelector('.tab[data-tab="issues"]'));
   if (!tab) return;
   tab.style.display = state.issues.length > 0 ? '' : 'none';
 }

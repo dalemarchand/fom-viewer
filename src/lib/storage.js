@@ -11,7 +11,7 @@ function initDB() {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => { db = request.result; resolve(db); };
     request.onupgradeneeded = (event) => {
-      const database = event.target.result;
+      const database = request.result;
       if (!database.objectStoreNames.contains(STORE_NAME)) {
         database.createObjectStore(STORE_NAME, { keyPath: 'name' });
       }
