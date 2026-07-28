@@ -111,6 +111,35 @@ async function runThemeBarRemovalTest() {
         throw new Error(`Expected theme to be "${newTheme}" after switch, but was "${appliedTheme}"`);
       }
       console.log('✓ Theme toggle via overflow menu works');
+
+      // TEST 4b: Premium Segmented Theme Buttons Click Test
+      console.log('Testing premium segmented buttons...');
+      // Click dark theme button
+      await page.click('button[aria-label="Dark theme"]');
+      await page.waitForTimeout(200);
+      const clickedDarkTheme = await page.evaluate(() => {
+        return document.documentElement.getAttribute('data-theme');
+      });
+      console.log(`Theme after clicking dark theme button: ${clickedDarkTheme}`);
+      if (clickedDarkTheme !== 'dark') {
+        throw new Error(`Expected theme to be "dark" after clicking Dark button, but was "${clickedDarkTheme}"`);
+      }
+
+      // Reopen overflow menu to expose Light button
+      await page.click('[data-testid="overflowToggle"]');
+      await page.waitForTimeout(200);
+
+      // Click light theme button
+      await page.click('button[aria-label="Light theme"]');
+      await page.waitForTimeout(200);
+      const clickedLightTheme = await page.evaluate(() => {
+        return document.documentElement.getAttribute('data-theme');
+      });
+      console.log(`Theme after clicking light theme button: ${clickedLightTheme}`);
+      if (clickedLightTheme !== 'light') {
+        throw new Error(`Expected theme to be "light" after clicking Light button, but was "${clickedLightTheme}"`);
+      }
+      console.log('✓ Premium segmented theme buttons click test passed');
     }
 
     // ============================================================
@@ -130,8 +159,8 @@ async function runThemeBarRemovalTest() {
     const hasRemovedClasses = await page.evaluate(() => {
       const allElements = document.querySelectorAll('*');
       for (const el of allElements) {
-        if (el.className && typeof el.className === 'string') {
-          if (el.className.includes('theme-bar') || el.className.includes('theme-select')) {
+        if (el.classList && el.classList.contains) {
+          if (el.classList.contains('theme-bar') || el.classList.contains('theme-select')) {
             return true;
           }
         }
