@@ -24,6 +24,23 @@ async function test_MobileLayout() {
     await page.waitForFunction(() => document.getElementById('app') !== null, { timeout: 10000 });
     await page.waitForTimeout(500);
 
+    // Verify no horizontal/vertical overflow initial state
+    let widthCheck = await page.evaluate(() => {
+      return {
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight
+      };
+    });
+    console.log('  Initial viewport layout sizes:', widthCheck);
+    if (widthCheck.scrollWidth > 375) {
+      throw new Error(`Horizontal overflow detected! Page scrollWidth: ${widthCheck.scrollWidth}, expected <= 375`);
+    }
+    if (widthCheck.scrollHeight > 667) {
+      throw new Error(`Vertical overflow detected on welcome screen! Page scrollHeight: ${widthCheck.scrollHeight}, expected <= 667`);
+    }
+
     // 1. Verify drawer toggle button is present on mobile
     const toggleExists = await page.evaluate(() => {
       const btn = document.querySelector('[data-testid="drawerToggle"]');
@@ -49,7 +66,7 @@ async function test_MobileLayout() {
     if (!isDrawerOpen) throw new Error('Expected drawer to open after toggle button click');
 
     // 4. Click backdrop to close drawer
-    await page.click('.drawer-backdrop');
+    await page.mouse.click(300, 300);
     await page.waitForTimeout(300);
     isDrawerOpen = await page.evaluate(() => {
       return document.querySelector('.app-body').classList.contains('drawer-open');
