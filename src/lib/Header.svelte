@@ -41,6 +41,31 @@
     
     return false;
   });
+
+  let currentTheme = $state('system');
+
+  $effect(() => {
+    currentTheme = localStorage.getItem('fomViewerTheme') || 'system';
+    
+    const handleStorage = () => {
+      currentTheme = localStorage.getItem('fomViewerTheme') || 'system';
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  });
+
+  function setTheme(theme) {
+    currentTheme = theme;
+    const sel = document.getElementById('overflowThemeSelect');
+    if (sel) {
+      sel.value = theme;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  function handleNativeSelectChange(e) {
+    currentTheme = e.target.value;
+  }
 </script>
 
 <header data-testid="app-header">
@@ -81,11 +106,17 @@
     <button class="btn header-btn" id="backBtn" data-testid="backBtn" style="display:none">← Back</button>
     <input type="file" id="fileInput" data-testid="fileInput" multiple accept=".xml" style="display:none" />
     <OverflowMenu>
-      <div class="overflow-item">
-        <select id="overflowThemeSelect" onchange={(e) => window.applyTheme(e.target.value)} style="width:100%;background:transparent;color:inherit;border:none;padding:8px;font-size:13px">
-          <option value="light">☀️ Light</option>
-          <option value="dark">🌙 Dark</option>
-          <option value="system">💻 System</option>
+      <div class="theme-selector-container">
+        <span class="theme-selector-label">Theme</span>
+        <div class="theme-segmented-control">
+          <button type="button" class="theme-btn" class:active={currentTheme === 'light'} onclick={() => setTheme('light')} aria-label="Light theme">☀️ Light</button>
+          <button type="button" class="theme-btn" class:active={currentTheme === 'dark'} onclick={() => setTheme('dark')} aria-label="Dark theme">🌙 Dark</button>
+          <button type="button" class="theme-btn" class:active={currentTheme === 'system'} onclick={() => setTheme('system')} aria-label="System theme">💻 System</button>
+        </div>
+        <select id="overflowThemeSelect" onchange={handleNativeSelectChange} style="display:none">
+          <option value="light">light</option>
+          <option value="dark">dark</option>
+          <option value="system">system</option>
         </select>
       </div>
       <div class="header-separator" style="margin:4px 0"></div>
@@ -108,4 +139,60 @@
     </OverflowMenu>
   </div>
 </header>
+
+<style>
+  .theme-selector-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .theme-selector-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+  }
+  .theme-segmented-control {
+    display: flex;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+  }
+  .theme-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .theme-btn:hover {
+    color: var(--text-primary);
+    background: rgba(0, 0, 0, 0.05);
+  }
+  :global([data-theme="dark"]) .theme-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .theme-btn.active {
+    color: var(--accent);
+    background: var(--bg-secondary);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  :global([data-theme="dark"]) .theme-btn.active {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+</style>
 
