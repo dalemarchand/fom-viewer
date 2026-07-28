@@ -64,4 +64,23 @@
     opacity: 0.7;
     text-align: center;
   }
+
+  @media (max-width: 767px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .stat-item {
+      padding: 10px 8px;
+    }
+    .stat-value {
+      font-size: 20px;
+    }
+    .stat-label {
+      font-size: 10px;
+    }
+    .stat-sub {
+      font-size: 9px;
+    }
+  }
 </style>
