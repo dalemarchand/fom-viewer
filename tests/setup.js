@@ -7,3 +7,10 @@ if (typeof globalThis.DOMParser === 'undefined') {
     }
   };
 }
+
+// Polyfill URL.createObjectURL and URL.revokeObjectURL for download/export tests
+if (typeof globalThis.URL.createObjectURL === 'undefined') {
+  globalThis.URL.createObjectURL = () => 'blob:mock-url';
+  globalThis.URL.revokeObjectURL = () => {};
+}
+
