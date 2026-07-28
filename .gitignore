@@ -5,3 +5,6 @@ test/screenshots/
 test/diagnose-*.js
 fom-worker*.js
 mockup.html
+.opencode/
+.swarm/
+.codenomad/
