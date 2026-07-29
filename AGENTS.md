@@ -109,7 +109,13 @@ npm run build
 ```
 
 ### Step 5: E2E Integration Verification
+> [!IMPORTANT]
+> Always execute the E2E verification test suite (`npm test`) immediately after rebuilding the app (`npm run build`) to ensure the compiled standalone HTML runs correctly.
 Run browser automation scenarios using Puppeteer:
 ```bash
 npm test
 ```
+
+### Step 6: Commit and CI Rules
+> [!WARNING]
+> Never append `[skip ci]` or bypass CI test suite execution in any commit message or pull request description unless explicitly granted permission by the user.
