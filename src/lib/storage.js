@@ -134,13 +134,36 @@ export async function loadBundleId() {
   });
 }
 
+export async function saveAppVersion(version) {
+  await initDB();
+  const transaction = db.transaction([STORE_NAME], 'readwrite');
+  const store = transaction.objectStore(STORE_NAME);
+  store.put({ name: '__appVersion__', version });
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+export async function loadAppVersion() {
+  await initDB();
+  const transaction = db.transaction([STORE_NAME], 'readonly');
+  const store = transaction.objectStore(STORE_NAME);
+  const request = store.get('__appVersion__');
+  return new Promise((resolve) => {
+    request.onsuccess = () => resolve(request.result?.version || null);
+    request.onerror = () => resolve(null);
+  });
+}
+
 export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
   await initDB();
   const transaction = db.transaction([STORE_NAME], 'readwrite');
   const store = transaction.objectStore(STORE_NAME);
-  // Preserve __recentFiles__ and __bundleId__ before clearing
+  // Preserve __recentFiles__, __bundleId__ and __appVersion__ before clearing
   const recentFilesReq = store.get('__recentFiles__');
   const bundleIdReq = store.get('__bundleId__');
+  const appVersionReq = store.get('__appVersion__');
   const recentFiles = await new Promise((resolve) => {
     recentFilesReq.onsuccess = () => resolve(recentFilesReq.result || null);
     recentFilesReq.onerror = () => resolve(null);
@@ -148,6 +171,10 @@ export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
   const bundleIdVal = await new Promise((resolve) => {
     bundleIdReq.onsuccess = () => resolve(bundleIdReq.result || null);
     bundleIdReq.onerror = () => resolve(null);
+  });
+  const appVersionVal = await new Promise((resolve) => {
+    appVersionReq.onsuccess = () => resolve(appVersionReq.result || null);
+    appVersionReq.onerror = () => resolve(null);
   });
   
   store.clear();
@@ -160,6 +187,9 @@ export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
   }
   if (bundleIdVal) {
     store.put(bundleIdVal);
+  }
+  if (appVersionVal) {
+    store.put(appVersionVal);
   }
   if (appspaceData) {
     store.put({ name: '__appspace__', data: appspaceData, subTab: appspaceSubTab });
