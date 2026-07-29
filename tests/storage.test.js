@@ -51,7 +51,7 @@ globalThis.indexedDB = {
 };
 
 // Now import storage
-import { saveFiles, saveUiState, saveAppspace, loadUiState, loadAppspace, loadAllFiles, clearAll, clearAppspace, saveBundleId, loadBundleId, saveAll } from '../src/lib/storage.js';
+import { saveFiles, saveUiState, saveAppspace, loadUiState, loadAppspace, loadAllFiles, clearAll, clearAppspace, saveBundleId, loadBundleId, saveAll, saveAppVersion, loadAppVersion } from '../src/lib/storage.js';
 
 describe('storage helper', () => {
   beforeEach(() => {
@@ -102,11 +102,23 @@ describe('storage helper', () => {
     expect(mockObjectStore.clear).toHaveBeenCalled();
   });
 
+  it('saveAppVersion and loadAppVersion write and read appVersion key', async () => {
+    mockObjectStore.put.mockImplementation(() => createMockRequest(null));
+    await saveAppVersion('1.2.3');
+    expect(mockObjectStore.put).toHaveBeenCalledWith({ name: '__appVersion__', version: '1.2.3' });
+
+    mockObjectStore.get.mockImplementation(() => createMockRequest({ name: '__appVersion__', version: '1.2.3' }));
+    const version = await loadAppVersion();
+    expect(version).toBe('1.2.3');
+    expect(mockObjectStore.get).toHaveBeenCalledWith('__appVersion__');
+  });
+
   it('saveAll clears the store and updates all files, uiState, and appspace while preserving config meta keys', async () => {
-    // get mock for preserving recentFiles and bundleId
+    // get mock for preserving recentFiles, bundleId and appVersion
     mockObjectStore.get.mockImplementation((key) => {
       if (key === '__recentFiles__') return createMockRequest({ name: '__recentFiles__', entries: [] });
       if (key === '__bundleId__') return createMockRequest({ name: '__bundleId__', bundleId: 'b123' });
+      if (key === '__appVersion__') return createMockRequest({ name: '__appVersion__', version: '1.2.3' });
       return createMockRequest(null);
     });
     mockObjectStore.clear.mockImplementation(() => createMockRequest(null));

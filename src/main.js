@@ -2,6 +2,13 @@
 // SVELTE APP ENTRY
 // ============================================================================
 
+// Force fresh load on back/forward navigation (disable bfcache)
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
 import { mount } from 'svelte';
 import App from './App.svelte';
 import './styles.css';
@@ -227,12 +234,20 @@ async function loadFromStorage() {
         console.warn('Failed to load UI state in strict mode:', e);
       }
     } else {
+      let storedVersion = null;
       try {
         storedBundleId = await storage.loadBundleId();
+        storedVersion = await storage.loadAppVersion();
       } catch (e) {
-        console.warn('Failed to load bundle ID:', e);
+        console.warn('Failed to load cache metadata:', e);
       }
-      if (customConfig.bundleId && storedBundleId !== customConfig.bundleId) {
+      
+      const currentVersion = '__VERSION__';
+      const isBundleActive = !!customConfig.bundleId;
+      const isVersionMismatch = storedVersion && storedVersion !== currentVersion;
+      const isBundleMismatch = isBundleActive && storedBundleId !== customConfig.bundleId;
+
+      if (isBundleMismatch || (isBundleActive && isVersionMismatch)) {
         try {
           await storage.clearAll();
           if (customConfig.preloadedFiles && customConfig.preloadedFiles.length > 0) {
@@ -248,6 +263,7 @@ async function loadFromStorage() {
             );
           }
           await storage.saveBundleId(customConfig.bundleId);
+          await storage.saveAppVersion(currentVersion);
           await storage.saveUiState({
             currentTab: 'overview',
             currentSubTab: 'basic',
