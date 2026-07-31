@@ -32,9 +32,10 @@ When your changes create orphans:
 
 The test: Every changed line should trace directly to the user's request.
 
-## 4. Goal-Driven Execution
-**Define success criteria. Loop until verified.**
-Transform tasks into verifiable goals:
+## 4. Goal-Driven Execution & Automatic Test Coverage Expansion
+**Define success criteria. Loop until verified. Always evaluate and expand test coverage.**
+- Anytime work is done in the codebase, evaluate existing tests and ensure test coverage is updated and expanded as needed (both Vitest unit tests in `tests/` and Puppeteer E2E tests in `test/`).
+- **Mandatory Type Check**: Always run full type validation (`npm run typecheck`) after any code changes to verify 0 type errors exist across JavaScript files and Svelte components.
 - "Add validation" → "Write tests for invalid inputs, then make them pass"
 - "Fix the bug" → "Write a test that reproduces it, then make it pass"
 - "Refactor X" → "Ensure tests pass before and after"
@@ -91,7 +92,7 @@ node --check src/main.js
 ```
 
 ### Step 2: Type Check
-Verify JSDoc type validation across core business logic:
+Verify JSDoc and TypeScript type validation across all core business logic and Svelte components (executes `tsc --noEmit && svelte-check`):
 ```bash
 npm run typecheck
 ```

@@ -108,7 +108,7 @@ import IssueRenderer from './TypeRenderer/Issue.svelte';
       }
       source = item.name;
     } else if (item.type === 'time') {
-      data = { ...fom?.time } || {};
+      data = { ...(fom?.time || {}) };
       source = 'Time Configuration';
     } else if (['basic', 'simple', 'array', 'fixed', 'enum', 'variant'].includes(item.type)) {
       const raw = fom?.dataTypes?.[item.type]?.find(d => d.name === item.name);

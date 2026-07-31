@@ -3,12 +3,12 @@
   import * as fomStore from './stores/fomStore.svelte.js';
 
   let files = $derived(recentFiles.getRecentFiles());
-  let loadedNames = $derived(new Set(fomStore.getFiles().map(f => f.name)));
+  let loadedNames = $derived(new Set(fomStore.getFiles().flatMap(f => [f.name, f.fileName].filter(Boolean))));
 
   function formatTime(ts) {
     const d = new Date(ts);
     const now = new Date();
-    const diff = now - d;
+    const diff = now.getTime() - d.getTime();
     if (diff < 60000) return 'Just now';
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
@@ -17,7 +17,10 @@
 
   function handleClick(name) {
     if (loadedNames.has(name)) {
-      window.__switchToModule?.(name);
+      const targetFile = fomStore.getFiles().find(f => f.name === name || f.fileName === name);
+      if (targetFile) {
+        window.__switchToModule?.(targetFile.name);
+      }
     }
   }
 

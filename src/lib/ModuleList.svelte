@@ -37,7 +37,7 @@ function handleSelect(name) {
 
 onMount(() => {
   window.__moduleListComponent = { setFiles, setSelected };
-  const input = document.getElementById('treeFilter');
+  const input = /** @type {HTMLInputElement | null} */ (document.getElementById('treeFilter'));
   if (input) {
     filterQuery = input.value || '';
     const handleInput = () => {

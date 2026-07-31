@@ -120,9 +120,6 @@ function toggle(e) {
     border-radius: 8px;
     flex-shrink: 0;
   }
-  .tree-children {
-    /* children container — no visual boundary needed */
-  }
   .tree-children.collapsed {
     display: none;
   }

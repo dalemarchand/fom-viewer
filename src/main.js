@@ -188,7 +188,7 @@ function debugBack(msg, ...args) {
 // ============================================================================
 
 async function saveToStorage() {
-  const fileData = state.files.map(f => ({ name: f.name, xml: f.xml }));
+  const fileData = state.files.map(f => ({ name: f.fileName || f.name, xml: f.xml }));
   const sel = state.selectedItem;
   const uiState = { currentTab: state.currentTab, currentSubTab: state.currentSubTab, selectedItem: sel ? { name: sel.name, type: sel.type } : null, sortEnabled: state.sortEnabled, issuesFilter: state.issuesFilter };
   try {
@@ -273,6 +273,21 @@ async function loadFromStorage() {
           });
         } catch (e) {
           console.warn('Failed to initialize preloaded database cache:', e);
+        }
+      } else if (isVersionMismatch || !storedVersion) {
+        try {
+          await storage.saveAppVersion(currentVersion);
+          if (isVersionMismatch) {
+            await storage.saveUiState({
+              currentTab: 'overview',
+              currentSubTab: 'basic',
+              selectedItem: null,
+              sortEnabled: 'asc',
+              issuesFilter: 'all'
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to update app version in storage:', e);
         }
       }
 
@@ -382,7 +397,10 @@ async function loadFromStorage() {
       for (const f of fileData) {
         try {
           const fom = await parseInWorker(f.xml);
-          fom.name = f.name;
+          fom.fileName = f.name;
+          if (!fom.name || fom.name === 'Unknown') {
+            fom.name = f.name;
+          }
           fom.xml = f.xml;
           state.files = [...state.files, fom];
         }
@@ -1185,6 +1203,10 @@ async function loadFiles(files) {
     try {
       const text = await file.text();
       const fom = await parseInWorker(text);
+      fom.fileName = file.name;
+      if (!fom.name || fom.name === 'Unknown') {
+        fom.name = file.name;
+      }
       state.files = [...state.files, fom];
       await addRecentFile(file.name, {
         objects: fom.objectClasses?.length || 0,

@@ -4,6 +4,7 @@
   import * as fomStore from './stores/fomStore.svelte.js';
   import * as appspaceStore from './stores/appspaceStore.svelte.js';
 
+  /** @type {{ ontoggledrawer?: (e?: MouseEvent) => void }} */
   let { ontoggledrawer = () => {} } = $props();
 
   let isMobile = $state(false);
@@ -27,9 +28,10 @@
     // Check if filenames and content hashes match
     const preloadedMap = new Map(preloadedFiles.map(f => [f.name, f.hash]));
     for (const f of activeFiles) {
-      if (!preloadedMap.has(f.name)) return true;
+      const matchKey = (f.fileName && preloadedMap.has(f.fileName)) ? f.fileName : f.name;
+      if (!preloadedMap.has(matchKey)) return true;
       const activeHash = window.hashCode ? window.hashCode(f.xml) : '';
-      if (preloadedMap.get(f.name) !== activeHash) return true;
+      if (preloadedMap.get(matchKey) !== activeHash) return true;
     }
     
     // Compare appspace
@@ -61,7 +63,7 @@
     if (typeof window.applyTheme === 'function') {
       window.applyTheme(theme);
     }
-    const sel = document.getElementById('overflowThemeSelect');
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById('overflowThemeSelect'));
     if (sel) {
       sel.value = theme;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
@@ -69,7 +71,7 @@
   }
 
   function handleNativeSelectChange(e) {
-    const theme = e.target.value;
+    const theme = /** @type {HTMLSelectElement} */ (e.target).value;
     currentTheme = theme;
     if (typeof window.applyTheme === 'function') {
       window.applyTheme(theme);

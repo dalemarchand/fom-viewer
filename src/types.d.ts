@@ -162,3 +162,32 @@ export interface AppspaceData {
   interactions?: AppspaceEntry[];
   unknown?: AppspaceEntry[];
 }
+
+declare global {
+  interface Window {
+    hashCode?: (str: string) => string;
+    applyTheme?: (theme: string) => void;
+    navigateToLocation?: (loc: any) => void;
+    __switchToModule?: (source: string) => void;
+    state?: any;
+    showIssueDetail?: (id: string) => void;
+    __selectTreeItem?: (item: any) => void;
+    __moduleListComponent?: any;
+    __dataTypeListComponent?: any;
+    __onSearchItemClick?: (item: any) => void;
+    __treeViewComponent?: any;
+    updateUI?: (skipAutoSelect?: boolean) => void;
+    parseAppspaceFile?: (content: string, filename?: string) => any;
+    __showDetail?: (name: string, type: string, addToHistory?: boolean) => void;
+    __showDataType?: (typeName: string, preferredCategory?: string) => void;
+    __getPreferredType?: (typeName: string) => string;
+    __moduleBodyHtml?: string;
+    __appspaceBodyHtml?: string;
+    __findNoteUsages?: (noteName: string) => any[];
+    __findDataTypeUsages?: (typeName: string) => any[];
+    loadFiles?: (files: any) => void;
+    __mergedFOM?: any;
+    __findDimensionByName?: (name: string) => any;
+  }
+}
+

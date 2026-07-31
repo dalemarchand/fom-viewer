@@ -43,7 +43,7 @@
 
   function handleLoadRecent() {
     const recents = document.querySelectorAll('.recent-file-item');
-    if (recents.length > 0) recents[0].click();
+    if (recents.length > 0) (/** @type {HTMLElement} */ (recents[0])).click();
   }
 
   function handleDragOver(e) {

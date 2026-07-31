@@ -190,6 +190,8 @@ export async function saveAll(files, uiState, appspaceData, appspaceSubTab) {
   }
   if (appVersionVal) {
     store.put(appVersionVal);
+  } else {
+    store.put({ name: '__appVersion__', version: '__VERSION__' });
   }
   if (appspaceData) {
     store.put({ name: '__appspace__', data: appspaceData, subTab: appspaceSubTab });
