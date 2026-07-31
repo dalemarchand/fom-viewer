@@ -15,7 +15,7 @@
         data-issue-id={issue.id}
         style="border:none;background:var(--bg-tertiary);width:100%;text-align:left;font-family:inherit;font-size:inherit;color:inherit;cursor:pointer;padding:4px 8px;margin:2px 0;border-radius:4px;font-size:13px;display:flex;align-items:center;gap:6px;"
         onclick={() => {
-          const el = document.querySelector(`.related-issue[data-issue-id="${issue.id}"]`);
+          const el = /** @type {HTMLElement | null} */ (document.querySelector(`.related-issue[data-issue-id="${issue.id}"]`));
           if (el) el.click();
         }}
       >

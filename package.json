@@ -11,7 +11,7 @@
     "build:dev": "vite build --mode development",
     "build:map": "vite build --sourcemap && cp dist/index.html dist/fom-viewer.html && cp dist/fom-viewer.html fom-viewer.html && node -e \"const fs = require('fs'); ['dist/fom-viewer.html', 'fom-viewer.html'].forEach(f => { if (fs.existsSync(f)) { const h = fs.readFileSync(f, 'utf8'); fs.writeFileSync(f, h.replace(/new Worker/g, 'new window.Worker')); } })\"",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && svelte-check",
     "test": "cd test && npm test",
     "test:combined": "npm run build && cd test && npm run test -- --combined",
     "test:unit": "vitest run",

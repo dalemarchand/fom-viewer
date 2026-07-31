@@ -38,7 +38,7 @@
   );
 
   function handleViewAll() {
-    const tab = document.querySelector('.tab[data-tab="issues"]');
+    const tab = /** @type {HTMLElement | null} */ (document.querySelector('.tab[data-tab="issues"]'));
     if (tab) tab.click();
   }
 </script>

@@ -2,7 +2,7 @@
   import CollapsibleSection from '../CollapsibleSection.svelte';
   import RelatedIssues from '../RelatedIssues.svelte';
 
-  let { item, parents = [], issues = [], widgetBadges = {}, appspaceName = '' } = $props();
+  let { item, parents = [], usages = [], issues = [], mergedFOM = null, widgetBadges = {}, appspaceName = '' } = $props();
   let safeParams = $derived(item?.parameters?.filter(p => p && typeof p === 'object') || []);
 
   function transportLink(transportation) {

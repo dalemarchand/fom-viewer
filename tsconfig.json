@@ -12,5 +12,5 @@
     "skipLibCheck": true,
     "types": ["svelte"]
   },
-  "include": ["src/lib/**/*.js", "src/types.d.ts"]
+  "include": ["src/lib/**/*.js", "src/lib/**/*.svelte", "src/types.d.ts"]
 }

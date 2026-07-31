@@ -63,21 +63,21 @@ export function updateIssueChipLabels(allCount, errorCount, warningCount) {
 }
   $effect(() => {
     const _ = ui.currentTab;
-    document.querySelectorAll('#dataTypeTabs .subtab').forEach(chip => {
+    (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#dataTypeTabs .subtab'))).forEach(chip => {
       chip.classList.toggle('active', ui.currentSubTab === chip.dataset.subtab);
     });
   });
 
   $effect(() => {
     const _ = ui.currentTab;
-    document.querySelectorAll('#appspaceTabs .subtab').forEach(chip => {
+    (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#appspaceTabs .subtab'))).forEach(chip => {
       chip.classList.toggle('active', ui.appspaceSubTab === chip.dataset.subtab);
     });
   });
 
   $effect(() => {
     const _ = ui.currentTab;
-    document.querySelectorAll('#issuesTabs .subtab').forEach(chip => {
+    (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#issuesTabs .subtab'))).forEach(chip => {
       chip.classList.toggle('active', issueStore.getIssuesFilter() === chip.dataset.subtab);
     });
   });

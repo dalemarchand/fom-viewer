@@ -148,7 +148,7 @@ onMount(() => {
     {#if flatItems.length > 0}
       <VirtualList
         height={containerHeight}
-        width={containerWidth || '100%'}
+        width={containerWidth ? String(containerWidth) : '100%'}
         itemCount={flatItems.length}
         itemSize={ITEM_SIZE}
         overscanCount={10}
