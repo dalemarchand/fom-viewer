@@ -110,4 +110,45 @@ describe('appspace classification logic', () => {
     expect(res.interactions).toHaveLength(0);
     expect(res.unknown).toHaveLength(1);
   });
+
+  it('correctly differentiates identical base object and interaction class names by full hierarchical name', () => {
+    const objs = [
+      { name: 'HLAobjectRoot.Manager' },
+      { name: 'HLAobjectRoot.HLAmanager.HLAfederate' }
+    ];
+    const ints = [
+      { name: 'HLAinteractionRoot.Manager' },
+      { name: 'HLAinteractionRoot.HLAmanager.HLAfederate' }
+    ];
+
+    const entries = [
+      { className: 'HLAobjectRoot.Manager', apps: ['AppObject'] },
+      { className: 'HLAinteractionRoot.Manager', apps: ['AppInteraction'] },
+      { className: 'Manager', apps: ['AppShared'] }
+    ];
+
+    const res = classifyAppspaceEntries(entries, objs, ints);
+
+    // Full hierarchical name matching
+    const objectManager = res.objects.find(e => e.className === 'HLAobjectRoot.Manager');
+    expect(objectManager).toBeDefined();
+    expect(objectManager.matchedClass).toBe('HLAobjectRoot.Manager');
+
+    const interactionManager = res.interactions.find(e => e.className === 'HLAinteractionRoot.Manager');
+    expect(interactionManager).toBeDefined();
+    expect(interactionManager.matchedClass).toBe('HLAinteractionRoot.Manager');
+
+    // Ensure full hierarchical names didn't cross-match
+    expect(res.objects.find(e => e.className === 'HLAinteractionRoot.Manager')).toBeUndefined();
+    expect(res.interactions.find(e => e.className === 'HLAobjectRoot.Manager')).toBeUndefined();
+
+    // Short/base name matching matches both
+    const sharedObject = res.objects.find(e => e.className === 'Manager');
+    const sharedInteraction = res.interactions.find(e => e.className === 'Manager');
+    expect(sharedObject).toBeDefined();
+    expect(sharedObject.matchedClass).toBe('HLAobjectRoot.Manager');
+    expect(sharedInteraction).toBeDefined();
+    expect(sharedInteraction.matchedClass).toBe('HLAinteractionRoot.Manager');
+  });
 });
+

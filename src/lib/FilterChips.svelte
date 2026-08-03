@@ -2,6 +2,7 @@
 import { ui } from './stores/uiStore.svelte.js';
 import * as issueStore from './stores/issueStore.svelte.js';
 import * as fomStore from './stores/fomStore.svelte.js';
+import * as appspaceStore from './stores/appspaceStore.svelte.js';
 
 let allIssues = $derived(issueStore.getIssues());
 let issueAllCount = $derived(allIssues.length);
@@ -9,6 +10,7 @@ let issueErrorCount = $derived(allIssues.filter(i => i.severity === 'error').len
 let issueWarningCount = $derived(allIssues.filter(i => i.severity === 'warning').length);
 
 let mergedFOM = $derived(fomStore.getMergedFOM());
+let currentAppspace = $derived(appspaceStore.getAppspace());
 
 let dtCounts = $derived({
   basic: mergedFOM?.dataTypes?.basic?.length ?? 0,
@@ -17,6 +19,12 @@ let dtCounts = $derived({
   fixed: mergedFOM?.dataTypes?.fixed?.length ?? 0,
   enum: mergedFOM?.dataTypes?.enum?.length ?? 0,
   variant: mergedFOM?.dataTypes?.variant?.length ?? 0,
+});
+
+let appspaceCounts = $derived({
+  objects: currentAppspace?.entries?.length ?? 0,
+  interactions: currentAppspace?.interactions?.length ?? 0,
+  unknown: currentAppspace?.unknown?.length ?? 0,
 });
 
 const DATA_TYPE_CHIPS = [
@@ -29,9 +37,9 @@ const DATA_TYPE_CHIPS = [
 ];
 
 const APPSPACE_CHIPS = [
-  { id: 'objects', label: 'Objects (0)' },
-  { id: 'interactions', label: 'Interactions (0)' },
-  { id: 'unknown', label: 'Unknown (0)' },
+  { id: 'objects', get label() { return `Objects (${appspaceCounts.objects})`; } },
+  { id: 'interactions', get label() { return `Interactions (${appspaceCounts.interactions})`; } },
+  { id: 'unknown', get label() { return `Unknown (${appspaceCounts.unknown})`; } },
 ];
 
 const ISSUE_CHIPS = [

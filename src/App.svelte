@@ -264,7 +264,9 @@ onMount(() => {
             <span class="sidebar-title">{sidebarTitle}</span>
             <span class="sidebar-count">{sidebarCount}</span>
           </div>
-          <FilterChips />
+          {#if currentTab !== 'appspaces'}
+            <FilterChips />
+          {/if}
           <div id="treeControls" class="tree-controls" style="display:none">
             <input type="text" id="treeFilter" class="tree-filter" placeholder="Filter items..." oninput={handleTreeFilterInput} />
           </div>
@@ -279,6 +281,9 @@ onMount(() => {
           </div>
         </div>
         <div class="detail">
+          {#if currentTab === 'appspaces'}
+            <FilterChips />
+          {/if}
           <DetailPanel />
         </div>
       {/if}

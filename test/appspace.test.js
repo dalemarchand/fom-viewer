@@ -176,6 +176,18 @@ async function test_AppspaceFeature() {
       throw new Error('Appspaces tab should be visible');
     }
 
+    // Verify appspace filter chips container is physically visible to the user
+    const appspaceChipsVisible = await page.evaluate(() => {
+      const container = document.getElementById('appspaceTabs');
+      if (!container) return false;
+      const rect = container.getBoundingClientRect();
+      const style = window.getComputedStyle(container);
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.height > 0 && rect.width > 0;
+    });
+    if (!appspaceChipsVisible) {
+      throw new Error('Expected #appspaceTabs filter chips to be physically visible on screen');
+    }
+
     // Verify Objects subtab is active and shows entries
     const objectsActive = await page.evaluate(() => {
       const activeTab = document.querySelector('#appspaceTabs .subtab.active');
