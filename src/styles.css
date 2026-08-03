@@ -389,6 +389,9 @@ header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
   overflow: hidden; 
   border: 1px solid var(--border); 
 }
+.detail-back-btn {
+  display: none;
+}
 .detail-header {
   padding: 20px 24px 16px;
   border-bottom: 1px solid var(--border);
