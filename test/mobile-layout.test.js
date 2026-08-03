@@ -111,6 +111,17 @@ async function test_MobileLayout() {
     console.log('  Viewport classes after clicking Back to List:', viewState);
     if (!viewState.isList) throw new Error('Expected viewport to return to list view after clicking Back to List');
 
+    // 7. Verify Back to List button is hidden on desktop viewports (>= 768px)
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.waitForTimeout(300);
+    const desktopBackBtnHidden = await page.evaluate(() => {
+      const btn = document.querySelector('[data-testid="detailBackBtn"]');
+      if (!btn) return true;
+      return window.getComputedStyle(btn).display === 'none';
+    });
+    console.log('  Back to List button hidden on desktop viewport:', desktopBackBtnHidden);
+    if (!desktopBackBtnHidden) throw new Error('Expected Back to List button to be hidden on desktop viewports (>= 768px)');
+
     console.log('\n✓ Mobile layout test cases passed!');
     return true;
   } catch (error) {
