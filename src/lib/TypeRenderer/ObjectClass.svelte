@@ -204,8 +204,7 @@
     table-layout: fixed;
   }
   .attr-table td {
-    word-wrap: break-word;
     word-break: normal;
-    overflow-wrap: break-word;
+    overflow-wrap: anywhere;
   }
 </style>
