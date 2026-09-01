@@ -4,6 +4,21 @@
 
   let { item, type = 'object', parents = [], usages = [], issues = [], mergedFOM = null, widgetBadges = {}, appspaceName = '' } = $props();
   let safeAttrs = $derived(item?.attributes?.filter(a => a && typeof a === 'object') || []);
+  let attrLevels = $derived.by(() => {
+    const list = [];
+    if (safeAttrs.length > 0) {
+      list.push({ class: item, attrs: safeAttrs, isCurrent: true });
+    }
+    for (let i = parents.length - 1; i >= 0; i--) {
+      const p = parents[i];
+      const pAttrs = p.attributes?.filter(a => a && typeof a === 'object') || [];
+      if (pAttrs.length > 0) {
+        list.push({ class: p, attrs: pAttrs, isCurrent: false });
+      }
+    }
+    return list;
+  });
+  let totalAttrs = $derived(attrLevels.reduce((sum, lvl) => sum + lvl.attrs.length, 0));
 
   function transportLink(transportation) {
     if (!transportation) return '';
@@ -117,8 +132,8 @@
   </table>
 </div>
 
-{#if safeAttrs.length > 0}
-  <CollapsibleSection title="Attributes" count={safeAttrs.length} threshold={0}>
+{#if totalAttrs > 0}
+  <CollapsibleSection title="Attributes" count={totalAttrs} threshold={0}>
   <table class="attr-table">
     <tbody>
     <tr>
@@ -126,28 +141,39 @@
       <th>Update Type</th><th>Update Condition</th><th>Notes</th><th>Ownership</th>
       <th>Transportation</th><th>Dimensions</th><th>Order</th>
     </tr>
-    {#each safeAttrs as p}
-      <tr>
-        <td>{p?.name ?? ''}</td>
-        <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
-        <td>{p?.sharing ?? ''}</td>
-        <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
-        <td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>
-        <td>{p?.updateType ?? ''}</td><td>{@html updateConditionHtml(p?.updateCondition, p?.updateConditionNotes)}</td>
-        <td>
-          {#if p?.notes}
-            <ul style="list-style:none;margin:0;padding:0;">
-              {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
-                <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
-              {/each}
-            </ul>
+    {#each attrLevels as level}
+      <tr class="level-header">
+        <th colspan="12" style="background: var(--bg-secondary, rgba(0,0,0,0.03)); text-transform: none; font-size: 13px; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); padding: 6px 10px;">
+          {#if level.isCurrent}
+            Current Class: <span style="font-weight: bold;">{level.class.name}</span>
+          {:else}
+            Inherited from <span style="color: var(--muted-foreground); font-weight: normal;">{level.class.name}</span>
           {/if}
-        </td>
-        <td>{p?.ownership ?? ''}</td>
-        <td>{@html transportLink(p?.transportation)}</td>
-        <td>{@html dimsHtml(p?.dimensions)}</td>
-        <td>{p?.order ?? ''}</td>
+        </th>
       </tr>
+      {#each level.attrs as p}
+        <tr>
+          <td>{p?.name ?? ''}</td>
+          <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
+          <td>{p?.sharing ?? ''}</td>
+          <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
+          <td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>
+          <td>{p?.updateType ?? ''}</td><td>{@html updateConditionHtml(p?.updateCondition, p?.updateConditionNotes)}</td>
+          <td>
+            {#if p?.notes}
+              <ul style="list-style:none;margin:0;padding:0;">
+                {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
+                  <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
+                {/each}
+              </ul>
+            {/if}
+          </td>
+          <td>{p?.ownership ?? ''}</td>
+          <td>{@html transportLink(p?.transportation)}</td>
+          <td>{@html dimsHtml(p?.dimensions)}</td>
+          <td>{p?.order ?? ''}</td>
+        </tr>
+      {/each}
     {/each}
     </tbody>
   </table>

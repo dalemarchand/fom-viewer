@@ -4,6 +4,21 @@
 
   let { item, parents = [], usages = [], issues = [], mergedFOM = null, widgetBadges = {}, appspaceName = '' } = $props();
   let safeParams = $derived(item?.parameters?.filter(p => p && typeof p === 'object') || []);
+  let paramLevels = $derived.by(() => {
+    const list = [];
+    if (safeParams.length > 0) {
+      list.push({ class: item, params: safeParams, isCurrent: true });
+    }
+    for (let i = parents.length - 1; i >= 0; i--) {
+      const p = parents[i];
+      const pParams = p.parameters?.filter(a => a && typeof a === 'object') || [];
+      if (pParams.length > 0) {
+        list.push({ class: p, params: pParams, isCurrent: false });
+      }
+    }
+    return list;
+  });
+  let totalParams = $derived(paramLevels.reduce((sum, lvl) => sum + lvl.params.length, 0));
 
   function transportLink(transportation) {
     if (!transportation) return '';
@@ -101,31 +116,42 @@
   </table>
 </div>
 
-{#if safeParams.length > 0}
-  <CollapsibleSection title="Parameters" count={safeParams.length} threshold={0}>
+{#if totalParams > 0}
+  <CollapsibleSection title="Parameters" count={totalParams} threshold={0}>
   <table class="attr-table">
     <tbody>
     <tr>
       <th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th>
       <th>Order</th><th>Notes</th>
     </tr>
-    {#each safeParams as p}
-      <tr>
-        <td>{p?.name ?? ''}</td>
-        <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
-        <td>{p?.sharing ?? ''}</td>
-        <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
-        <td>{p?.order ?? ''}</td>
-        <td>
-          {#if p?.notes}
-            <ul style="list-style:none;margin:0;padding:0;">
-              {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
-                <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
-              {/each}
-            </ul>
+    {#each paramLevels as level}
+      <tr class="level-header">
+        <th colspan="6" style="background: var(--bg-secondary, rgba(0,0,0,0.03)); text-transform: none; font-size: 13px; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); padding: 6px 10px;">
+          {#if level.isCurrent}
+            Current Class: <span style="font-weight: bold;">{level.class.name}</span>
+          {:else}
+            Inherited from <span style="color: var(--muted-foreground); font-weight: normal;">{level.class.name}</span>
           {/if}
-        </td>
+        </th>
       </tr>
+      {#each level.params as p}
+        <tr>
+          <td>{p?.name ?? ''}</td>
+          <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
+          <td>{p?.sharing ?? ''}</td>
+          <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
+          <td>{p?.order ?? ''}</td>
+          <td>
+            {#if p?.notes}
+              <ul style="list-style:none;margin:0;padding:0;">
+                {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
+                  <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
+                {/each}
+              </ul>
+            {/if}
+          </td>
+        </tr>
+      {/each}
     {/each}
     </tbody>
   </table>
