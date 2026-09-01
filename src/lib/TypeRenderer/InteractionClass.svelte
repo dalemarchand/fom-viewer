@@ -119,6 +119,15 @@
 {#if totalParams > 0}
   <CollapsibleSection title="Parameters" count={totalParams} threshold={0}>
   <table class="attr-table">
+    <colgroup>
+      <col style="width: 22%;">
+      <col style="width: 20%;">
+      <col style="width: 10%;">
+      <col style="width: 28%;">
+      <col style="width: 10%;">
+      <col style="width: 5%;">
+      <col style="width: 5%;">
+    </colgroup>
     <tbody>
     <tr>
       <th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th><th>Module</th>
@@ -163,3 +172,14 @@
 <RelatedIssues issues={issues} />
 </CollapsibleSection>
 {/if}
+
+<style>
+  .attr-table {
+    table-layout: fixed;
+  }
+  .attr-table td {
+    word-wrap: break-word;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+</style>
