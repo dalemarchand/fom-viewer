@@ -20,6 +20,44 @@
   });
   let totalParams = $derived(paramLevels.reduce((sum, lvl) => sum + lvl.params.length, 0));
 
+  let activeColumns = $derived.by(() => {
+    let hasSharing = false, hasModule = false, hasOrder = false, hasNotes = false;
+    for (const lvl of paramLevels) {
+      for (const p of lvl.params) {
+        if (p.sharing) hasSharing = true;
+        if (p._source) hasModule = true;
+        if (p.order) hasOrder = true;
+        if (p.notes) hasNotes = true;
+      }
+    }
+    return { sharing: hasSharing, module: hasModule, order: hasOrder, notes: hasNotes };
+  });
+
+  let colsConfig = $derived.by(() => {
+    const list = [
+      { width: 22, name: 'Name', show: true },
+      { width: 20, name: 'Data Type', show: true },
+      { width: 10, name: 'Sharing', show: activeColumns.sharing },
+      { width: 28, name: 'Semantics', show: true },
+      { width: 10, name: 'Module', show: activeColumns.module },
+      { width: 5, name: 'Order', show: activeColumns.order },
+      { width: 5, name: 'Notes', show: activeColumns.notes }
+    ];
+    const active = list.filter(c => c.show);
+    const totalW = active.reduce((s, c) => s + c.width, 0);
+    for (const c of active) c.computedWidth = c.width * (100 / totalW);
+    return active;
+  });
+
+  let omittedCols = $derived.by(() => {
+    let omitted = [];
+    if (!activeColumns.sharing) omitted.push('Sharing');
+    if (!activeColumns.module) omitted.push('Module');
+    if (!activeColumns.order) omitted.push('Order');
+    if (!activeColumns.notes) omitted.push('Notes');
+    return omitted;
+  });
+
   function transportLink(transportation) {
     if (!transportation) return '';
     const merged = window.__mergedFOM;
@@ -120,22 +158,23 @@
   <CollapsibleSection title="Parameters" count={totalParams} threshold={0}>
   <table class="attr-table">
     <colgroup>
-      <col style="width: 22%;">
-      <col style="width: 20%;">
-      <col style="width: 10%;">
-      <col style="width: 28%;">
-      <col style="width: 10%;">
-      <col style="width: 5%;">
-      <col style="width: 5%;">
+      {#each colsConfig as c}
+        <col style="width: {c.computedWidth}%;">
+      {/each}
     </colgroup>
     <tbody>
     <tr>
-      <th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th><th>Module</th>
-      <th>Order</th><th>Notes</th>
+      <th>Name</th>
+      <th>Data Type</th>
+      {#if activeColumns.sharing}<th>Sharing</th>{/if}
+      <th>Semantics</th>
+      {#if activeColumns.module}<th>Module</th>{/if}
+      {#if activeColumns.order}<th>Order</th>{/if}
+      {#if activeColumns.notes}<th>Notes</th>{/if}
     </tr>
     {#each paramLevels as level}
       <tr class="level-header">
-        <th colspan="7" style="background: var(--bg-secondary, rgba(0,0,0,0.03)); text-transform: none; font-size: 13px; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); padding: 6px 10px;">
+        <th colspan={colsConfig.length} style="background: var(--bg-secondary, rgba(0,0,0,0.03)); text-transform: none; font-size: 13px; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); padding: 6px 10px;">
           {#if level.isCurrent}
             Current Class: <span style="font-weight: bold;">{level.class.name}</span>
           {:else}
@@ -147,10 +186,11 @@
         <tr>
           <td>{p?.name ?? ''}</td>
           <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
-          <td>{p?.sharing ?? ''}</td>
+          {#if activeColumns.sharing}<td>{p?.sharing ?? ''}</td>{/if}
           <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
-          <td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>
-          <td>{p?.order ?? ''}</td>
+          {#if activeColumns.module}<td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>{/if}
+          {#if activeColumns.order}<td>{p?.order ?? ''}</td>{/if}
+          {#if activeColumns.notes}
           <td>
             {#if p?.notes}
               <ul style="list-style:none;margin:0;padding:0;">
@@ -160,11 +200,17 @@
               </ul>
             {/if}
           </td>
+          {/if}
         </tr>
       {/each}
     {/each}
     </tbody>
   </table>
+  {#if omittedCols.length > 0}
+    <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px; padding-left: 4px;">
+      Empty columns omitted: {omittedCols.join(', ')}
+    </div>
+  {/if}
   </CollapsibleSection>
 {/if}
 
