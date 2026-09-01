@@ -135,6 +135,20 @@
 {#if totalAttrs > 0}
   <CollapsibleSection title="Attributes" count={totalAttrs} threshold={0}>
   <table class="attr-table">
+    <colgroup>
+      <col style="width: 12%;"> <!-- Name -->
+      <col style="width: 12%;"> <!-- Data Type -->
+      <col style="width: 5%;">  <!-- Sharing -->
+      <col style="width: 20%;"> <!-- Semantics -->
+      <col style="width: 8%;">  <!-- Module -->
+      <col style="width: 8%;">  <!-- Update Type -->
+      <col style="width: 10%;"> <!-- Update Condition -->
+      <col style="width: 5%;">  <!-- Notes -->
+      <col style="width: 5%;">  <!-- Ownership -->
+      <col style="width: 5%;">  <!-- Transportation -->
+      <col style="width: 5%;">  <!-- Dimensions -->
+      <col style="width: 5%;">  <!-- Order -->
+    </colgroup>
     <tbody>
     <tr>
       <th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th><th>Module</th>
@@ -184,3 +198,13 @@
 <RelatedIssues issues={issues} />
 </CollapsibleSection>
 {/if}
+
+<style>
+  .attr-table {
+    table-layout: fixed;
+  }
+  .attr-table td {
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+</style>
