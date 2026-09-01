@@ -1,1 +1,10 @@
-# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n## [Unreleased]\n\n### Added\n- **UI Enhancement**: In the Detail Panel for Object Classes and Interaction Classes, inherited attributes and parameters are now displayed in a grouped manner within the Attributes/Parameters table. Properties are rendered from the top-down starting with the current class's native properties, followed by the immediate parent's properties, all the way up to the root class. Each level is clearly demarcated by an inline header row indicating where the properties are inherited from.
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Added
+- **UI Enhancement**: In the Detail Panel for Object Classes and Interaction Classes, inherited attributes and parameters are now displayed in a grouped manner within the Attributes/Parameters table. Properties are rendered from the top-down starting with the current class's native properties, followed by the immediate parent's properties, all the way up to the root class. Each level is clearly demarcated by an inline header row indicating where the properties are inherited from.
+- **UI Enhancement**: Added a "Module" column to the Interaction Class parameters table to mirror the Object Class attributes view, explicitly displaying which module each parameter is associated with.
+- **UI Enhancement**: Attributes and parameters within the Details Panel are now sorted alphabetically by name within each of their respective hierarchical groups.
