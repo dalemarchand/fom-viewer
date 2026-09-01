@@ -7,4 +7,4 @@ fom-worker*.js
 mockup.html
 .opencode/
 .swarm/
-.codenomad/
+.codenomad/fom-viewer.html

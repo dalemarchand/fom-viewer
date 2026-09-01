@@ -7,13 +7,13 @@
   let attrLevels = $derived.by(() => {
     const list = [];
     if (safeAttrs.length > 0) {
-      list.push({ class: item, attrs: safeAttrs, isCurrent: true });
+      list.push({ class: item, attrs: [...safeAttrs].sort((a, b) => (a.name || '').localeCompare(b.name || '')), isCurrent: true });
     }
     for (let i = parents.length - 1; i >= 0; i--) {
       const p = parents[i];
       const pAttrs = p.attributes?.filter(a => a && typeof a === 'object') || [];
       if (pAttrs.length > 0) {
-        list.push({ class: p, attrs: pAttrs, isCurrent: false });
+        list.push({ class: p, attrs: [...pAttrs].sort((a, b) => (a.name || '').localeCompare(b.name || '')), isCurrent: false });
       }
     }
     return list;

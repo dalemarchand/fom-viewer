@@ -63,7 +63,6 @@ For multi-step tasks, state a brief plan:
 - **Svelte 5 runes-based architecture**: Reactive stores and components compiled to DOM updates.
 - **Client-side only**: Runs entirely in the browser, no server required.
 - **Single-file distribution**: Compiles to `fom-viewer.html` at the root.
-- **Committed HTML size limit**: The root `fom-viewer.html` committed to git must be a non-bundled build (less than 1.5 MB).
 
 ---
 
