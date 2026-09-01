@@ -121,12 +121,12 @@
   <table class="attr-table">
     <tbody>
     <tr>
-      <th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th>
+      <th>Name</th><th>Data Type</th><th>Sharing</th><th>Semantics</th><th>Module</th>
       <th>Order</th><th>Notes</th>
     </tr>
     {#each paramLevels as level}
       <tr class="level-header">
-        <th colspan="6" style="background: var(--bg-secondary, rgba(0,0,0,0.03)); text-transform: none; font-size: 13px; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); padding: 6px 10px;">
+        <th colspan="7" style="background: var(--bg-secondary, rgba(0,0,0,0.03)); text-transform: none; font-size: 13px; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); padding: 6px 10px;">
           {#if level.isCurrent}
             Current Class: <span style="font-weight: bold;">{level.class.name}</span>
           {:else}
@@ -140,6 +140,7 @@
           <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
           <td>{p?.sharing ?? ''}</td>
           <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
+          <td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>
           <td>{p?.order ?? ''}</td>
           <td>
             {#if p?.notes}
