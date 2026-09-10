@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, test, '**']
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -11,7 +11,6 @@ env:
 
 jobs:
   test:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +25,8 @@ jobs:
         run: npm run lint
       - name: Run typecheck
         run: npm run typecheck
+      - name: Run unit tests
+        run: npm run test:unit
       - name: Build combined file
         run: npm run build
       - name: Run standard tests
