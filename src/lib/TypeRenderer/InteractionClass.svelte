@@ -162,49 +162,62 @@
         <col style="width: {c.computedWidth}%;">
       {/each}
     </colgroup>
-    <tbody>
-    <tr>
-      <th>Name</th>
-      <th>Data Type</th>
-      {#if activeColumns.sharing}<th>Sharing</th>{/if}
-      <th>Semantics</th>
-      {#if activeColumns.module}<th>Module</th>{/if}
-      {#if activeColumns.order}<th>Order</th>{/if}
-      {#if activeColumns.notes}<th>Notes</th>{/if}
-    </tr>
-    {#each paramLevels as level}
-      <tr class="level-header">
-        <th colspan={colsConfig.length} style="background: var(--bg-secondary, rgba(0,0,0,0.03)); text-transform: none; font-size: 13px; font-weight: 600; color: var(--foreground); border-bottom: 1px solid var(--border); padding: 6px 10px;">
-          {#if level.isCurrent}
-            Current Class: <span style="font-weight: bold;">{level.class.name}</span>
-          {:else}
-            Inherited from <span style="color: var(--muted-foreground); font-weight: normal;">{level.class.name}</span>
-          {/if}
-        </th>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Data Type</th>
+        {#if activeColumns.sharing}<th>Sharing</th>{/if}
+        <th>Semantics</th>
+        {#if activeColumns.module}<th>Module</th>{/if}
+        {#if activeColumns.order}<th>Order</th>{/if}
+        {#if activeColumns.notes}<th>Notes</th>{/if}
       </tr>
-      {#each level.params as p}
-        <tr>
-          <td>{p?.name ?? ''}</td>
-          <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
-          {#if activeColumns.sharing}<td>{p?.sharing ?? ''}</td>{/if}
-          <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
-          {#if activeColumns.module}<td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>{/if}
-          {#if activeColumns.order}<td>{p?.order ?? ''}</td>{/if}
-          {#if activeColumns.notes}
-          <td>
-            {#if p?.notes}
-              <ul style="list-style:none;margin:0;padding:0;">
-                {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
-                  <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
-                {/each}
-              </ul>
-            {/if}
-          </td>
-          {/if}
+    </thead>
+    {#each paramLevels as level, idx}
+      <tbody class="inheritance-group {level.isCurrent ? 'current-level' : 'inherited-level'} {idx > 0 ? 'subsequent-level' : ''}">
+        <tr class="level-header">
+          <th scope="rowgroup" colspan={colsConfig.length}>
+            <div class="level-header-content">
+              <div class="level-header-left">
+                {#if level.isCurrent}
+                  <span class="level-badge badge-current">CURRENT CLASS</span>
+                  <span class="level-class-name">{level.class.name}</span>
+                {:else}
+                  <span class="level-badge badge-inherited">INHERITED FROM</span>
+                  <button type="button" class="clickable-item level-class-name" onclick={() => window.__showDetail(level.class.name, 'interactions', true)}>
+                    {level.class.name}
+                  </button>
+                {/if}
+              </div>
+              <div class="level-header-right">
+                <span class="level-count-pill">{level.params.length} {level.params.length === 1 ? 'parameter' : 'parameters'}</span>
+              </div>
+            </div>
+          </th>
         </tr>
-      {/each}
+        {#each level.params as p}
+          <tr>
+            <td>{p?.name ?? ''}</td>
+            <td>{#if p?.dataType}<button type="button" class="clickable-item" onclick={() => window.__showDataType(p.dataType, window.__getPreferredType(p.dataType))}>{p.dataType}</button>{/if}</td>
+            {#if activeColumns.sharing}<td>{p?.sharing ?? ''}</td>{/if}
+            <td style="max-width:300px;word-wrap:break-word;white-space:pre-wrap;">{p?.semantics ?? ''}</td>
+            {#if activeColumns.module}<td>{#if p?._source}<button type="button" class="clickable-item" onclick={() => window.__switchToModule(p._source)}>{p._source}</button>{/if}</td>{/if}
+            {#if activeColumns.order}<td>{p?.order ?? ''}</td>{/if}
+            {#if activeColumns.notes}
+            <td>
+              {#if p?.notes}
+                <ul style="list-style:none;margin:0;padding:0;">
+                  {#each (p.notes || '').split(/\s+/).filter(Boolean) as note}
+                    <li><button type="button" class="clickable-item" onclick={() => window.__showDetail(note, 'notes', true)}>{note}</button></li>
+                  {/each}
+                </ul>
+              {/if}
+            </td>
+            {/if}
+          </tr>
+        {/each}
+      </tbody>
     {/each}
-    </tbody>
   </table>
   {#if omittedCols.length > 0}
     <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px; padding-left: 4px;">
@@ -226,5 +239,86 @@
   .attr-table td {
     word-break: normal;
     overflow-wrap: anywhere;
+  }
+
+  /* Inheritance Group Delineation (Option 1) */
+  .attr-table tr.level-header th {
+    background: var(--bg-primary);
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .attr-table tr.level-header:hover th {
+    background: var(--bg-primary);
+  }
+
+  .attr-table tbody.current-level tr.level-header th {
+    border-left: 4px solid var(--accent);
+  }
+
+  .attr-table tbody.inherited-level tr.level-header th {
+    border-left: 4px solid var(--border-hover);
+  }
+
+  .attr-table tbody.subsequent-level tr.level-header th {
+    border-top: 2px solid var(--border-hover);
+  }
+
+  .level-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .level-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .level-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+    line-height: 1.2;
+    display: inline-block;
+  }
+
+  .badge-current {
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid var(--accent-dim);
+  }
+
+  .badge-inherited {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  .level-class-name {
+    font-size: 12px;
+    font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: var(--text-primary);
+  }
+
+  .level-count-pill {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
   }
 </style>
